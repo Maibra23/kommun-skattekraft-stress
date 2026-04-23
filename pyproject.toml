@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kommun-skattekraft-stress"
+version = "0.1.0"
+description = "Two-way fixed-effects panel model of Swedish municipal tax base growth with Streamlit dashboard."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "requests",
+    "pandas>=2.0",
+    "pyarrow",
+    "linearmodels>=6.0",
+    "streamlit>=1.30",
+    "plotly>=5.0",
+    "folium",
+    "branca",
+    "streamlit-folium",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

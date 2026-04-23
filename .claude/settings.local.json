@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(touch:*)",
+      "Bash(mv:*)",
+      "Bash(python:*)",
+      "Bash(.venv-test/Scripts/pip install:*)",
+      "Bash(rm:*)",
+      "Bash(.venv-test/Scripts/python.exe:*)"
+    ]
+  }
+}
