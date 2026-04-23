@@ -377,6 +377,7 @@ def _verify(df: pd.DataFrame, years: list[int]) -> None:
     Raises:
         ValueError: If hard checks fail.
     """
+    expected_groups = {"0-19", "20-64", "65+"}
     for year in years:
         year_df = df[df["year"] == year]
         n_unique = year_df["kommun_kod"].nunique()
@@ -384,6 +385,14 @@ def _verify(df: pd.DataFrame, years: list[int]) -> None:
             raise ValueError(
                 f"Expected {_EXPECTED_COMMUNES} unique kommun_kod for year {year}, "
                 f"got {n_unique}."
+            )
+        present_groups = set(year_df["age_group"].unique())
+        if present_groups != expected_groups:
+            missing = expected_groups - present_groups
+            raise ValueError(
+                f"Missing age groups {missing} for year {year}. "
+                "The API response may have omitted some age bands — "
+                "verify the Alder dimension codes and '100+' handling."
             )
 
     if 2024 not in years:

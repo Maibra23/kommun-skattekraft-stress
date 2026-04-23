@@ -105,11 +105,11 @@ def fetch_education(
         logger.info("Loading education from cache: %s", _CACHE_FILE)
         df = _load_cache(_CACHE_FILE)
     else:
-        table_url, contents_code, edu_level_codes, age_codes, sex_codes = (
+        table_url, contents_code, edu_dim, edu_level_codes, age_dim, age_codes, sex_dim, sex_codes = (
             _discover_table()
         )
         query_body = _build_query(
-            contents_code, edu_level_codes, age_codes, sex_codes, years
+            contents_code, edu_dim, edu_level_codes, age_dim, age_codes, sex_dim, sex_codes, years
         )
         df_raw = query_pxweb(table_url, query_body)
         df = _compute_edu_share(df_raw)
@@ -133,7 +133,7 @@ def fetch_education(
 # ---------------------------------------------------------------------------
 
 
-def _discover_table() -> tuple[str, str, list[str], list[str], list[str]]:
+def _discover_table() -> tuple[str, str, str, list[str], str, list[str], str, list[str]]:
     """Probe candidate UF0506 subtable URLs and return query parameters.
 
     For each candidate URL, fetches metadata and checks:
@@ -143,12 +143,14 @@ def _discover_table() -> tuple[str, str, list[str], list[str], list[str]]:
       - An age dimension covering 25–64 exists.
 
     Returns:
-        Tuple of (table_url, contents_code, edu_level_codes, age_codes,
-        sex_codes) where:
-          - edu_level_codes: all available UtbildningsNiva codes (full list,
-            to allow computing the denominator).
-          - age_codes: list of age codes covering 25–64.
-          - sex_codes: list of sex/total codes.
+        Tuple of:
+          (table_url, contents_code,
+           edu_dim_code, edu_level_codes,
+           age_dim_code, age_codes,
+           sex_dim_code, sex_codes)
+        where *_dim_code is the exact API dimension code name to use in queries,
+        and *_codes are the value lists to request.  edu_level_codes contains
+        ALL available education levels so the denominator can be computed.
 
     Raises:
         ValueError: If no candidate subtable is accessible or usable.
@@ -162,10 +164,9 @@ def _discover_table() -> tuple[str, str, list[str], list[str], list[str]]:
 
         logger.info("Probing education subtable: %s", url)
 
-        edu_codes = _get_dimension_codes(meta, "UtbildningsNiva")
-        if not edu_codes:
-            edu_codes = _get_dimension_codes(meta, "UtbildningNiva")
-        if not edu_codes:
+        # Discover education level dimension — track the actual API code name.
+        edu_dim_code, edu_codes = _resolve_edu_dim(meta)
+        if not edu_dim_code:
             logger.warning("No UtbildningsNiva dimension in %s; skipping.", url)
             continue
         if not _HIGH_EDU_LEVELS.issubset(set(edu_codes)):
@@ -176,12 +177,13 @@ def _discover_table() -> tuple[str, str, list[str], list[str], list[str]]:
             )
             continue
 
-        age_codes = _resolve_age_codes(meta)
-        if not age_codes:
+        age_result = _resolve_age_codes(meta)
+        if age_result is None:
             logger.warning("No 25-64 age codes found in %s; skipping.", url)
             continue
+        age_dim_code, age_codes = age_result
 
-        sex_codes = _resolve_sex_codes(meta)
+        sex_dim_code, sex_codes = _resolve_sex_codes(meta)
 
         contents_code = _discover_contents_code(meta, url)
         if contents_code is None:
@@ -191,12 +193,13 @@ def _discover_table() -> tuple[str, str, list[str], list[str], list[str]]:
             continue
 
         logger.info(
-            "Selected education subtable: %s  ContentsCode=%s  edu_levels=%s",
+            "Selected education subtable: %s  ContentsCode=%s  edu_dim=%s  levels=%s",
             url,
             contents_code,
+            edu_dim_code,
             edu_codes,
         )
-        return url, contents_code, edu_codes, age_codes, sex_codes
+        return url, contents_code, edu_dim_code, edu_codes, age_dim_code, age_codes, sex_dim_code, sex_codes
 
     raise ValueError(
         "No accessible UF0506 subtable found.  Tried: "
@@ -210,7 +213,7 @@ def _get_dimension_codes(metadata: dict, dimension_code: str) -> list[str]:
 
     Args:
         metadata: Table metadata dict returned by fetch_metadata.
-        dimension_code: The dimension code to look up.
+        dimension_code: The dimension code to look up (exact match).
 
     Returns:
         List of value code strings, or empty list if dimension is absent.
@@ -221,60 +224,77 @@ def _get_dimension_codes(metadata: dict, dimension_code: str) -> list[str]:
     return []
 
 
-def _resolve_age_codes(metadata: dict) -> list[str]:
-    """Find age codes covering the 25–64 bracket in table metadata.
+def _resolve_edu_dim(metadata: dict) -> tuple[str, list[str]]:
+    """Find the education level dimension code and its values in table metadata.
 
-    First looks for the aggregate code '25-64'.  If absent, returns all
-    available single-year age codes in the 25–64 range so the caller can
-    query them individually.
+    Tries several known SCB API names for the education dimension.
 
     Args:
         metadata: Table metadata dict returned by fetch_metadata.
 
     Returns:
-        List of age code strings to include in the query.
+        (dim_code, values) where dim_code is the exact API code name and
+        values is the list of available education level codes.  Returns
+        ("", []) if not found.
+    """
+    for candidate in ("UtbildningsNiva", "UtbildningNiva", "Utbildningsniva"):
+        codes = _get_dimension_codes(metadata, candidate)
+        if codes:
+            return candidate, codes
+    return "", []
+
+
+def _resolve_age_codes(metadata: dict) -> tuple[str, list[str]] | None:
+    """Find the age dimension code and codes covering the 25–64 bracket.
+
+    Tries several known SCB API names for the age dimension.  Prefers the
+    aggregate bracket code '25-64'; falls back to individual single-year codes.
+
+    Args:
+        metadata: Table metadata dict returned by fetch_metadata.
+
+    Returns:
+        (dim_code, age_codes) where dim_code is the exact API code name (e.g.
+        'Alder') and age_codes is the list to include in the query.
+        Returns None if no matching dimension is found.
     """
     for var in metadata.get("variables", []):
-        code = var.get("code", "")
-        if code.lower() not in ("alder", "ålder", "age"):
+        api_code = var.get("code", "")
+        if api_code.lower() not in ("alder", "ålder", "age"):
             continue
         values: list[str] = var.get("values", [])
-        # Prefer the aggregate bracket code.
         for preferred in _AGE_25_64_CODES:
             if preferred in values:
-                return [preferred]
-        # Fall back to individual single-year ages in the 25–64 range.
-        single_year = [
-            v for v in values
-            if v.isdigit() and 25 <= int(v) <= 64
-        ]
+                return api_code, [preferred]
+        single_year = [v for v in values if v.isdigit() and 25 <= int(v) <= 64]
         if single_year:
-            return single_year
-    return []
+            return api_code, single_year
+    return None
 
 
-def _resolve_sex_codes(metadata: dict) -> list[str]:
-    """Find the sex / total code from table metadata.
+def _resolve_sex_codes(metadata: dict) -> tuple[str, list[str]]:
+    """Find the sex dimension code and the preferred total codes.
 
-    Prefers the combined-total code ('1+2').  Falls back to querying all
-    available sex codes if the total is not present.
+    Prefers the combined-total code ('1+2'); falls back to all available codes.
 
     Args:
         metadata: Table metadata dict returned by fetch_metadata.
 
     Returns:
-        List of sex code strings to include in the query.
+        (dim_code, sex_codes) where dim_code is the exact API code name (e.g.
+        'Kon') and sex_codes is the list to include in the query.
+        Returns ("Kon", ["1+2"]) as a safe default if dimension is absent.
     """
     for var in metadata.get("variables", []):
-        code = var.get("code", "")
-        if code.lower() not in ("kon", "kön", "sex"):
+        api_code = var.get("code", "")
+        if api_code.lower() not in ("kon", "kön", "sex"):
             continue
         values: list[str] = var.get("values", [])
         for preferred in _SEX_TOTAL_CODES:
             if preferred in values:
-                return [preferred]
-        return values
-    return []
+                return api_code, [preferred]
+        return api_code, values
+    return "Kon", ["1+2"]
 
 
 def _discover_contents_code(metadata: dict, url: str) -> str | None:
@@ -327,8 +347,11 @@ def _discover_contents_code(metadata: dict, url: str) -> str | None:
 
 def _build_query(
     contents_code: str,
+    edu_dim_code: str,
     edu_level_codes: list[str],
+    age_dim_code: str,
     age_codes: list[str],
+    sex_dim_code: str,
     sex_codes: list[str],
     years: list[int],
 ) -> dict:
@@ -336,11 +359,16 @@ def _build_query(
 
     Queries ALL education levels so that the response contains both the
     numerator (levels 6+7) and the denominator (all levels summed).
+    Uses the exact dimension code names returned by _discover_table to avoid
+    400 errors from code-name mismatches (e.g. 'UtbildningNiva' vs 'UtbildningsNiva').
 
     Args:
         contents_code: The ContentsCode for population counts.
-        edu_level_codes: All available UtbildningsNiva codes (used as-is).
+        edu_dim_code: Exact API code name for the education dimension.
+        edu_level_codes: All available education level codes (used as-is).
+        age_dim_code: Exact API code name for the age dimension.
         age_codes: Age codes covering the 25–64 bracket.
+        sex_dim_code: Exact API code name for the sex dimension.
         sex_codes: Sex / total codes to include.
         years: List of integer years to request.
 
@@ -357,24 +385,24 @@ def _build_query(
                 },
             },
             {
-                "code": "UtbildningsNiva",
+                "code": edu_dim_code,
                 "selection": {
                     "filter": "item",
                     "values": edu_level_codes,
                 },
             },
             {
-                "code": "Alder",
+                "code": age_dim_code,
                 "selection": {
                     "filter": "item",
                     "values": age_codes,
                 },
             },
             {
-                "code": "Kon",
+                "code": sex_dim_code,
                 "selection": {
                     "filter": "item",
-                    "values": sex_codes if sex_codes else ["1+2"],
+                    "values": sex_codes,
                 },
             },
             {
@@ -459,17 +487,17 @@ def _compute_edu_share(df_raw: pd.DataFrame) -> pd.DataFrame:
     df["year"] = df["year"].astype(int)
     df["count"] = pd.to_numeric(df["count"], errors="coerce").fillna(0)
 
-    # Compute numerator and denominator per (kommun, year).
-    df["is_high_edu"] = df["edu_level"].isin(_HIGH_EDU_LEVELS)
-
-    agg = df.groupby(["kommun_kod", "year"]).agg(
-        total=("count", "sum"),
-        high_edu=("count", lambda s: s[df.loc[s.index, "is_high_edu"]].sum()),
-    ).reset_index()
-
-    agg["edu_share"] = (agg["high_edu"] / agg["total"].replace(0, float("nan"))) * 100
-
-    return agg[["kommun_kod", "year", "edu_share"]]
+    # Compute numerator (levels 6+7) and denominator (all levels) per (kommun, year).
+    # Filter first, then groupby — avoids fragile cross-group index references.
+    group_keys = ["kommun_kod", "year"]
+    total = df.groupby(group_keys)["count"].sum()
+    high_edu = (
+        df[df["edu_level"].isin(_HIGH_EDU_LEVELS)]
+        .groupby(group_keys)["count"]
+        .sum()
+    )
+    edu_share = (100.0 * high_edu / total.replace(0, float("nan"))).rename("edu_share")
+    return edu_share.reset_index()
 
 
 # ---------------------------------------------------------------------------

@@ -93,7 +93,7 @@ def fetch_unemployment(
         logger.info("Loading unemployment from cache: %s", _CACHE_FILE)
         df = _load_cache(_CACHE_FILE)
     else:
-        table_url, contents_code, available_years = _discover_table(years)
+        table_url, contents_code, available_years, table_meta = _discover_table(years)
         missing = [y for y in years if y not in available_years]
         if missing:
             raise NotImplementedError(
@@ -102,7 +102,7 @@ def fetch_unemployment(
                 "Consult KRI_Dataset_Identification.md §3 for manual fallback strategies."
             )
 
-        query_body = _build_query(contents_code, years, table_url)
+        query_body = _build_query(contents_code, years, table_meta)
         df_raw = query_pxweb(table_url, query_body)
         df = _clean_response(df_raw)
         _save_cache(df, _CACHE_FILE)
@@ -127,7 +127,7 @@ def fetch_unemployment(
 
 def _discover_table(
     requested_years: list[int],
-) -> tuple[str, str, list[int]]:
+) -> tuple[str, str, list[int], dict]:
     """Probe candidate AA0003 subtable URLs and return the first viable one.
 
     Tries the primary URL first, then each alternative in order.  For each
@@ -140,8 +140,9 @@ def _discover_table(
         requested_years: The integer years required by the caller.
 
     Returns:
-        Tuple of (table_url, contents_code, available_tid_years) for the
-        first viable subtable.
+        Tuple of (table_url, contents_code, available_tid_years, metadata)
+        for the first viable subtable.  The metadata dict is returned so
+        _build_query can reuse it without a second network call.
 
     Raises:
         NotImplementedError: If no candidate covers the requested years.
@@ -180,7 +181,7 @@ def _discover_table(
             )
             continue
 
-        return url, contents_code, tid_years
+        return url, contents_code, tid_years, meta
 
     raise NotImplementedError(
         "No AA0003B subtable is accessible or covers the requested year window. "
@@ -283,27 +284,25 @@ def _get_dimension_codes(metadata: dict, dimension_code: str) -> list[str]:
 def _build_query(
     contents_code: str,
     years: list[int],
-    table_url: str,
+    table_meta: dict,
 ) -> dict:
     """Build the PxWeb POST query body for the unemployment rate table.
 
-    Fetches metadata to discover valid codes for all non-Region, non-Tid
-    dimensions (Kon, UtbildningsNiva, etc.) and includes ALL values for each.
-    This returns the full disaggregated dataset, which _clean_response then
-    averages across those dimensions to produce one rate per (kommun, year).
+    Uses already-fetched metadata (from _discover_table) to discover valid
+    codes for all non-Region, non-Tid dimensions (Kon, UtbildningsNiva, etc.)
+    and includes ALL values for each.  This returns the full disaggregated
+    dataset, which _clean_response then averages to produce one rate per
+    (kommun, year).
 
     Args:
         contents_code: The ContentsCode for 'Andel öppet arbetslösa'.
         years: List of integer years to request.
-        table_url: The active table URL (used to re-fetch metadata).
+        table_meta: Metadata dict already fetched by _discover_table.
 
     Returns:
         A PxWeb query dict ready for POST.
     """
-    try:
-        meta = fetch_metadata(table_url)
-    except ValueError:
-        meta = {}
+    meta = table_meta
 
     query_dims: list[dict] = [
         {
