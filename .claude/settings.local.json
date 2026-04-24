@@ -9,7 +9,12 @@
       "Bash(rm:*)",
       "Bash(.venv-test/Scripts/python.exe:*)",
       "Bash(\"C:\\\\Users\\\\Mustafa Ibrahim\\\\.pyenv\\\\pyenv-win\\\\versions\\\\3.11.9\\\\python.exe\":*)",
-      "Bash(.venv/Scripts/pytest:*)"
+      "Bash(.venv/Scripts/pytest:*)",
+      "Bash(.venv/Scripts/python:*)",
+      "Bash(del:*)",
+      "Bash(gh pr:*)",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(.venv/Scripts/pip install:*)"
     ]
   }
 }
