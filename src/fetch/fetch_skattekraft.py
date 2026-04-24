@@ -12,14 +12,19 @@ Note on reference year: skattekraft for year t is based on income from year
 t-2 (e.g. 2024 skattekraft reflects 2022 income). Document this in tooltips.
 """
 
-import json
 import logging
-from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
 
-from src.fetch.pxweb_client import fetch_metadata, query_pxweb
+from src.fetch.pxweb_client import (
+    fetch_metadata,
+    get_dimension_codes,
+    is_cache_fresh,
+    load_df_cache,
+    query_pxweb,
+    save_df_cache,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +44,22 @@ _EXPECTED_COMMUNES: int = 290
 _DEFAULT_YEARS: list[int] = list(range(2010, 2025))
 
 # Known ContentsCode for "skattekraft per invånare"; verified at runtime via
-# metadata call and falls back to auto-discovery if this code changes.
-_KNOWN_CONTENTS_CODE: str = "000001LB"
+# metadata call.  Updated from legacy '000001LB' to 'OE0101A0' (current SCB API).
+_KNOWN_CONTENTS_CODE: str = "OE0101A0"
+
+# Swedish keyword fragments used to identify skattekraft per invånare by text
+# when the known code is not found (robust to future SCB code changes).
+_SKATTEKRAFT_PER_CAPITA_KEYWORDS: tuple[str, ...] = (
+    "skattekraft, kronor per",
+    "skattekraft per invånare",
+    "skattekraft per inv",
+)
+
+_CACHE_DTYPES: dict[str, str] = {
+    "kommun_kod": "str_zfill4",
+    "year": "int",
+    "tax_base_per_capita": "float",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +75,9 @@ def fetch_skattekraft(
 
     Uses a local JSON cache (data/raw/skattekraft.json) that is considered
     fresh for 7 days.  The cache is always skipped when force_refresh=True.
+
+    The metadata call to confirm the ContentsCode is only made when data
+    actually needs to be fetched from the API, not when loading from cache.
 
     Args:
         years: List of integer years to include.  Defaults to 2010–2024.
@@ -73,24 +95,26 @@ def fetch_skattekraft(
     if years is None:
         years = _DEFAULT_YEARS
 
-    # --- Step 1: Confirm ContentsCode via metadata ---
-    logger.info("Fetching OE0101 metadata from %s", _TABLE_URL)
-    metadata = fetch_metadata(_TABLE_URL)
-    contents_code = _discover_contents_code(metadata)
-    logger.info("Using ContentsCode: %s", contents_code)
-
-    # --- Steps 2–5: Fetch or load from cache ---
-    if not force_refresh and _is_cache_fresh(_CACHE_FILE):
+    # --- Steps 1–5: Fetch or load from cache ---
+    if not force_refresh and is_cache_fresh(_CACHE_FILE, _CACHE_MAX_AGE_DAYS):
         logger.info("Loading skattekraft from cache: %s", _CACHE_FILE)
-        df = _load_cache(_CACHE_FILE)
+        df = load_df_cache(_CACHE_FILE, _CACHE_DTYPES)
     else:
+        # Step 1: Confirm ContentsCode via metadata (only when fetching)
+        logger.info("Fetching OE0101 metadata from %s", _TABLE_URL)
+        metadata = fetch_metadata(_TABLE_URL)
+        contents_code = _discover_contents_code(metadata)
+        logger.info("Using ContentsCode: %s", contents_code)
+        region_codes = _discover_region_codes(metadata)
+        logger.info("Using %d explicit region codes.", len(region_codes))
+
         logger.info(
             "Fetching skattekraft from SCB API for years %d–%d",
             min(years),
             max(years),
         )
         # Step 2: Build query per KRI §2
-        query_body = _build_query(contents_code, years)
+        query_body = _build_query(contents_code, years, region_codes)
 
         # Step 3: Call generic client
         df_raw = query_pxweb(_TABLE_URL, query_body)
@@ -99,7 +123,7 @@ def fetch_skattekraft(
         df = _clean_response(df_raw)
 
         # Step 5: Persist cache
-        _save_cache(df, _CACHE_FILE)
+        save_df_cache(df, _CACHE_FILE)
 
     # Filter to exactly the requested years (cache may cover a wider range).
     df = df[df["year"].isin(years)].reset_index(drop=True)
@@ -125,17 +149,23 @@ def fetch_skattekraft(
 def _discover_contents_code(metadata: dict) -> str:
     """Find the ContentsCode for skattekraft per invånare in table metadata.
 
-    Prefers the known code _KNOWN_CONTENTS_CODE; falls back to the first
-    available code with a warning if the known one is absent.
+    Preference order:
+      1. The known code _KNOWN_CONTENTS_CODE (exact match).
+      2. A code whose valueText matches _SKATTEKRAFT_PER_CAPITA_KEYWORDS.
+      3. Raises ValueError — never silently falls back to the first code,
+         because OE0101 also contains skatteunderlag (total SEK) and the
+         riksmedelvärde ratio, both of which would produce wrong values.
 
     Args:
         metadata: Table metadata dict returned by fetch_metadata.
 
     Returns:
-        The ContentsCode string (e.g. '000001LB').
+        The ContentsCode string for skattekraft per invånare.
 
     Raises:
-        ValueError: If no ContentsCode variable is found in the metadata.
+        ValueError: If no ContentsCode variable is found, or none of the
+            available codes can be confidently identified as the per-capita
+            skattekraft metric.
     """
     for variable in metadata.get("variables", []):
         if variable.get("code") == "ContentsCode":
@@ -147,14 +177,25 @@ def _discover_contents_code(metadata: dict) -> str:
                 "Available OE0101 ContentsCodes: %s",
                 list(zip(codes, texts)),
             )
+            # 1. Exact known-code match.
             if _KNOWN_CONTENTS_CODE in codes:
+                logger.info("Using known ContentsCode '%s'.", _KNOWN_CONTENTS_CODE)
                 return _KNOWN_CONTENTS_CODE
-            logger.warning(
-                "Known ContentsCode '%s' not in metadata; using '%s' instead.",
-                _KNOWN_CONTENTS_CODE,
-                codes[0],
+            # 2. Keyword match against valueTexts.
+            for code, text in zip(codes, texts):
+                if any(kw in text.lower() for kw in _SKATTEKRAFT_PER_CAPITA_KEYWORDS):
+                    logger.info(
+                        "Known code not found; matched ContentsCode '%s' (%s) by keyword.",
+                        code,
+                        text,
+                    )
+                    return code
+            # 3. No safe fallback — raise rather than silently use the wrong metric.
+            raise ValueError(
+                f"Could not identify the skattekraft per invånare ContentsCode in "
+                f"OE0101 metadata.  Available codes: {list(zip(codes, texts))}. "
+                "Update _KNOWN_CONTENTS_CODE or _SKATTEKRAFT_PER_CAPITA_KEYWORDS."
             )
-            return codes[0]
 
     raise ValueError(
         f"Could not find ContentsCode variable in OE0101 metadata at {_TABLE_URL}. "
@@ -162,27 +203,61 @@ def _discover_contents_code(metadata: dict) -> str:
     )
 
 
-def _is_cache_fresh(cache_path: Path) -> bool:
-    """Return True if the cache file exists and is younger than the max age.
+def _discover_region_codes(metadata: dict) -> list[str]:
+    """Extract 4-digit municipality codes from OE0101 table metadata.
+
+    The SCB PxWeb API no longer accepts the vs:RegionKommun07EjAggr value-set
+    filter (returns HTTP 400).  This helper extracts the explicit municipality
+    codes from the Region dimension metadata so that _build_query can use
+    filter=item instead.
+
+    Municipality codes are identified by being exactly 4 characters long and
+    all-numeric (e.g. '0114', '0180').  County codes ('01', '25') and the
+    national total ('00') are 2 characters and are excluded.
 
     Args:
-        cache_path: Path to the cached JSON file.
+        metadata: Table metadata dict returned by fetch_metadata.
 
     Returns:
-        True if the file exists and its mtime is within CACHE_MAX_AGE_DAYS.
+        Sorted list of 4-digit municipality code strings.
+
+    Raises:
+        ValueError: If the Region dimension is absent from metadata or no
+            4-digit codes are found.
     """
-    if not cache_path.exists():
-        return False
-    mtime = datetime.fromtimestamp(cache_path.stat().st_mtime)
-    return (datetime.now() - mtime) < timedelta(days=_CACHE_MAX_AGE_DAYS)
+    all_codes = get_dimension_codes(metadata, "Region")
+    if not all_codes:
+        raise ValueError(
+            f"Region dimension not found in OE0101 metadata at {_TABLE_URL}. "
+            "Verify the table URL and check for SCB API changes."
+        )
+    muni_codes = sorted(c for c in all_codes if len(c) == 4 and c.isdigit())
+    if not muni_codes:
+        raise ValueError(
+            f"No 4-digit municipality codes found in OE0101 Region dimension. "
+            f"Available codes (first 10): {all_codes[:10]}."
+        )
+    logger.info(
+        "Discovered %d municipality codes from Region metadata (e.g. %s … %s).",
+        len(muni_codes),
+        muni_codes[0],
+        muni_codes[-1],
+    )
+    return muni_codes
 
 
-def _build_query(contents_code: str, years: list[int]) -> dict:
+def _build_query(contents_code: str, years: list[int], region_codes: list[str]) -> dict:
     """Build the PxWeb POST query body for OE0101/SkatteKraft.
+
+    Uses explicit municipality codes (filter=item) instead of a value-set
+    filter (vs:RegionKommun07EjAggr) because the SCB API no longer accepts
+    the value-set syntax and returns HTTP 400.  The codes are discovered at
+    runtime from the table metadata by _discover_region_codes.
 
     Args:
         contents_code: The ContentsCode value for skattekraft per invånare.
         years: List of integer years to request.
+        region_codes: List of 4-digit municipality code strings from metadata.
 
     Returns:
         A PxWeb query dict ready for POST.
@@ -192,10 +267,8 @@ def _build_query(contents_code: str, years: list[int]) -> dict:
             {
                 "code": "Region",
                 "selection": {
-                    # vs:RegionKommun07EjAggr selects all 290 kommuner
-                    # without any aggregation groups.
-                    "filter": "vs:RegionKommun07EjAggr",
-                    "values": [],  # empty = all members of the value set
+                    "filter": "item",
+                    "values": region_codes,
                 },
             },
             {
@@ -255,54 +328,23 @@ def _clean_response(df_raw: pd.DataFrame) -> pd.DataFrame:
     return df[["kommun_kod", "year", "tax_base_per_capita"]]
 
 
-def _save_cache(df: pd.DataFrame, cache_path: Path) -> None:
-    """Persist the cleaned DataFrame to the cache JSON file.
-
-    Args:
-        df: Cleaned DataFrame with [kommun_kod, year, tax_base_per_capita].
-        cache_path: Destination path for the JSON file.
-    """
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    cache_path.write_text(
-        df.to_json(orient="records", force_ascii=False),
-        encoding="utf-8",
-    )
-    logger.info("Cached skattekraft data to %s", cache_path)
-
-
-def _load_cache(cache_path: Path) -> pd.DataFrame:
-    """Load the cleaned DataFrame from the cache JSON file.
-
-    Args:
-        cache_path: Path to the JSON cache file.
-
-    Returns:
-        DataFrame with correctly typed columns [kommun_kod, year,
-        tax_base_per_capita].
-    """
-    records = json.loads(cache_path.read_text(encoding="utf-8"))
-    df = pd.DataFrame(records)
-    df["kommun_kod"] = df["kommun_kod"].astype(str).str.zfill(4)
-    df["year"] = df["year"].astype(int)
-    df["tax_base_per_capita"] = pd.to_numeric(df["tax_base_per_capita"])
-    return df
-
-
 def _verify(df: pd.DataFrame, years: list[int]) -> None:
     """Run sanity checks on the fetched skattekraft DataFrame.
 
     Checks:
         1. Exactly 290 unique kommun_kod values per year.
-        2. For 2024: logs the highest value and its kommune code (expected:
-           Danderyd 0162, ~496 000 SEK); warns if another kommune is highest.
+        2. For 2024: raises ValueError if Danderyd (0162) is not the highest.
         3. National mean for 2024 is within 200 000–350 000 SEK range.
+
+    Both the Danderyd check and the national mean check raise ValueError
+    for consistent severity — any failure indicates a data integrity problem.
 
     Args:
         df: Cleaned DataFrame with [kommun_kod, year, tax_base_per_capita].
         years: The requested years (used to check 290-per-year constraint).
 
     Raises:
-        ValueError: If any hard check fails.
+        ValueError: If any check fails.
     """
     for year in years:
         year_df = df[df["year"] == year]
@@ -331,10 +373,10 @@ def _verify(df: pd.DataFrame, years: list[int]) -> None:
     logger.info("2024 national mean skattekraft: %.0f SEK", national_mean)
 
     if max_row["kommun_kod"] != "0162":
-        logger.warning(
-            "Expected Danderyd (0162) to have the highest 2024 skattekraft "
-            "but found %s. Verify ContentsCode and data freshness.",
-            max_row["kommun_kod"],
+        raise ValueError(
+            f"Expected Danderyd (0162) to have the highest 2024 skattekraft "
+            f"but found {max_row['kommun_kod']}. "
+            "Verify ContentsCode and data freshness."
         )
 
     if not (200_000 <= national_mean <= 350_000):

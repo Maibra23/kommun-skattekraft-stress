@@ -235,8 +235,8 @@ class TestFetchMetadata:
             ],
         }
         mock_resp = MagicMock()
+        mock_resp.status_code = 200
         mock_resp.json.return_value = metadata
-        mock_resp.raise_for_status = MagicMock()
 
         with patch("src.fetch.pxweb_client.requests.get", return_value=mock_resp):
             result = fetch_metadata(_FAKE_URL)
@@ -244,22 +244,63 @@ class TestFetchMetadata:
         assert result["title"] == "SkatteKraft"
         assert result["variables"][0]["code"] == "ContentsCode"
 
-    def test_raises_on_connection_error(self) -> None:
-        """A ConnectionError is wrapped in a ValueError."""
+    def test_raises_on_connection_error_after_retries(self) -> None:
+        """Persistent ConnectionErrors exhaust all retries → ValueError."""
         with patch(
             "src.fetch.pxweb_client.requests.get",
             side_effect=requests.ConnectionError("refused"),
-        ):
-            with pytest.raises(ValueError, match="Failed to fetch metadata"):
+        ) as mock_get:
+            with patch("src.fetch.pxweb_client.time.sleep"):
+                with pytest.raises(ValueError, match="All metadata retry attempts failed"):
+                    fetch_metadata(_FAKE_URL)
+
+        # 1 initial + 3 retries = 4 total calls
+        assert mock_get.call_count == 4
+
+    def test_raises_immediately_on_non_retryable_4xx(self) -> None:
+        """A 404 is not retried; ValueError is raised on the first attempt."""
+        with patch(
+            "src.fetch.pxweb_client.requests.get",
+            return_value=_mock_status(404),
+        ) as mock_get:
+            with pytest.raises(ValueError, match="Non-recoverable HTTP 404"):
                 fetch_metadata(_FAKE_URL)
 
-    def test_raises_on_http_error(self) -> None:
-        """An HTTP error (e.g. 404) is wrapped in a ValueError."""
-        mock_resp = MagicMock()
-        mock_resp.raise_for_status.side_effect = requests.HTTPError("404")
-        with patch("src.fetch.pxweb_client.requests.get", return_value=mock_resp):
-            with pytest.raises(ValueError, match="Failed to fetch metadata"):
-                fetch_metadata(_FAKE_URL)
+        assert mock_get.call_count == 1
+
+    def test_retries_on_429_then_succeeds(self) -> None:
+        """A 429 triggers retry; subsequent 200 returns metadata."""
+        metadata = {"title": "Test", "variables": []}
+        ok_resp = MagicMock()
+        ok_resp.status_code = 200
+        ok_resp.json.return_value = metadata
+
+        side_effects = [_mock_status(429), ok_resp]
+        with patch(
+            "src.fetch.pxweb_client.requests.get", side_effect=side_effects
+        ) as mock_get:
+            with patch("src.fetch.pxweb_client.time.sleep"):
+                result = fetch_metadata(_FAKE_URL)
+
+        assert mock_get.call_count == 2
+        assert result["title"] == "Test"
+
+    def test_retries_on_500_then_succeeds(self) -> None:
+        """A 500 triggers retry; subsequent 200 returns metadata."""
+        metadata = {"title": "Test", "variables": []}
+        ok_resp = MagicMock()
+        ok_resp.status_code = 200
+        ok_resp.json.return_value = metadata
+
+        side_effects = [_mock_status(500), ok_resp]
+        with patch(
+            "src.fetch.pxweb_client.requests.get", side_effect=side_effects
+        ) as mock_get:
+            with patch("src.fetch.pxweb_client.time.sleep"):
+                result = fetch_metadata(_FAKE_URL)
+
+        assert mock_get.call_count == 2
+        assert result["title"] == "Test"
 
 
 # ---------------------------------------------------------------------------

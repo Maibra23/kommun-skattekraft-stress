@@ -13,17 +13,27 @@ where age_group is one of '0-19', '20-64', '65+'.
 These columns feed:
   - dependency_ratio = (pop_0_19 + pop_65plus) / pop_20_64
   - population_growth_pct = year-over-year percent change in total population
+
+Note: this module implements its own per-year loop with per-year caching
+rather than using chunk_query_by_year from pxweb_client.  The per-year cache
+files (data/raw/population_{year}.json) enable incremental re-fetching of
+individual years without re-downloading the full 16-year series.
 """
 
 import copy
-import json
 import logging
-from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
 
-from src.fetch.pxweb_client import fetch_metadata, query_pxweb
+from src.fetch.pxweb_client import (
+    fetch_metadata,
+    get_dimension_codes,
+    is_cache_fresh,
+    load_df_cache,
+    query_pxweb,
+    save_df_cache,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +73,7 @@ def fetch_population(
 
     Queries single-year age data for both sexes, then aggregates to three
     broad age groups (0-19, 20-64, 65+).  Each year is fetched as a separate
-    PxWeb POST to stay under the cell limit (290 × 101 ages × 2 sexes = 58 580
+    PxWeb POST to stay under the cell limit (290 x 101 ages x 2 sexes = 58 580
     cells per year, well under the 150 000-cell limit).
 
     Per-year raw JSON is cached at data/raw/population_{year}.json.
@@ -74,7 +84,7 @@ def fetch_population(
 
     Returns:
         Long-format DataFrame with columns [kommun_kod, year, age_group,
-        population].  Exactly 290 × len(years) × 3 rows.
+        population].  Exactly 290 x len(years) x 3 rows.
 
     Raises:
         ValueError: If API calls fail after retries, or shape / sanity checks fail.
@@ -82,15 +92,19 @@ def fetch_population(
     if years is None:
         years = _DEFAULT_YEARS
 
-    table_url = _resolve_table_url()
-    base_query = _build_base_query()
+    table_url, table_meta = _resolve_table_url()
+    region_codes = sorted(
+        c for c in get_dimension_codes(table_meta, "Region")
+        if len(c) == 4 and c.isdigit()
+    )
+    base_query = _build_base_query(region_codes)
 
     frames: list[pd.DataFrame] = []
     for year in years:
         cache_path = _year_cache_path(year)
-        if not force_refresh and _is_cache_fresh(cache_path):
+        if not force_refresh and is_cache_fresh(cache_path, _CACHE_MAX_AGE_DAYS):
             logger.info("Loading population year %d from cache: %s", year, cache_path)
-            df_raw = _load_year_cache(cache_path)
+            df_raw = load_df_cache(cache_path)
         else:
             year_query = copy.deepcopy(base_query)
             for dim in year_query["query"]:
@@ -99,7 +113,7 @@ def fetch_population(
                     break
             logger.info("Fetching population year %d from SCB API.", year)
             df_raw = query_pxweb(table_url, year_query)
-            _save_year_cache(df_raw, cache_path)
+            save_df_cache(df_raw, cache_path)
 
         df_agg = _aggregate_to_age_groups(df_raw)
         frames.append(df_agg)
@@ -124,14 +138,15 @@ def fetch_population(
 # ---------------------------------------------------------------------------
 
 
-def _resolve_table_url() -> str:
-    """Return the first accessible BE0101A subtable URL.
+def _resolve_table_url() -> tuple[str, dict]:
+    """Return the first accessible BE0101A subtable URL and its metadata.
 
     Tries BefolkningNy first; falls back to FolkmangdNov if the primary
-    metadata call fails.
+    metadata call fails.  Returns the metadata alongside the URL so callers
+    can reuse it (e.g. to extract region codes) without a second network call.
 
     Returns:
-        The accessible table URL string.
+        Tuple of (table_url, metadata).
 
     Raises:
         ValueError: If neither subtable is accessible.
@@ -141,7 +156,7 @@ def _resolve_table_url() -> str:
             meta = fetch_metadata(url)
             if "variables" in meta:
                 logger.info("Using BE0101 subtable: %s", url)
-                return url
+                return url, meta
         except ValueError as exc:
             logger.warning(
                 "Metadata unavailable for %s (%s); trying fallback.", url, exc
@@ -158,11 +173,19 @@ def _resolve_table_url() -> str:
 # ---------------------------------------------------------------------------
 
 
-def _build_base_query() -> dict:
+def _build_base_query(region_codes: list[str]) -> dict:
     """Build the base PxWeb query for one year of BE0101 population data.
+
+    Uses explicit municipality codes (filter=item) instead of a value-set
+    filter (vs:RegionKommun07EjAggr) because the SCB API no longer accepts
+    the value-set syntax (returns HTTP 400).
 
     The Tid dimension value is a placeholder ('2024') that the per-year loop
     overrides before each POST.
+
+    Args:
+        region_codes: Sorted list of 4-digit municipality code strings from
+            the table metadata.
 
     Returns:
         A PxWeb query dict ready for deep-copying and year substitution.
@@ -172,8 +195,8 @@ def _build_base_query() -> dict:
             {
                 "code": "Region",
                 "selection": {
-                    "filter": "vs:RegionKommun07EjAggr",
-                    "values": [],
+                    "filter": "item",
+                    "values": region_codes,
                 },
             },
             {
@@ -311,49 +334,6 @@ def _year_cache_path(year: int) -> Path:
         Path object pointing to data/raw/population_{year}.json.
     """
     return _CACHE_DIR / f"population_{year}.json"
-
-
-def _is_cache_fresh(cache_path: Path) -> bool:
-    """Return True if the cache file exists and is younger than the max age.
-
-    Args:
-        cache_path: Path to the cached JSON file.
-
-    Returns:
-        True if the file exists and its mtime is within CACHE_MAX_AGE_DAYS.
-    """
-    if not cache_path.exists():
-        return False
-    mtime = datetime.fromtimestamp(cache_path.stat().st_mtime)
-    return (datetime.now() - mtime) < timedelta(days=_CACHE_MAX_AGE_DAYS)
-
-
-def _save_year_cache(df_raw: pd.DataFrame, cache_path: Path) -> None:
-    """Persist a raw year DataFrame to the JSON cache.
-
-    Args:
-        df_raw: Raw DataFrame from query_pxweb.
-        cache_path: Destination path.
-    """
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    cache_path.write_text(
-        df_raw.to_json(orient="records", force_ascii=False),
-        encoding="utf-8",
-    )
-    logger.info("Saved population cache to %s", cache_path)
-
-
-def _load_year_cache(cache_path: Path) -> pd.DataFrame:
-    """Load a raw year DataFrame from the JSON cache.
-
-    Args:
-        cache_path: Path to the JSON cache file.
-
-    Returns:
-        DataFrame matching the shape of a raw PxWeb response for one year.
-    """
-    records = json.loads(cache_path.read_text(encoding="utf-8"))
-    return pd.DataFrame(records)
 
 
 # ---------------------------------------------------------------------------

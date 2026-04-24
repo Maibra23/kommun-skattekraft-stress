@@ -15,20 +15,26 @@ UtbildningsNivå (education level), the fetcher aggregates to a single rate per
 (kommun, year) by taking an unweighted mean across the available Kön ×
 UtbildningsNivå cells.  This is a simplifying assumption; differences from the
 true population-weighted aggregate are expected to be small (< 0.3 percentage
-points) and are documented in METHODOLOGY §7.
+points) and are documented in METHODOLOGY §7.9.
 
 Raw JSON is cached to data/raw/unemployment.json.  Returns a tidy DataFrame
 with columns [kommun_kod, year, unemployment_rate].
 """
 
-import json
 import logging
-from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
 
-from src.fetch.pxweb_client import fetch_metadata, query_pxweb
+from src.fetch.pxweb_client import (
+    extract_tid_years,
+    fetch_metadata,
+    get_dimension_codes,
+    is_cache_fresh,
+    load_df_cache,
+    query_pxweb,
+    save_df_cache,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -36,14 +42,23 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
+# SCB STATIV restructured AA0003 in 2022.  The old municipality-level table
+# (IntGr1KomKonUtb) was archived in AA0003X and covers 1997–2021.  The new
+# equivalent (IntGr1KomUtbBAS) lives in AA0003B and covers 2022 onwards.
+# To fetch 2010–2024, both tables are needed.
 _PRIMARY_TABLE_URL = (
-    "https://api.scb.se/OV0104/v1/doris/sv/ssd/START/AA/AA0003/AA0003B"
+    "https://api.scb.se/OV0104/v1/doris/sv/ssd/START/AA/AA0003/AA0003X"
     "/IntGr1KomKonUtb"
 )
-_ALTERNATIVE_URLS: list[str] = [
-    "https://api.scb.se/OV0104/v1/doris/sv/ssd/START/AA/AA0003/AA0003B/IntGr1KomKon",
-    "https://api.scb.se/OV0104/v1/doris/sv/ssd/START/AA/AA0003/AA0003B/IntGr1Kom",
-]
+_CONTINUATION_TABLE_URL = (
+    "https://api.scb.se/OV0104/v1/doris/sv/ssd/START/AA/AA0003/AA0003B"
+    "/IntGr1KomUtbBAS"
+)
+# Year boundary between the two tables.
+_OLD_TABLE_LAST_YEAR: int = 2021
+_NEW_TABLE_FIRST_YEAR: int = 2022
+# Legacy: kept for backward compatibility in _discover_table signature.
+_ALTERNATIVE_URLS: list[str] = []
 
 _PROJECT_ROOT = Path(__file__).parents[2]
 _CACHE_FILE: Path = _PROJECT_ROOT / "data" / "raw" / "unemployment.json"
@@ -51,6 +66,12 @@ _CACHE_FILE: Path = _PROJECT_ROOT / "data" / "raw" / "unemployment.json"
 _CACHE_MAX_AGE_DAYS: int = 7
 _EXPECTED_COMMUNES: int = 290
 _DEFAULT_YEARS: list[int] = list(range(2010, 2025))
+
+_CACHE_DTYPES: dict[str, str] = {
+    "kommun_kod": "str_zfill4",
+    "year": "int",
+    "unemployment_rate": "float",
+}
 
 # Swedish keyword fragments used to identify the open-unemployment share code.
 _OPEN_UNEMPLOYMENT_KEYWORDS = ("öppet arbetslösa", "öppna arbetslösa", "andel arbetslösa")
@@ -89,23 +110,41 @@ def fetch_unemployment(
     if years is None:
         years = _DEFAULT_YEARS
 
-    if not force_refresh and _is_cache_fresh(_CACHE_FILE):
+    if not force_refresh and is_cache_fresh(_CACHE_FILE, _CACHE_MAX_AGE_DAYS):
         logger.info("Loading unemployment from cache: %s", _CACHE_FILE)
-        df = _load_cache(_CACHE_FILE)
+        df = load_df_cache(_CACHE_FILE, _CACHE_DTYPES)
     else:
-        table_url, contents_code, available_years, table_meta = _discover_table(years)
-        missing = [y for y in years if y not in available_years]
-        if missing:
-            raise NotImplementedError(
-                f"No AA0003 subtable covers the full requested year window {years}. "
-                f"Missing years: {missing}. "
-                "Consult KRI_Dataset_Identification.md §3 for manual fallback strategies."
-            )
+        # SCB split the municipality unemployment table into two: the old table
+        # (IntGr1KomKonUtb in AA0003X) covers 1997–2021, and the new table
+        # (IntGr1KomUtbBAS in AA0003B) covers 2022 onwards.  Fetch from each
+        # as needed and concatenate.
+        frames: list[pd.DataFrame] = []
 
-        query_body = _build_query(contents_code, years, table_meta)
-        df_raw = query_pxweb(table_url, query_body)
-        df = _clean_response(df_raw)
-        _save_cache(df, _CACHE_FILE)
+        old_years = [y for y in years if y <= _OLD_TABLE_LAST_YEAR]
+        new_years = [y for y in years if y >= _NEW_TABLE_FIRST_YEAR]
+
+        for table_url_candidate, subset_years in [
+            (_PRIMARY_TABLE_URL, old_years),
+            (_CONTINUATION_TABLE_URL, new_years),
+        ]:
+            if not subset_years:
+                continue
+            table_url, contents_code, available_years, table_meta = _discover_table(
+                subset_years, [table_url_candidate]
+            )
+            missing = [y for y in subset_years if y not in available_years]
+            if missing:
+                raise NotImplementedError(
+                    f"AA0003 subtable {table_url_candidate} does not cover years "
+                    f"{missing}. SCB may have restructured the table. "
+                    "Consult KRI_Dataset_Identification.md §3 for fallback strategies."
+                )
+            query_body = _build_query(contents_code, subset_years, table_meta)
+            df_raw = query_pxweb(table_url, query_body)
+            frames.append(_clean_response(df_raw))
+
+        df = pd.concat(frames, ignore_index=True)
+        save_df_cache(df, _CACHE_FILE)
 
     df = df[df["year"].isin(years)].reset_index(drop=True)
     _verify(df, years)
@@ -127,6 +166,7 @@ def fetch_unemployment(
 
 def _discover_table(
     requested_years: list[int],
+    candidates: list[str] | None = None,
 ) -> tuple[str, str, list[int], dict]:
     """Probe candidate AA0003 subtable URLs and return the first viable one.
 
@@ -138,6 +178,8 @@ def _discover_table(
 
     Args:
         requested_years: The integer years required by the caller.
+        candidates: Optional explicit list of URLs to try.  If None, defaults
+            to [_PRIMARY_TABLE_URL] + _ALTERNATIVE_URLS.
 
     Returns:
         Tuple of (table_url, contents_code, available_tid_years, metadata)
@@ -147,7 +189,8 @@ def _discover_table(
     Raises:
         NotImplementedError: If no candidate covers the requested years.
     """
-    candidates = [_PRIMARY_TABLE_URL] + _ALTERNATIVE_URLS
+    if candidates is None:
+        candidates = [_PRIMARY_TABLE_URL] + _ALTERNATIVE_URLS
 
     for url in candidates:
         try:
@@ -156,7 +199,7 @@ def _discover_table(
             logger.warning("Metadata fetch failed for %s: %s", url, exc)
             continue
 
-        tid_years = _extract_tid_years(meta)
+        tid_years = extract_tid_years(meta)
         coverage = sorted(set(tid_years) & set(requested_years))
         if not coverage:
             logger.warning(
@@ -187,28 +230,6 @@ def _discover_table(
         "No AA0003B subtable is accessible or covers the requested year window. "
         "Consult KRI_Dataset_Identification.md §3 for fallback strategies."
     )
-
-
-def _extract_tid_years(metadata: dict) -> list[int]:
-    """Extract available integer years from the Tid variable in table metadata.
-
-    Args:
-        metadata: Table metadata dict returned by fetch_metadata.
-
-    Returns:
-        Sorted list of integer years found in the Tid dimension.
-    """
-    for var in metadata.get("variables", []):
-        if var.get("code") == "Tid":
-            raw_values: list[str] = var.get("values", [])
-            years: list[int] = []
-            for v in raw_values:
-                try:
-                    years.append(int(v))
-                except ValueError:
-                    pass
-            return sorted(years)
-    return []
 
 
 def _discover_contents_code(metadata: dict, url: str) -> str | None:
@@ -260,22 +281,6 @@ def _discover_contents_code(metadata: dict, url: str) -> str | None:
     return None
 
 
-def _get_dimension_codes(metadata: dict, dimension_code: str) -> list[str]:
-    """Extract all value codes for a named dimension from table metadata.
-
-    Args:
-        metadata: Table metadata dict returned by fetch_metadata.
-        dimension_code: The dimension code to look up (e.g. 'Kon').
-
-    Returns:
-        List of value code strings, or empty list if dimension is absent.
-    """
-    for var in metadata.get("variables", []):
-        if var.get("code") == dimension_code:
-            return var.get("values", [])
-    return []
-
-
 # ---------------------------------------------------------------------------
 # Private helpers — query construction
 # ---------------------------------------------------------------------------
@@ -288,11 +293,19 @@ def _build_query(
 ) -> dict:
     """Build the PxWeb POST query body for the unemployment rate table.
 
-    Uses already-fetched metadata (from _discover_table) to discover valid
-    codes for all non-Region, non-Tid dimensions (Kon, UtbildningsNiva, etc.)
-    and includes ALL values for each.  This returns the full disaggregated
-    dataset, which _clean_response then averages to produce one rate per
-    (kommun, year).
+    Uses already-fetched metadata to select total-aggregate codes for each
+    cross-tabulation dimension (Kön, UtbNiv, BakgrVar), so the response
+    contains one row per (municipality, year) rather than disaggregated cells.
+    This keeps the query well within the SCB cell limit (~150 000 cells) and
+    returns the correct population-weighted total directly.
+
+    Preferred "total" codes per dimension (both tables have these):
+        Kön      → '1+2' (men and women combined)
+        UtbNiv   → '000' (all education levels)
+        BakgrVar → 'TOT' (all persons)
+
+    If a preferred code is not found for a dimension, all available codes for
+    that dimension are included and _clean_response averages across them.
 
     Args:
         contents_code: The ContentsCode for 'Andel öppet arbetslösa'.
@@ -302,46 +315,55 @@ def _build_query(
     Returns:
         A PxWeb query dict ready for POST.
     """
-    meta = table_meta
+    # Extract municipality codes. The vs:RegionKommun07EjAggr value-set filter
+    # no longer works on the SCB API (returns HTTP 400).
+    all_region_codes = get_dimension_codes(table_meta, "Region")
+    muni_codes = sorted(c for c in all_region_codes if len(c) == 4 and c.isdigit())
 
     query_dims: list[dict] = [
         {
             "code": "Region",
-            "selection": {
-                "filter": "vs:RegionKommun07EjAggr",
-                "values": [],
-            },
+            "selection": {"filter": "item", "values": muni_codes},
         },
     ]
 
-    # Include all available codes for every extra dimension (Kon, UtbildningsNiva, …).
+    # For each extra dimension, prefer the "total" aggregate code if available;
+    # fall back to all values.
+    _TOTAL_CODES: dict[str, list[str]] = {
+        "Kon": ["1+2"],
+        "UtbNiv": ["000"],
+        "BakgrVar": ["TOT"],
+    }
     skip_codes = {"Region", "ContentsCode", "Tid"}
-    for var in meta.get("variables", []):
+    for var in table_meta.get("variables", []):
         code = var.get("code", "")
         if code in skip_codes:
             continue
         values = var.get("values", [])
-        if values:
-            query_dims.append(
-                {
-                    "code": code,
-                    "selection": {"filter": "item", "values": values},
-                }
+        if not values:
+            continue
+        preferred = _TOTAL_CODES.get(code, [])
+        selected = next((p for p in preferred if p in values), None)
+        if selected:
+            chosen = [selected]
+            logger.debug("Dimension %s: using total code %r.", code, selected)
+        else:
+            chosen = values
+            logger.debug(
+                "Dimension %s: no total code found; using all %d values.",
+                code, len(values),
             )
+        query_dims.append(
+            {"code": code, "selection": {"filter": "item", "values": chosen}}
+        )
 
     query_dims.append(
-        {
-            "code": "ContentsCode",
-            "selection": {"filter": "item", "values": [contents_code]},
-        }
+        {"code": "ContentsCode", "selection": {"filter": "item", "values": [contents_code]}}
     )
     query_dims.append(
         {
             "code": "Tid",
-            "selection": {
-                "filter": "item",
-                "values": [str(y) for y in sorted(years)],
-            },
+            "selection": {"filter": "item", "values": [str(y) for y in sorted(years)]},
         }
     )
 
@@ -356,10 +378,13 @@ def _build_query(
 def _clean_response(df_raw: pd.DataFrame) -> pd.DataFrame:
     """Convert raw PxWeb response to one unemployment rate per (kommun, year).
 
-    Identifies the Region and Tid columns, casts types, then averages the
-    unemployment rate metric across all disaggregation dimensions (Kon,
-    UtbildningsNiva, etc.).  The average is unweighted; this is a documented
-    approximation (see module docstring).
+    Uses the PxWeb column position convention to reliably identify the metric
+    column: key columns are listed first (matching the 'key' array in the JSON
+    data), followed by value/content columns.  The last column in the response
+    is always the metric value when a single ContentsCode is requested.
+
+    This replaces a previous unique-ratio heuristic that was fragile when the
+    metric column had high cardinality.
 
     Args:
         df_raw: DataFrame from query_pxweb (all string columns).
@@ -370,9 +395,15 @@ def _clean_response(df_raw: pd.DataFrame) -> pd.DataFrame:
     Raises:
         ValueError: If the rate metric column cannot be identified.
     """
+    if df_raw.empty:
+        return pd.DataFrame(columns=["kommun_kod", "year", "unemployment_rate"])
+
     rename: dict[str, str] = {}
-    extra_dims: list[str] = []
-    value_col: str | None = None
+    drop_cols: list[str] = []
+
+    # The last column is the metric value (PxWeb always puts value columns
+    # after all key columns).
+    metric_col = df_raw.columns[-1]
 
     for col in df_raw.columns:
         lower = col.lower()
@@ -381,33 +412,14 @@ def _clean_response(df_raw: pd.DataFrame) -> pd.DataFrame:
         elif lower == "tid":
             rename[col] = "year"
         elif lower == "contentscode":
-            pass  # drop silently
+            drop_cols.append(col)
+        elif col == metric_col:
+            rename[col] = "unemployment_rate"
         else:
-            # Remaining columns: the metric value or extra disaggregation dimensions.
-            # Heuristic: if the column has few unique values relative to row count,
-            # treat it as a disaggregation dimension; otherwise it is the metric.
-            unique_ratio = df_raw[col].nunique() / max(len(df_raw), 1)
-            if unique_ratio < 0.05:
-                extra_dims.append(col)
-            else:
-                if value_col is None:
-                    value_col = col
-                    rename[col] = "unemployment_rate"
+            # Extra disaggregation dimensions (Kon, UtbildningsNiva, etc.)
+            drop_cols.append(col)
 
-    if value_col is None:
-        # Fallback: take the last column as the value.
-        last_col = df_raw.columns[-1]
-        if last_col not in rename:
-            rename[last_col] = "unemployment_rate"
-            value_col = last_col
-        if value_col is None:
-            raise ValueError(
-                "Could not identify the unemployment rate column. "
-                f"Available columns: {list(df_raw.columns)}"
-            )
-
-    drop_cols = [c for c in df_raw.columns if c.lower() == "contentscode"]
-    df = df_raw.rename(columns=rename).drop(columns=drop_cols + extra_dims, errors="ignore")
+    df = df_raw.rename(columns=rename).drop(columns=drop_cols, errors="ignore")
 
     df["kommun_kod"] = df["kommun_kod"].astype(str).str.zfill(4)
     df["year"] = df["year"].astype(int)
@@ -418,59 +430,6 @@ def _clean_response(df_raw: pd.DataFrame) -> pd.DataFrame:
         df.groupby(["kommun_kod", "year"], as_index=False)["unemployment_rate"]
         .mean()
     )
-    return df
-
-
-# ---------------------------------------------------------------------------
-# Private helpers — cache management
-# ---------------------------------------------------------------------------
-
-
-def _is_cache_fresh(cache_path: Path) -> bool:
-    """Return True if the cache file exists and is younger than the max age.
-
-    Args:
-        cache_path: Path to the cached JSON file.
-
-    Returns:
-        True if the file exists and its mtime is within CACHE_MAX_AGE_DAYS.
-    """
-    if not cache_path.exists():
-        return False
-    mtime = datetime.fromtimestamp(cache_path.stat().st_mtime)
-    return (datetime.now() - mtime) < timedelta(days=_CACHE_MAX_AGE_DAYS)
-
-
-def _save_cache(df: pd.DataFrame, cache_path: Path) -> None:
-    """Persist the cleaned DataFrame to the cache JSON file.
-
-    Args:
-        df: Cleaned DataFrame with [kommun_kod, year, unemployment_rate].
-        cache_path: Destination path for the JSON file.
-    """
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    cache_path.write_text(
-        df.to_json(orient="records", force_ascii=False),
-        encoding="utf-8",
-    )
-    logger.info("Cached unemployment data to %s", cache_path)
-
-
-def _load_cache(cache_path: Path) -> pd.DataFrame:
-    """Load the cleaned DataFrame from the cache JSON file.
-
-    Args:
-        cache_path: Path to the JSON cache file.
-
-    Returns:
-        DataFrame with correctly typed columns [kommun_kod, year,
-        unemployment_rate].
-    """
-    records = json.loads(cache_path.read_text(encoding="utf-8"))
-    df = pd.DataFrame(records)
-    df["kommun_kod"] = df["kommun_kod"].astype(str).str.zfill(4)
-    df["year"] = df["year"].astype(int)
-    df["unemployment_rate"] = pd.to_numeric(df["unemployment_rate"])
     return df
 
 

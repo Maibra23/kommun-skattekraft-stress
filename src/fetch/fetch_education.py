@@ -26,14 +26,20 @@ SUN 2000 education level codes used in UF0506:
 Expected national mean edu_share ≈ 30 % (METHODOLOGY §6).
 """
 
-import json
 import logging
-from datetime import datetime, timedelta
 from pathlib import Path
+from typing import NamedTuple
 
 import pandas as pd
 
-from src.fetch.pxweb_client import fetch_metadata, query_pxweb
+from src.fetch.pxweb_client import (
+    fetch_metadata,
+    get_dimension_codes,
+    is_cache_fresh,
+    load_df_cache,
+    query_pxweb,
+    save_df_cache,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,10 +47,12 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
+# SCB renamed the UF0506 education tables in 2024/2025.  Old subtable paths
+# (Utbildning4, Utbildning3, Utbildning4C) now return HTTP 400 on metadata.
+# Current canonical table is UF0506B/Utbildning (covers 1985–2024).
 _CANDIDATE_URLS: list[str] = [
-    "https://api.scb.se/OV0104/v1/doris/sv/ssd/START/UF/UF0506/UF0506B/Utbildning4",
-    "https://api.scb.se/OV0104/v1/doris/sv/ssd/START/UF/UF0506/UF0506A/Utbildning3",
-    "https://api.scb.se/OV0104/v1/doris/sv/ssd/START/UF/UF0506/UF0506C/Utbildning4C",
+    "https://api.scb.se/OV0104/v1/doris/sv/ssd/START/UF/UF0506/UF0506B/Utbildning",
+    "https://api.scb.se/OV0104/v1/doris/sv/ssd/START/UF/UF0506/UF0506B/UtbBefRegionR",
 ]
 
 _PROJECT_ROOT = Path(__file__).parents[2]
@@ -53,6 +61,12 @@ _CACHE_FILE: Path = _PROJECT_ROOT / "data" / "raw" / "education.json"
 _CACHE_MAX_AGE_DAYS: int = 7
 _EXPECTED_COMMUNES: int = 290
 _DEFAULT_YEARS: list[int] = list(range(2010, 2025))
+
+_CACHE_DTYPES: dict[str, str] = {
+    "kommun_kod": "str_zfill4",
+    "year": "int",
+    "edu_share": "float",
+}
 
 # SUN 2000 codes for the numerator (eftergymnasial 3+ år + forskarutbildning)
 _HIGH_EDU_LEVELS: frozenset[str] = frozenset({"6", "7"})
@@ -65,6 +79,25 @@ _SEX_TOTAL_CODES: list[str] = ["1+2"]
 
 # Keywords to identify the population count ContentsCode.
 _COUNT_KEYWORDS: tuple[str, ...] = ("antal", "befolkning", "folkmängd", "count", "persons")
+
+
+# ---------------------------------------------------------------------------
+# Named tuple for table discovery result
+# ---------------------------------------------------------------------------
+
+
+class TableConfig(NamedTuple):
+    """Configuration resolved from PxWeb table metadata for the education query."""
+
+    table_url: str
+    contents_code: str
+    edu_dim_code: str
+    edu_level_codes: list[str]
+    age_dim_code: str
+    age_codes: list[str]
+    sex_dim_code: str
+    sex_codes: list[str]
+    region_codes: list[str]  # 4-digit municipality codes; replaces vs:RegionKommun07EjAggr
 
 
 # ---------------------------------------------------------------------------
@@ -101,19 +134,32 @@ def fetch_education(
     if years is None:
         years = _DEFAULT_YEARS
 
-    if not force_refresh and _is_cache_fresh(_CACHE_FILE):
+    if not force_refresh and is_cache_fresh(_CACHE_FILE, _CACHE_MAX_AGE_DAYS):
         logger.info("Loading education from cache: %s", _CACHE_FILE)
-        df = _load_cache(_CACHE_FILE)
+        df = load_df_cache(_CACHE_FILE, _CACHE_DTYPES)
     else:
-        table_url, contents_code, edu_dim, edu_level_codes, age_dim, age_codes, sex_dim, sex_codes = (
-            _discover_table()
+        config = _discover_table()
+        # If the table has no combined-sex code (e.g. '1+2') and uses individual
+        # age codes for the 25-64 range, a single POST exceeds the SCB cell limit
+        # (~150 000 cells).  Chunk by year and sex to stay within the limit:
+        #   per chunk: 290 muni × 40 ages × 8 edu × 1 sex ≈ 92 800 cells.
+        needs_chunking = (
+            len(config.sex_codes) > 1
+            and "1+2" not in config.sex_codes
+            and len(config.age_codes) > 5  # individual years, not a single bracket
         )
-        query_body = _build_query(
-            contents_code, edu_dim, edu_level_codes, age_dim, age_codes, sex_dim, sex_codes, years
-        )
-        df_raw = query_pxweb(table_url, query_body)
+        if needs_chunking:
+            logger.info(
+                "No combined sex code — fetching %d year(s) × %d sex code(s) "
+                "in separate POST requests to stay within SCB cell limit.",
+                len(years), len(config.sex_codes),
+            )
+            df_raw = _fetch_chunked_by_sex_year(config, years)
+        else:
+            query_body = _build_query(config, years)
+            df_raw = query_pxweb(config.table_url, query_body)
         df = _compute_edu_share(df_raw)
-        _save_cache(df, _CACHE_FILE)
+        save_df_cache(df, _CACHE_FILE)
 
     df = df[df["year"].isin(years)].reset_index(drop=True)
     _verify(df, years)
@@ -133,7 +179,7 @@ def fetch_education(
 # ---------------------------------------------------------------------------
 
 
-def _discover_table() -> tuple[str, str, str, list[str], str, list[str], str, list[str]]:
+def _discover_table() -> TableConfig:
     """Probe candidate UF0506 subtable URLs and return query parameters.
 
     For each candidate URL, fetches metadata and checks:
@@ -143,14 +189,7 @@ def _discover_table() -> tuple[str, str, str, list[str], str, list[str], str, li
       - An age dimension covering 25–64 exists.
 
     Returns:
-        Tuple of:
-          (table_url, contents_code,
-           edu_dim_code, edu_level_codes,
-           age_dim_code, age_codes,
-           sex_dim_code, sex_codes)
-        where *_dim_code is the exact API dimension code name to use in queries,
-        and *_codes are the value lists to request.  edu_level_codes contains
-        ALL available education levels so the denominator can be computed.
+        A TableConfig named tuple containing all resolved query parameters.
 
     Raises:
         ValueError: If no candidate subtable is accessible or usable.
@@ -192,36 +231,40 @@ def _discover_table() -> tuple[str, str, str, list[str], str, list[str], str, li
             )
             continue
 
+        # Extract municipality codes. The vs:RegionKommun07EjAggr value-set
+        # filter no longer works on the SCB API (returns HTTP 400); use
+        # explicit 4-digit codes with filter=item instead.
+        region_codes = sorted(
+            c for c in get_dimension_codes(meta, "Region")
+            if len(c) == 4 and c.isdigit()
+        )
+
         logger.info(
-            "Selected education subtable: %s  ContentsCode=%s  edu_dim=%s  levels=%s",
+            "Selected education subtable: %s  ContentsCode=%s  edu_dim=%s  "
+            "levels=%s  region_codes=%d",
             url,
             contents_code,
             edu_dim_code,
             edu_codes,
+            len(region_codes),
         )
-        return url, contents_code, edu_dim_code, edu_codes, age_dim_code, age_codes, sex_dim_code, sex_codes
+        return TableConfig(
+            table_url=url,
+            contents_code=contents_code,
+            edu_dim_code=edu_dim_code,
+            edu_level_codes=edu_codes,
+            age_dim_code=age_dim_code,
+            age_codes=age_codes,
+            sex_dim_code=sex_dim_code,
+            sex_codes=sex_codes,
+            region_codes=region_codes,
+        )
 
     raise ValueError(
         "No accessible UF0506 subtable found.  Tried: "
         + ", ".join(_CANDIDATE_URLS)
         + ".  Verify subtable names via SCB API browser."
     )
-
-
-def _get_dimension_codes(metadata: dict, dimension_code: str) -> list[str]:
-    """Extract all value codes for a named dimension from table metadata.
-
-    Args:
-        metadata: Table metadata dict returned by fetch_metadata.
-        dimension_code: The dimension code to look up (exact match).
-
-    Returns:
-        List of value code strings, or empty list if dimension is absent.
-    """
-    for var in metadata.get("variables", []):
-        if var.get("code") == dimension_code:
-            return var.get("values", [])
-    return []
 
 
 def _resolve_edu_dim(metadata: dict) -> tuple[str, list[str]]:
@@ -238,7 +281,7 @@ def _resolve_edu_dim(metadata: dict) -> tuple[str, list[str]]:
         ("", []) if not found.
     """
     for candidate in ("UtbildningsNiva", "UtbildningNiva", "Utbildningsniva"):
-        codes = _get_dimension_codes(metadata, candidate)
+        codes = get_dimension_codes(metadata, candidate)
         if codes:
             return candidate, codes
     return "", []
@@ -345,31 +388,16 @@ def _discover_contents_code(metadata: dict, url: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def _build_query(
-    contents_code: str,
-    edu_dim_code: str,
-    edu_level_codes: list[str],
-    age_dim_code: str,
-    age_codes: list[str],
-    sex_dim_code: str,
-    sex_codes: list[str],
-    years: list[int],
-) -> dict:
+def _build_query(config: TableConfig, years: list[int]) -> dict:
     """Build the PxWeb POST query body for UF0506 education counts.
 
     Queries ALL education levels so that the response contains both the
     numerator (levels 6+7) and the denominator (all levels summed).
-    Uses the exact dimension code names returned by _discover_table to avoid
+    Uses the exact dimension code names from the TableConfig to avoid
     400 errors from code-name mismatches (e.g. 'UtbildningNiva' vs 'UtbildningsNiva').
 
     Args:
-        contents_code: The ContentsCode for population counts.
-        edu_dim_code: Exact API code name for the education dimension.
-        edu_level_codes: All available education level codes (used as-is).
-        age_dim_code: Exact API code name for the age dimension.
-        age_codes: Age codes covering the 25–64 bracket.
-        sex_dim_code: Exact API code name for the sex dimension.
-        sex_codes: Sex / total codes to include.
+        config: Resolved TableConfig from _discover_table.
         years: List of integer years to request.
 
     Returns:
@@ -380,36 +408,38 @@ def _build_query(
             {
                 "code": "Region",
                 "selection": {
-                    "filter": "vs:RegionKommun07EjAggr",
-                    "values": [],
+                    # Explicit municipality codes replace the vs:RegionKommun07EjAggr
+                    # value-set filter which the SCB API no longer accepts (HTTP 400).
+                    "filter": "item",
+                    "values": config.region_codes,
                 },
             },
             {
-                "code": edu_dim_code,
+                "code": config.edu_dim_code,
                 "selection": {
                     "filter": "item",
-                    "values": edu_level_codes,
+                    "values": config.edu_level_codes,
                 },
             },
             {
-                "code": age_dim_code,
+                "code": config.age_dim_code,
                 "selection": {
                     "filter": "item",
-                    "values": age_codes,
+                    "values": config.age_codes,
                 },
             },
             {
-                "code": sex_dim_code,
+                "code": config.sex_dim_code,
                 "selection": {
                     "filter": "item",
-                    "values": sex_codes,
+                    "values": config.sex_codes,
                 },
             },
             {
                 "code": "ContentsCode",
                 "selection": {
                     "filter": "item",
-                    "values": [contents_code],
+                    "values": [config.contents_code],
                 },
             },
             {
@@ -427,6 +457,37 @@ def _build_query(
 # ---------------------------------------------------------------------------
 # Private helpers — share computation
 # ---------------------------------------------------------------------------
+
+
+def _fetch_chunked_by_sex_year(config: TableConfig, years: list[int]) -> pd.DataFrame:
+    """Fetch UF0506 data one (year, sex) chunk at a time to stay under cell limit.
+
+    Used when the table has no combined-sex code and individual age codes make
+    a full POST exceed the SCB cell limit (~150 000 cells).  Each chunk covers
+    exactly one year and one sex code, keeping the cell count at:
+        290 muni × ~40 ages × 8 edu levels × 1 sex ≈ 92 800 cells.
+
+    Args:
+        config: Resolved TableConfig (sex_codes contains individual codes, e.g. ['1','2']).
+        years: List of integer years to fetch.
+
+    Returns:
+        Concatenated raw DataFrame from all (year, sex) chunks.
+    """
+
+    frames: list[pd.DataFrame] = []
+    for year in years:
+        for sex_code in config.sex_codes:
+            sex_config = config._replace(sex_codes=[sex_code])
+            q = _build_query(sex_config, [year])
+            logger.info(
+                "Fetching education year %d, sex %s from %s",
+                year, sex_code, config.table_url,
+            )
+            df_part = query_pxweb(config.table_url, q)
+            frames.append(df_part)
+
+    return pd.concat(frames, ignore_index=True)
 
 
 def _compute_edu_share(df_raw: pd.DataFrame) -> pd.DataFrame:
@@ -488,7 +549,6 @@ def _compute_edu_share(df_raw: pd.DataFrame) -> pd.DataFrame:
     df["count"] = pd.to_numeric(df["count"], errors="coerce").fillna(0)
 
     # Compute numerator (levels 6+7) and denominator (all levels) per (kommun, year).
-    # Filter first, then groupby — avoids fragile cross-group index references.
     group_keys = ["kommun_kod", "year"]
     total = df.groupby(group_keys)["count"].sum()
     high_edu = (
@@ -498,58 +558,6 @@ def _compute_edu_share(df_raw: pd.DataFrame) -> pd.DataFrame:
     )
     edu_share = (100.0 * high_edu / total.replace(0, float("nan"))).rename("edu_share")
     return edu_share.reset_index()
-
-
-# ---------------------------------------------------------------------------
-# Private helpers — cache management
-# ---------------------------------------------------------------------------
-
-
-def _is_cache_fresh(cache_path: Path) -> bool:
-    """Return True if the cache file exists and is younger than the max age.
-
-    Args:
-        cache_path: Path to the cached JSON file.
-
-    Returns:
-        True if the file exists and its mtime is within CACHE_MAX_AGE_DAYS.
-    """
-    if not cache_path.exists():
-        return False
-    mtime = datetime.fromtimestamp(cache_path.stat().st_mtime)
-    return (datetime.now() - mtime) < timedelta(days=_CACHE_MAX_AGE_DAYS)
-
-
-def _save_cache(df: pd.DataFrame, cache_path: Path) -> None:
-    """Persist the cleaned DataFrame to the cache JSON file.
-
-    Args:
-        df: Cleaned DataFrame with [kommun_kod, year, edu_share].
-        cache_path: Destination path for the JSON file.
-    """
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    cache_path.write_text(
-        df.to_json(orient="records", force_ascii=False),
-        encoding="utf-8",
-    )
-    logger.info("Cached education data to %s", cache_path)
-
-
-def _load_cache(cache_path: Path) -> pd.DataFrame:
-    """Load the cleaned DataFrame from the cache JSON file.
-
-    Args:
-        cache_path: Path to the JSON cache file.
-
-    Returns:
-        DataFrame with correctly typed columns [kommun_kod, year, edu_share].
-    """
-    records = json.loads(cache_path.read_text(encoding="utf-8"))
-    df = pd.DataFrame(records)
-    df["kommun_kod"] = df["kommun_kod"].astype(str).str.zfill(4)
-    df["year"] = df["year"].astype(int)
-    df["edu_share"] = pd.to_numeric(df["edu_share"])
-    return df
 
 
 # ---------------------------------------------------------------------------
