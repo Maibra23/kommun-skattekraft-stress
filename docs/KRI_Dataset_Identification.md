@@ -45,29 +45,35 @@ The `{topic}` segment of the URL must match the table family (e.g. OE for offent
 
 ### Query parameters
 ```python
+# Step 1: GET metadata to discover region codes and confirm ContentsCode
+metadata = fetch_metadata(TABLE_URL)
+region_codes = sorted(
+    c for c in get_dimension_codes(metadata, "Region")
+    if len(c) == 4 and c.isdigit()  # 290 municipality codes; excludes county/national totals
+)
+
+# Step 2: POST query with explicit codes
 query_body = {
     "query": [
         {
             "code": "Region",
             "selection": {
-                "filter": "vs:RegionKommun07EjAggr",  # 290 kommuner, no aggregations
-                "values": []  # empty = all
+                "filter": "item",                  # explicit list (vs: filter is deprecated)
+                "values": region_codes              # 290 four-digit codes from metadata
             }
         },
         {
             "code": "ContentsCode",
             "selection": {
                 "filter": "item",
-                "values": ["000001LB"]  # skattekraft per invånare; verify code on first call
+                "values": ["OE0101A0"]              # skattekraft per invånare (confirmed via metadata)
             }
         },
         {
             "code": "Tid",
             "selection": {
                 "filter": "item",
-                "values": ["2010", "2011", "2012", "2013", "2014",
-                           "2015", "2016", "2017", "2018", "2019",
-                           "2020", "2021", "2022", "2023", "2024"]
+                "values": [str(y) for y in range(2009, 2025)]  # 2009 needed for 2010 growth baseline
             }
         }
     ],
@@ -75,7 +81,7 @@ query_body = {
 }
 ```
 
-**Important:** The exact `ContentsCode` value (e.g. `000001LB`) must be confirmed by an initial GET to the table metadata endpoint. The fetcher in `src/fetch/pxweb_client.py` should fetch metadata first, then construct the query.
+**Important:** The `vs:RegionKommun07EjAggr` value-set filter was deprecated by SCB and returns HTTP 400. The pipeline discovers explicit 4-digit municipality codes from the metadata at runtime. The `ContentsCode` `OE0101A0` is confirmed against metadata; if SCB changes it, the fetcher falls back to keyword matching on "skattekraft, kronor per" in the value texts. Year 2009 is included to compute the 2010 growth rate baseline; it is dropped from the final panel.
 
 ### Response schema
 ```json
@@ -93,12 +99,14 @@ query_body = {
 ```
 
 ### Expected row count
-290 kommuner × 15 years = **4 350 rows**
+290 kommuner × 16 years (2009–2024) = **4 640 rows** from API; after dropping 2009 growth-baseline rows, the final panel contains 290 × 15 = **4 350 rows**.
 
 ### Known issues
 1. **Reference year vs income year:** Skattekraft for year t is based on income from year t-2. The 2025 published number reflects 2023 income. Document this explicitly in tooltips.
-2. **Cell limit:** pxweb caps cells per query at ~150,000. 290 × 1 metric × 15 years = 4 350 cells, well under limit. No chunking needed.
+2. **Cell limit:** pxweb caps cells per query at ~150,000. 290 × 1 metric × 16 years = 4 640 cells, well under limit. No chunking needed.
 3. **Kommun code changes:** None within 2010–2024 window. (Knivsta separated from Uppsala in 2003, before window.) Verified.
+4. **Value-set filter deprecated:** `vs:RegionKommun07EjAggr` returns HTTP 400 as of 2024. Pipeline uses explicit 290 codes from metadata. See METHODOLOGY §12.1.
+5. **ContentsCode change:** The legacy code `000001LB` was replaced by `OE0101A0`. Pipeline confirms code at runtime via metadata.
 
 ### Join key
 `region` (4-digit kommun code, zero-padded). Use `kommun_kod` as the column name after rename.
@@ -109,8 +117,8 @@ Annual, typically published in December for the following budget year (skattekra
 ### Verification check (Day 1)
 After fetching, verify:
 * Exactly 290 unique `kommun_kod` values per year
-* `Danderyd` (kod 0162) has the highest 2024 value
-* National mean of 2024 values approximately matches SCB's reported 271 000 SEK (2024 figure)
+* `Danderyd` (kod 0162) has the highest 2024 value (observed: 481 069 SEK)
+* Unweighted mean of 2024 values within 200 000–350 000 SEK range (observed: 230 660 SEK). Note: SCB's published "riksmedelvärde" (~271 000 SEK) is population-weighted and therefore higher than the unweighted municipality mean
 
 ---
 
@@ -119,42 +127,64 @@ After fetching, verify:
 ### Identification
 * **Authority:** SCB STATIV (data originally from Arbetsförmedlingen)
 * **Statistic name:** Integration och arbetsmarknad — andel öppet arbetslösa
-* **Table ID:** AA0003 (subtable family: AA0003B)
-* **Web reference:** `https://www.statistikdatabasen.scb.se/pxweb/sv/ssd/START__AA__AA0003__AA0003B/`
-* **API endpoint base:** `https://api.scb.se/OV0104/v1/doris/sv/ssd/START/AA/AA0003/AA0003B/`
+* **Table ID:** AA0003 (two subtables — see coverage below)
+* **API endpoints:**
+  * **2010–2021:** `https://api.scb.se/OV0104/v1/doris/sv/ssd/START/AA/AA0003/AA0003X/IntGr1KomKonUtb` (archived table, 1997–2021)
+  * **2022–2024:** `https://api.scb.se/OV0104/v1/doris/sv/ssd/START/AA/AA0003/AA0003B/IntGr1KomUtbBAS` (current table, 2022–present)
 
 ### Definition
 "Andelen personer som någon gång under året registrerats som öppet arbetslösa i sökandekategori för öppen arbetslöshet, dividerat med befolkningen 20–64 år."
 
+This is a **flow measure** (registered at any point during the year), not a point-in-time stock. Values are therefore higher than AKU survey-based unemployment.
+
 ### Coverage
-* **Time:** Per the table description, AA0003B contains data only for the 2022–2023 web preview, but the underlying STATIV database holds data from 1997 forward. **Action: confirm full series availability via metadata call on Day 1.** If pre-2022 data is not exposed via this specific subtable, fall back to the older STATIV table or use the alternative endpoint.
+* **Time:** 2010–2024 via two-table strategy. SCB reorganized the STATIV tables around 2023–2024: the old subtable `AA0003B/IntGr1KomKonUtb` was moved to the archive path `AA0003X` and a new subtable `AA0003B/IntGr1KomUtbBAS` was introduced covering 2022 onwards. See METHODOLOGY §12.2.
 * **Geography:** All 290 kommuner
-* **Unit:** Percent (share)
+* **Unit:** Percent (share of population 20–64)
 
-### Fallback strategy if AA0003B does not provide 2010–2021
-1. **Primary alternative:** Pull from older STATIV-derived table (search SCB pxweb for "Andel öppet arbetslösa" with longer time series; an integration table starting 1997 is documented to exist).
-2. **Secondary alternative:** Compute manually from Arbetsförmedlingen's monthly statistics aggregated to annual mean. Adds complexity.
-3. **Last resort:** Restrict time window to 2014–2024 and document the trade-off in METHODOLOGY §7.
+### Two-table strategy (implemented)
+The pipeline splits the requested year range at the 2021/2022 boundary:
 
-### Query parameters (template, adjust after metadata check)
+| Year range | Table URL | Coverage |
+|---|---|---|
+| 2010–2021 | `AA0003X/IntGr1KomKonUtb` | 1997–2021 (archived, still accessible) |
+| 2022–2024 | `AA0003B/IntGr1KomUtbBAS` | 2022–present |
+
+Results from both tables are concatenated. Constants `_OLD_TABLE_LAST_YEAR = 2021` and `_NEW_TABLE_FIRST_YEAR = 2022` in `fetch_unemployment.py` control the split.
+
+### Query parameters (per table)
 ```python
+# Step 1: GET metadata to discover region codes
+metadata = fetch_metadata(table_url)
+region_codes = sorted(
+    c for c in get_dimension_codes(metadata, "Region")
+    if len(c) == 4 and c.isdigit()
+)
+
+# Step 2: POST query using total-aggregate codes to avoid cell limit
 query_body = {
     "query": [
-        {"code": "Region", "selection": {"filter": "vs:RegionKommun07EjAggr", "values": []}},
-        {"code": "ContentsCode", "selection": {"filter": "item", "values": ["<TBD from metadata>"]}},
-        {"code": "Tid", "selection": {"filter": "item", "values": [str(y) for y in range(2010, 2025)]}}
+        {"code": "Region", "selection": {"filter": "item", "values": region_codes}},
+        {"code": "Kon", "selection": {"filter": "item", "values": ["1+2"]}},       # both sexes (SCB total)
+        {"code": "UtbNiv", "selection": {"filter": "item", "values": ["000"]}},     # all education levels (SCB total)
+        {"code": "BakgrVar", "selection": {"filter": "item", "values": ["TOT"]}},   # all backgrounds (SCB total)
+        {"code": "ContentsCode", "selection": {"filter": "item", "values": ["<from metadata>"]}},
+        {"code": "Tid", "selection": {"filter": "item", "values": [str(y) for y in subset_years]}}
     ],
     "response": {"format": "json"}
 }
 ```
 
+**Total-code optimization:** Using `Kön='1+2'`, `UtbNiv='000'`, `BakgrVar='TOT'` selects the pre-aggregated SCB total directly. This reduces each POST to 290 × 1 × 1 × 1 × n_years cells (well within the ~150 000 cell limit) and avoids any need for client-side averaging.
+
 ### Expected row count
-290 × 15 = **4 350 rows** (assuming full series available)
+290 × 15 = **4 350 rows** (concatenated from both tables)
 
 ### Known issues
 1. **Definition change in 2018:** SCB updated the methodology — "från och med uppdatering år 2018 av nya uppgifter från 1997 och framåt justerades även innehållet i Andel öppet arbetslösa." Pre-2018 values may differ slightly from post-2018 series. The table notes this; we accept it and document.
-2. **Series break with RAMS / BAS transition:** RAMS was discontinued in 2022, replaced by BAS (Befolkningens arbetsmarknadsstatus). For our use case, we use the STATIV-derived "Andel öppet arbetslösa" which draws from Arbetsförmedlingen registrations directly, avoiding the RAMS/BAS break.
-3. **Not the same as AKU:** AKU (Arbetskraftsundersökningarna) is the official survey-based unemployment rate but is unavailable at kommun level for small kommuner. The STATIV register-based measure is what's actually usable. Volunteer this limitation in interviews (METHODOLOGY §7).
+2. **STATIV table restructure (2023–2024):** The old `AA0003B/IntGr1KomKonUtb` subtable (and its siblings `IntGr1KomKon`, `IntGr1Kom`) was moved to archive path `AA0003X`. The new `AA0003B/IntGr1KomUtbBAS` only covers 2022+. The pipeline uses both tables. See METHODOLOGY §12.2.
+3. **Not the same as AKU:** AKU (Arbetskraftsundersökningarna) is the official survey-based unemployment rate but is unavailable at kommun level for small kommuner. The STATIV register-based measure is a flow measure (higher values than AKU). Volunteer this limitation in interviews (METHODOLOGY §7).
+4. **Value-set filter deprecated:** `vs:RegionKommun07EjAggr` returns HTTP 400. Pipeline uses explicit codes from metadata. See METHODOLOGY §12.1.
 
 ### Join key
 `region` → `kommun_kod` (4-digit, zero-padded).
@@ -164,7 +194,7 @@ Annual, published mid-year for previous reference year.
 
 ### Verification check (Day 1)
 * All 290 kommuner present per year
-* National mean should be in plausible range (3–8% historically)
+* National mean in plausible range for register-based flow measure: 8–15 % (observed: 11.6 % mean across 2010–2024). Note: this is higher than AKU point-in-time unemployment (3–8 %) because the STATIV measure counts anyone registered as unemployed at any point during the year
 * Norrland and Bergslagen kommuner should generally show higher values than Stockholm/Mälardalen
 
 ---
@@ -189,27 +219,34 @@ Folkmängd by kommun, single-year age, sex. We aggregate to age groups for our d
 
 ### Query parameters
 ```python
+# Step 1: GET metadata to discover region codes and resolve table URL
+# Primary: BE0101A/BefolkningNy; fallback: BE0101A/FolkmangdNov
+table_url, metadata = _resolve_table_url()
+region_codes = sorted(
+    c for c in get_dimension_codes(metadata, "Region")
+    if len(c) == 4 and c.isdigit()
+)
+
+# Step 2: POST one query per year (chunked to stay under cell limit)
 query_body = {
     "query": [
-        {"code": "Region", "selection": {"filter": "vs:RegionKommun07EjAggr", "values": []}},
+        {"code": "Region", "selection": {"filter": "item", "values": region_codes}},
         {"code": "Alder", "selection": {"filter": "item", "values": [
-            # All single-year ages 0 through 100+
             *[str(a) for a in range(0, 100)], "100+"
         ]}},
-        {"code": "Kon", "selection": {"filter": "item", "values": ["1", "2"]}},  # both sexes
-        {"code": "ContentsCode", "selection": {"filter": "item", "values": ["BE0101N1"]}},  # folkmangd
-        {"code": "Tid", "selection": {"filter": "item", "values": [str(y) for y in range(2009, 2025)]}}
+        {"code": "Kon", "selection": {"filter": "item", "values": ["1", "2"]}},
+        {"code": "ContentsCode", "selection": {"filter": "item", "values": ["BE0101N1"]}},
+        {"code": "Tid", "selection": {"filter": "item", "values": [str(year)]}}  # one year at a time
     ],
     "response": {"format": "json"}
 }
 ```
 
 ### Expected row count and chunking
-* 290 kommuner × 101 ages × 2 sexes × 16 years = **937 280 cells**
-* **Exceeds pxweb cell limit (~150 000).** MUST chunk.
-* **Chunking strategy:** Iterate over years, one year per query → 290 × 101 × 2 = 58 580 cells per query. Well under limit. 16 sequential queries.
-
-Alternative chunking: query age groups (0-19, 20-64, 65+) directly if the table allows aggregation. Reduces complexity downstream.
+* 290 kommuner × 101 ages × 2 sexes × 16 years = **937 280 cells total**
+* **Exceeds pxweb cell limit (~150 000).** Chunked by year.
+* **Chunking strategy:** One year per POST → 290 × 101 × 2 = 58 580 cells per query. Well under limit. 16 sequential queries with per-year caching (`data/raw/population_{year}.json`).
+* After fetching, single-year ages are aggregated to three broad age groups: `0-19`, `20-64`, `65+` (summing across both sexes). This produces 290 × 3 age groups per year.
 
 ### Derived variables
 * `dependency_ratio_t = (pop_aged_0_19_t + pop_aged_65plus_t) / pop_aged_20_64_t`
@@ -222,11 +259,16 @@ Alternative chunking: query age groups (0-19, 20-64, 65+) directly if the table 
 ### Refresh cadence
 Annual, published February for previous year-end.
 
+### Known issues
+1. **Value-set filter deprecated:** `vs:RegionKommun07EjAggr` returns HTTP 400. Pipeline uses explicit codes from metadata. See METHODOLOGY §12.1.
+2. **Table URL may change:** Primary table `BefolkningNy` has a fallback to `FolkmangdNov`. The fetcher tries both.
+3. **Long-format output:** The aggregated DataFrame has 3 rows per (municipality, year) — one per age group. The `validate_and_harmonize` step in `build_panel.py` uses a deduplicated slice to avoid false duplicate errors.
+
 ### Verification check (Day 1)
-* National total approximately matches SCB published 10.55 million (2024 year-end)
-* Stockholm kommun (kod 0180) is largest by population
+* National total approximately matches SCB published 10.55 million (observed 2024: 10 587 710)
+* Stockholm kommun (kod 0180) is largest by population (observed: 995 574)
 * Bjurholm (kod 2403) or similar small Norrland kommun is among smallest
-* `dependency_ratio` is roughly 0.7–0.9 nationally, with rural kommuner higher
+* `dependency_ratio` range approximately 0.5–1.25 nationally (observed: 0.508–1.241), with rural kommuner higher
 
 ---
 
@@ -237,40 +279,59 @@ Annual, published February for previous year-end.
 * **Statistic name:** Befolkningens utbildning
 * **Table ID:** UF0506
 * **Web reference:** `https://www.statistikdatabasen.scb.se/pxweb/sv/ssd/START__UF__UF0506/`
-* **Likely subtable:** `UF0506B/Utbildning4` or similar (verify via metadata)
-* **API endpoint base:** `https://api.scb.se/OV0104/v1/doris/sv/ssd/START/UF/UF0506/`
+* **Current subtable:** `UF0506B/Utbildning` (1985–2024). Fallback: `UF0506B/UtbBefRegionR`
+* **API endpoint:** `https://api.scb.se/OV0104/v1/doris/sv/ssd/START/UF/UF0506/UF0506B/Utbildning`
 
 ### Definition
-Andel av befolkningen 25–64 år med eftergymnasial utbildning 3 år eller längre, per kommun.
+Andel av befolkningen 25–64 år med eftergymnasial utbildning 3 år eller längre (SUN 2020 codes 6+7), per kommun.
 
 ### Coverage
 * **Time:** Annual, available for full 2010–2024 window (typically published spring of following year)
 * **Geography:** All 290 kommuner
-* **Unit:** Percent (share)
+* **Unit:** Number of persons per (kommun, age, sex, education level) cell; pipeline computes percent share
 
-### Query parameters (template)
+### Query parameters
 ```python
-query_body = {
-    "query": [
-        {"code": "Region", "selection": {"filter": "vs:RegionKommun07EjAggr", "values": []}},
-        {"code": "UtbildningsNiva", "selection": {"filter": "item", "values": ["6", "7"]}},  # eftergymnasial 3+ år
-        {"code": "Alder", "selection": {"filter": "item", "values": ["25-64"]}},
-        {"code": "Kon", "selection": {"filter": "item", "values": ["1+2"]}},  # total
-        {"code": "ContentsCode", "selection": {"filter": "item", "values": ["<TBD>"]}},
-        {"code": "Tid", "selection": {"filter": "item", "values": [str(y) for y in range(2010, 2025)]}}
-    ],
-    "response": {"format": "json"}
-}
+# Step 1: GET metadata to discover region codes, education codes, age codes, sex codes
+metadata = fetch_metadata(table_url)
+region_codes = sorted(
+    c for c in get_dimension_codes(metadata, "Region")
+    if len(c) == 4 and c.isdigit()
+)
+# Education codes for SUN 6+7 (eftergymnasial 3+ år + forskarutbildning)
+# Age codes for 25-64 range (individual year codes, e.g. "25", "26", ..., "64")
+# Sex codes: "1" (men) and "2" (women) — no combined "1+2" code in current table
+
+# Step 2: POST query — chunked by (year, sex) to stay under cell limit
+# Per chunk: 290 × 40 ages × 8 edu levels × 1 sex = 92 800 cells (under 150 000 limit)
+for year in years:
+    for sex_code in ["1", "2"]:
+        query_body = {
+            "query": [
+                {"code": "Region", "selection": {"filter": "item", "values": region_codes}},
+                {"code": "UtbildningsNiva", "selection": {"filter": "item", "values": edu_codes}},
+                {"code": "Alder", "selection": {"filter": "item", "values": age_codes}},
+                {"code": "Kon", "selection": {"filter": "item", "values": [sex_code]}},
+                {"code": "ContentsCode", "selection": {"filter": "item", "values": [contents_code]}},
+                {"code": "Tid", "selection": {"filter": "item", "values": [str(year)]}}
+            ],
+            "response": {"format": "json"}
+        }
 ```
 
-**Action Day 1:** Confirm exact code values via metadata. The actual UtbildningsNiva codes (SUN 2000) are: 1 = förgymnasial <9 år, 2 = förgymnasial 9 år, 3 = gymnasial <3 år, 4 = gymnasial 3 år, 5 = eftergymnasial <3 år, 6 = eftergymnasial 3+ år, 7 = forskarutbildning. We sum codes 6+7.
+**Per-sex-year chunking:** The current `UF0506B/Utbildning` table has no combined sex code (`1+2`). With 290 × 40 ages × 8 education levels × 2 sexes = 185 600 cells per year, the SCB cell limit (~150 000) is exceeded. The pipeline detects this and fetches one (year, sex) pair at a time (92 800 cells each), then aggregates across sex to compute `edu_share`. See METHODOLOGY §12.4.
+
+**Education share formula:** `edu_share = sum(population with SUN 6+7) / sum(population with any SUN code)`, computed per (kommun, year) after aggregating across all age codes in the 25–64 range and both sexes.
 
 ### Expected row count
-290 × 15 = **4 350 rows** (after summing the two utbildningsnivå codes)
+290 × 15 = **4 350 rows** (after aggregation to edu_share per kommun-year)
 
 ### Known issues
-1. **Slow-moving:** Education stocks change slowly within a kommun. Within-kommun variation across 15 years is modest. β₄ may have wide confidence interval. Document in METHODOLOGY §6.
-2. **Definition stable:** SUN 2000 has been used consistently across the time window. No series break.
+1. **Slow-moving:** Education stocks change slowly within a kommun. Within-kommun variation across 15 years is modest. β₄ may have wide confidence interval. Document in METHODOLOGY §7.7.
+2. **Definition stable:** SUN 2020 has been used consistently across the time window. No series break.
+3. **Table renamed (2024):** Old subtable names `Utbildning4`, `Utbildning3`, `Utbildning4C` all return HTTP 400. Current table is `UF0506B/Utbildning`. See METHODOLOGY §12.3.
+4. **Value-set filter deprecated:** `vs:RegionKommun07EjAggr` returns HTTP 400. Pipeline uses explicit codes from metadata. See METHODOLOGY §12.1.
+5. **No combined sex code:** Unlike older tables, `Utbildning` has only `Kön='1','2'` (no `'1+2'`). Requires per-sex chunking. See METHODOLOGY §12.4.
 
 ### Join key
 `region` → `kommun_kod`.
@@ -281,7 +342,7 @@ Annual, typically published April–May.
 ### Verification check (Day 1)
 * Lund kommun (kod 1281) and Stockholm should have highest values
 * Rural Norrland kommuner should have lowest
-* National mean approximately 30% (verify against SCB published statistic)
+* National mean approximately 19–20 % for SUN codes 6+7 only (observed: 19.5 %). Note: the broader "all post-secondary" figure (~30 %) includes SUN code 5 (eftergymnasial <3 år), which we exclude
 
 ---
 

@@ -14,7 +14,7 @@ For data sources and URLs, see `KRI_Dataset_Identification.md`. This document fo
 
 Swedish kommuner finance their operations primarily through municipal income tax (kommunalskatt) levied on residents' taxable employment income. The tax base per inhabitant — *skattekraft* — is therefore the central determinant of a kommun's fiscal capacity.
 
-Skattekraft varies enormously across the 290 kommuner: in 2024, Danderyd reported approximately 496 000 SEK per inhabitant while small Norrland kommuner reported under 200 000 SEK. The Swedish kommunalekonomisk utjämningssystem partially offsets these differences through grants from high-skattekraft to low-skattekraft kommuner, but the underlying tax base remains a real constraint on each kommun's fiscal autonomy and creditworthiness.
+Skattekraft varies enormously across the 290 kommuner: in 2024, Danderyd reported approximately 481 000 SEK per inhabitant while small Norrland kommuner reported under 150 000 SEK. The Swedish kommunalekonomisk utjämningssystem partially offsets these differences through grants from high-skattekraft to low-skattekraft kommuner, but the underlying tax base remains a real constraint on each kommun's fiscal autonomy and creditworthiness.
 
 ### 1.2 Why study skattekraft *growth* rather than levels
 
@@ -196,9 +196,9 @@ The pipeline raises an error and stops if any of these fail. Failure indicates a
 
 | Check | Expected | Source |
 |---|---|---|
-| Highest 2024 skattekraft | Danderyd (kod 0162), approximately 496 000 kr | SCB published statistic |
+| Highest 2024 skattekraft | Danderyd (kod 0162), approximately 481 000 kr | SCB OE0101 fetched data |
 | Bottom 5 skattekraft kommuner 2024 | All from Norrland or sparsely populated regions | Domain knowledge |
-| National mean skattekraft 2024 | Approximately 271 000 kr | SCB published 2024 figure |
+| National mean skattekraft 2024 | Unweighted mean approximately 231 000 kr (range 200 000–350 000 kr) | Pipeline computed; note: SCB's published "riksmedelvärde" (~271 000 kr) is population-weighted and therefore higher |
 | All 290 kommuner present in every year | Yes | Implementation |
 
 ### 6.2 Population checks
@@ -213,10 +213,10 @@ The pipeline raises an error and stops if any of these fail. Failure indicates a
 
 | Check | Expected |
 |---|---|
-| Mean tax_base_growth_pct over 2010–2024 | Positive, between 2.5% and 5% annually |
-| No kommun has tax_base_growth_pct below -10% in any year | True (extreme outliers indicate data error) |
-| 2020 growth distribution | Lower than 2019 (COVID effect visible) |
-| Dependency ratio range | 0.5 to 1.2 across kommuner |
+| Mean tax_base_growth_pct over 2010–2024 | Positive, between 2.5% and 5% annually (observed: 2.65 %) |
+| No kommun has tax_base_growth_pct below -10% in any year | True (observed min: −4.9 %; extreme outliers indicate data error) |
+| 2020 growth distribution | Lower than 2019 (COVID effect visible; observed: 2019 mean 3.2 %, 2020 mean 2.2 %) |
+| Dependency ratio range | 0.5 to 1.25 across kommuner (observed: 0.508–1.241) |
 
 ### 6.4 Model fit checks
 
