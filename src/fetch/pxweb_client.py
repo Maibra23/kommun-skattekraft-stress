@@ -3,12 +3,16 @@
 Provides a low-level function that sends a PxWeb JSON query to any SCB table
 endpoint and returns a pandas DataFrame.  Handles the SCB cell limit by
 splitting large queries into chunks along the time dimension and concatenating
-the results.
+the results.  Also provides shared cache and metadata helpers used by all
+fetcher modules.
 """
 
 import copy
+import json
 import logging
 import time
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -27,7 +31,11 @@ _DEFAULT_TIMEOUT: int = 60  # seconds per request
 
 
 def fetch_metadata(table_url: str) -> dict[str, Any]:
-    """Fetch PxWeb table metadata via HTTP GET.
+    """Fetch PxWeb table metadata via HTTP GET with retry on transient errors.
+
+    Retries up to 3 times with exponential back-off (1 s, 2 s, 4 s) on
+    HTTP 429 (rate-limit) or 5xx (server) responses, consistent with
+    query_pxweb retry behavior.
 
     Args:
         table_url: Full URL of the PxWeb table endpoint (e.g.
@@ -38,16 +46,53 @@ def fetch_metadata(table_url: str) -> dict[str, Any]:
         table structure fields.
 
     Raises:
-        ValueError: If the GET request fails or the response is not valid JSON.
+        ValueError: If all retry attempts fail, a non-recoverable HTTP error
+            is received, or the response is not valid JSON.
     """
-    try:
-        resp = requests.get(table_url, timeout=_DEFAULT_TIMEOUT)
-        resp.raise_for_status()
-        return resp.json()
-    except requests.RequestException as exc:
-        raise ValueError(
-            f"Failed to fetch metadata from {table_url}: {exc}"
-        ) from exc
+    last_exc: Exception | None = None
+
+    for attempt, delay in enumerate([0.0] + _RETRY_DELAYS):
+        if delay:
+            logger.debug("Waiting %.1f s before metadata retry %d.", delay, attempt)
+            time.sleep(delay)
+
+        try:
+            resp = requests.get(table_url, timeout=_DEFAULT_TIMEOUT)
+        except requests.RequestException as exc:
+            last_exc = exc
+            logger.warning(
+                "Network error on metadata attempt %d for %s: %s",
+                attempt + 1, table_url, exc,
+            )
+            continue
+
+        status = resp.status_code
+
+        if 400 <= status < 500 and status != 429:
+            raise ValueError(
+                f"Non-recoverable HTTP {status} fetching metadata from {table_url}."
+            )
+
+        if status == 429 or status >= 500:
+            last_exc = requests.HTTPError(
+                f"HTTP {status} from {table_url}", response=resp
+            )
+            logger.warning(
+                "Retryable HTTP %d on metadata from %s (attempt %d of %d).",
+                status, table_url, attempt + 1, len(_RETRY_DELAYS) + 1,
+            )
+            continue
+
+        try:
+            return resp.json()
+        except ValueError as exc:
+            raise ValueError(
+                f"Could not parse metadata JSON from {table_url}: {exc}"
+            ) from exc
+
+    raise ValueError(
+        f"All metadata retry attempts failed for {table_url}: {last_exc}"
+    ) from last_exc
 
 
 def query_pxweb(table_url: str, query_body: dict[str, Any]) -> pd.DataFrame:
@@ -233,3 +278,112 @@ def _extract_year_range(query_body: dict[str, Any]) -> str:
             if years:
                 return f"{min(years)}-{max(years)}"
     return "unknown"
+
+
+# ---------------------------------------------------------------------------
+# Shared metadata helpers
+# ---------------------------------------------------------------------------
+
+
+def get_dimension_codes(metadata: dict[str, Any], dimension_code: str) -> list[str]:
+    """Extract all value codes for a named dimension from table metadata.
+
+    This is a shared utility used by multiple fetcher modules to inspect
+    PxWeb table metadata without duplicating the lookup logic.
+
+    Args:
+        metadata: Table metadata dict returned by fetch_metadata.
+        dimension_code: The dimension code to look up (exact match).
+
+    Returns:
+        List of value code strings, or empty list if dimension is absent.
+    """
+    for var in metadata.get("variables", []):
+        if var.get("code") == dimension_code:
+            return var.get("values", [])
+    return []
+
+
+def extract_tid_years(metadata: dict[str, Any]) -> list[int]:
+    """Extract available integer years from the Tid variable in table metadata.
+
+    Args:
+        metadata: Table metadata dict returned by fetch_metadata.
+
+    Returns:
+        Sorted list of integer years found in the Tid dimension.
+    """
+    for var in metadata.get("variables", []):
+        if var.get("code") == "Tid":
+            raw_values: list[str] = var.get("values", [])
+            years: list[int] = []
+            for v in raw_values:
+                try:
+                    years.append(int(v))
+                except ValueError:
+                    pass
+            return sorted(years)
+    return []
+
+
+# ---------------------------------------------------------------------------
+# Shared cache helpers
+# ---------------------------------------------------------------------------
+
+
+def is_cache_fresh(cache_path: Path, max_age_days: int = 7) -> bool:
+    """Return True if a cache file exists and is younger than the max age.
+
+    Args:
+        cache_path: Path to the cached file.
+        max_age_days: Maximum age in days before the cache is stale.
+
+    Returns:
+        True if the file exists and its mtime is within max_age_days.
+    """
+    if not cache_path.exists():
+        return False
+    mtime = datetime.fromtimestamp(cache_path.stat().st_mtime)
+    return (datetime.now() - mtime) < timedelta(days=max_age_days)
+
+
+def save_df_cache(df: pd.DataFrame, cache_path: Path) -> None:
+    """Persist a DataFrame to a JSON cache file.
+
+    Args:
+        df: DataFrame to cache (records-oriented JSON).
+        cache_path: Destination path for the JSON file.
+    """
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text(
+        df.to_json(orient="records", force_ascii=False),
+        encoding="utf-8",
+    )
+    logger.info("Saved cache to %s", cache_path)
+
+
+def load_df_cache(cache_path: Path, dtypes: dict[str, str] | None = None) -> pd.DataFrame:
+    """Load a DataFrame from a JSON cache file with optional type casting.
+
+    Args:
+        cache_path: Path to the JSON cache file.
+        dtypes: Optional dict mapping column names to target dtype strings.
+            Supported values: 'str_zfill4' (zero-padded 4-digit string),
+            'int', 'float'.
+
+    Returns:
+        DataFrame with columns cast per dtypes if provided.
+    """
+    records = json.loads(cache_path.read_text(encoding="utf-8"))
+    df = pd.DataFrame(records)
+    if dtypes:
+        for col, dtype in dtypes.items():
+            if col not in df.columns:
+                continue
+            if dtype == "str_zfill4":
+                df[col] = df[col].astype(str).str.zfill(4)
+            elif dtype == "int":
+                df[col] = df[col].astype(int)
+            elif dtype == "float":
+                df[col] = pd.to_numeric(df[col])
+    return df

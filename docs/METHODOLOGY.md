@@ -268,6 +268,12 @@ The within-kommun variation in education share across 15 years is modest. β₄ 
 
 SCB updated the methodology for "Andel öppet arbetslösa" in 2018, applied retroactively to 1997. Pre-2018 published values may differ slightly from current values. We use the current (post-2018) consistent series throughout.
 
+### 7.9 Unemployment rate is the SCB-published total aggregate
+
+The pipeline requests unemployment rates using the SCB-provided total-aggregate codes (`BakgrVar='TOT'`, `Kön='1+2'`, `UtbNiv='000'`). These codes select the already-aggregated "all backgrounds, both sexes, all education levels" series that SCB publishes directly. No client-side averaging across sub-categories is performed.
+
+This approach was adopted during pipeline implementation when the SCB STATIV tables were restructured (see §12.2). Using the published total avoids the weighting ambiguity entirely and ensures the series matches the aggregate figures SCB publishes in its statistical news releases.
+
 ---
 
 ## 8. Reproducibility
@@ -311,6 +317,96 @@ The decomposition shows which structural factors are pulling your kommun above o
 * SKR (Sveriges Kommuner och Regioner). Annual *Ekonomirapporten* (context for kommun fiscal trends).
 * Wooldridge, J. M. (2010). *Econometric Analysis of Cross Section and Panel Data*, Chapter 10 (panel methods).
 * `linearmodels` documentation: https://bashtage.github.io/linearmodels/
+
+---
+
+## 11. Pipeline Implementation Decisions
+
+This section documents technical decisions made during the implementation of the data fetching pipeline (Tasks 1.2–1.6) that affect data quality, reliability, or reproducibility. These decisions are recorded here so that future maintainers and reviewers understand the rationale.
+
+### 11.1 Shared infrastructure in pxweb_client
+
+All four fetcher modules (`fetch_skattekraft`, `fetch_population`, `fetch_unemployment`, `fetch_education`) share common infrastructure centralized in `src/fetch/pxweb_client.py`:
+
+* **Cache helpers** (`is_cache_fresh`, `save_df_cache`, `load_df_cache`): standardized 7-day cache freshness check, JSON serialization/deserialization, and type casting. Centralizing these eliminates duplicated cache logic and ensures consistent behavior across all fetchers.
+* **Metadata helpers** (`get_dimension_codes`, `extract_tid_years`): shared functions for inspecting PxWeb table metadata. Avoids duplicating lookup logic in each fetcher.
+* **Retry logic**: both `fetch_metadata` (GET) and `query_pxweb` (POST) retry up to 3 times with exponential back-off (1 s, 2 s, 4 s) on HTTP 429 (rate-limit) and 5xx (server error) responses. Non-retryable 4xx errors fail immediately. This ensures consistent resilience to transient SCB API issues across all operations.
+
+### 11.2 Deferred metadata calls
+
+The `fetch_skattekraft` module defers its metadata call (to confirm the ContentsCode) until data actually needs to be fetched from the API. When loading from cache, no network requests are made. This avoids unnecessary latency and eliminates a failure point during cached reads.
+
+### 11.3 Population chunking uses per-year caching
+
+The `fetch_population` module implements its own per-year query loop with per-year cache files (`data/raw/population_{year}.json`) rather than using the generic `chunk_query_by_year` function from `pxweb_client`. This is a deliberate improvement: per-year cache files enable incremental re-fetching of individual years without re-downloading the full 16-year series. The `chunk_query_by_year` function remains available in `pxweb_client` for other use cases that do not require per-year caching.
+
+### 11.4 Unemployment metric column identification
+
+The `fetch_unemployment` module identifies the unemployment rate metric column using the PxWeb response column position convention: PxWeb always places key/dimension columns first (matching the `key` array in the JSON data), followed by value/content columns. When a single ContentsCode is requested, the last column in the response is always the metric value. This positional approach is more reliable than the previously considered unique-ratio heuristic (`unique_ratio < 0.05`), which could misclassify high-cardinality metric columns as disaggregation dimensions.
+
+### 11.5 Education fetcher uses NamedTuple for table configuration
+
+The `fetch_education` module uses a `TableConfig` named tuple to bundle the 8 parameters resolved during table discovery (table URL, contents code, education dimension code and values, age dimension code and values, sex dimension code and values). This improves readability and self-documentation compared to unpacking an anonymous 8-element tuple.
+
+### 11.6 Verification check severity
+
+All fetcher verification checks follow a consistent severity policy:
+
+* **Hard checks** (raise `ValueError`): missing kommuner, implausible value ranges, structural data integrity failures (e.g. Danderyd not highest skattekraft, national mean outside expected range). These indicate a data integrity problem that would corrupt downstream artifacts.
+* **Soft checks** (log warning): unexpected but non-fatal observations (e.g. Stockholm not the largest kommune, unemployment mean outside the narrow 3–8 % historical range but within the wider 1–15 % plausible range). These may indicate data quality issues worth investigating but do not block the pipeline.
+
+---
+
+## 12. SCB API Structural Changes Discovered During Implementation
+
+This section documents the SCB PxWeb API changes encountered and adapted to during pipeline implementation. Future maintainers should consult this section first if any fetcher fails with HTTP 400 or HTTP 403 errors.
+
+### 12.1 Value-set filter `vs:RegionKommun07EjAggr` is no longer accepted
+
+**Symptom:** All four fetchers returned HTTP 400 on POST queries that used `"filter": "vs:RegionKommun07EjAggr"` with an empty `"values": []` list.
+
+**Root cause:** The SCB PxWeb v1 API no longer honours the `vs:` (value-set) filter syntax for the Region dimension. The documentation still lists this filter type, but the API rejects it.
+
+**Fix applied (all four fetchers):** At fetch time, the pipeline first calls the metadata endpoint (`GET /api/v1/...`) to retrieve all Region dimension codes. It then filters to 4-digit all-numeric codes (`len(c) == 4 and c.isdigit()`) to isolate the 290 municipality codes (county codes are 2 digits; the national total is `"00"`). The POST query then uses `"filter": "item"` with the explicit list of 290 codes. This produces identical results to the value-set filter and is robust to future value-set changes.
+
+### 12.2 SCB STATIV AA0003 unemployment table restructure
+
+**Symptom:** Metadata GET for the old `AA0003B/IntGr1KomKonUtb` subtable returned HTTP 400 ("table not found").
+
+**Root cause:** SCB reorganized the STATIV unemployment tables around 2023–2024. The old subtable `AA0003B/IntGr1KomKonUtb` (and its siblings `IntGr1KomKon`, `IntGr1Kom`) were moved to an archive path `AA0003X`. A new subtable `AA0003B/IntGr1KomUtbBAS` was introduced but only covers 2022 onwards.
+
+**Fix applied:** The `fetch_unemployment` module uses a two-table strategy:
+
+| Year range | Table URL | Coverage |
+|---|---|---|
+| 2010–2021 | `AA0003X/IntGr1KomKonUtb` | 1997–2021 (archived, still accessible) |
+| 2022–2024 | `AA0003B/IntGr1KomUtbBAS` | 2022–present |
+
+Results from both tables are concatenated to form the complete 2010–2024 series. Constants `_OLD_TABLE_LAST_YEAR = 2021` and `_NEW_TABLE_FIRST_YEAR = 2022` control the split. If SCB updates the new table to cover earlier years in the future, adjusting these constants is sufficient to change the routing.
+
+**Total-code optimization:** Both tables provide total-aggregate codes (`BakgrVar='TOT'`, `Kön='1+2'`, `UtbNiv='000'`). The pipeline selects these codes directly, reducing each POST to 290 × 1 × 1 × 1 × n_years cells (well within SCB's ~150 000-cell limit). This also avoids the unweighted-mean approximation described previously in §7.9.
+
+### 12.3 SCB UF0506 education table renamed
+
+**Symptom:** Metadata GET for candidate URLs `UF0506B/Utbildning4`, `UF0506B/Utbildning3`, and `UF0506B/Utbildning4C` all returned HTTP 400.
+
+**Root cause:** SCB consolidated the UF0506 education disaggregation tables. The active subtable is now `UF0506B/Utbildning` (covering 1985–2024). A backup candidate `UF0506B/UtbBefRegionR` is tried if the primary fails.
+
+**Fix applied:** Updated `_CANDIDATE_URLS` in `fetch_education.py` to the current table names.
+
+### 12.4 Education fetcher: per-sex-year chunking to stay within cell limit
+
+**Symptom:** POST queries to `UF0506B/Utbildning` returned HTTP 403 (cell limit exceeded).
+
+**Root cause:** The new education table disaggregates by Kön (sex) using only individual codes `'1'` and `'2'` (no `'1+2'` total). With 290 municipalities × 40 age codes × 8 education levels × 2 sex codes = 185 600 cells per year, the SCB limit of ~150 000 cells is exceeded.
+
+**Fix applied:** The pipeline detects this condition (`len(sex_codes) > 1 and '1+2' not in sex_codes and len(age_codes) > 5`) and switches to `_fetch_chunked_by_sex_year`: one POST per (year, sex) combination. Each POST covers 290 × 40 × 8 × 1 = 92 800 cells, well within the limit. The two sex-specific frames are concatenated before aggregation. The `edu_share` variable (share with tertiary education, SUN codes 6+7) is computed after aggregating across sex, yielding the correct population-level share.
+
+### 12.5 2009 skattekraft baseline required for 2010 growth computation
+
+**Background:** The `tax_base_growth_pct` variable for year *t* is computed as `(skattekraft_t / skattekraft_{t-1} − 1) × 100`. The first year in the analysis window is 2010, so 2009 values are needed as the lag baseline.
+
+**Fix applied:** `build_panel.py` fetches skattekraft for years 2009–2024 (constant `_FETCH_YEARS_SKATTEKRAFT`). After computing growth rates, the 2009 rows are dropped (`df_skatt_growth = df_skatt_growth[df_skatt_growth["year"].isin(_PANEL_YEARS)]`). The skattekraft cache file (`data/raw/skattekraft.json`) therefore covers 2009–2024, while the final panel covers only 2010–2024. The same logic applies to population: `_FETCH_YEARS_POPULATION` includes 2009 for the population growth computation.
 
 ---
 
