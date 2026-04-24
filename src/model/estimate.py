@@ -64,7 +64,7 @@ def estimate_main(panel: pd.DataFrame):
     logger.info(
         "Main spec — N=%d, T_avg=%.1f, R²(within)=%.4f, R²(between)=%.4f",
         results.nobs,
-        results.nobs / panel["kommun_kod"].nunique(),
+        results.nobs / df.index.get_level_values(0).nunique(),
         results.rsquared_within,
         results.rsquared_between,
     )
@@ -166,8 +166,8 @@ def extract_coefficients(results) -> pd.DataFrame:
                 "std_error": float(results.std_errors[var]),
                 "t_stat": float(results.tstats[var]),
                 "p_value": float(results.pvalues[var]),
-                "lower_ci": float(ci.iloc[list(results.params.index).index(var), 0]),
-                "upper_ci": float(ci.iloc[list(results.params.index).index(var), 1]),
+                "lower_ci": float(ci.loc[var].iloc[0]),
+                "upper_ci": float(ci.loc[var].iloc[1]),
             }
         )
     return pd.DataFrame(records)

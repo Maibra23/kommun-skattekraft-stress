@@ -80,20 +80,20 @@ def build_panel(force_refresh: bool = False) -> pd.DataFrame:
             sanity check fails.
     """
     # --- Step 1: Fetch raw data ---
-    logger.info("Step 1/6: Fetching skattekraft (OE0101) …")
+    logger.info("Step 1/7: Fetching skattekraft (OE0101) …")
     df_skatt = fetch_skattekraft(years=_FETCH_YEARS_SKATTEKRAFT, force_refresh=force_refresh)
 
-    logger.info("Step 2/6: Fetching population (BE0101) …")
+    logger.info("Step 2/7: Fetching population (BE0101) …")
     df_pop = fetch_population(years=_FETCH_YEARS_POPULATION, force_refresh=force_refresh)
 
-    logger.info("Step 3/6: Fetching unemployment (AA0003) …")
+    logger.info("Step 3/7: Fetching unemployment (AA0003) …")
     df_unemp = fetch_unemployment(years=_PANEL_YEARS, force_refresh=force_refresh)
 
-    logger.info("Step 4/6: Fetching education (UF0506) …")
+    logger.info("Step 4/7: Fetching education (UF0506) …")
     df_edu = fetch_education(years=_PANEL_YEARS, force_refresh=force_refresh)
 
-    # --- Step 2: Harmonize codes ---
-    logger.info("Step 2/6: Harmonizing municipality codes …")
+    # --- Step 5: Harmonize codes ---
+    logger.info("Step 5/7: Harmonizing municipality codes …")
     df_skatt = validate_and_harmonize(df_skatt)
     # Population is long-format (3 age-group rows per municipality-year).
     # Validate municipality codes using a deduplicated (municipality, year)
@@ -103,8 +103,8 @@ def build_panel(force_refresh: bool = False) -> pd.DataFrame:
     df_unemp = validate_and_harmonize(df_unemp)
     df_edu = validate_and_harmonize(df_edu)
 
-    # --- Step 3: Compute derived variables ---
-    logger.info("Step 3/6: Computing derived variables …")
+    # --- Step 6: Compute derived variables ---
+    logger.info("Step 6/7: Computing derived variables …")
     df_dep_ratio = compute_dependency_ratio(df_pop)
     df_pop_growth = compute_population_growth(df_pop)
     df_skatt_growth = compute_tax_base_growth(df_skatt[["kommun_kod", "year", "tax_base_per_capita"]])
@@ -117,8 +117,8 @@ def build_panel(force_refresh: bool = False) -> pd.DataFrame:
     # --- Step 4: Extract name columns from harmonized skattekraft ---
     name_cols = df_skatt[["kommun_kod", "kommun_name", "lan_kod", "lan_name"]].drop_duplicates()
 
-    # --- Step 5: Merge all on (kommun_kod, year) ---
-    logger.info("Step 5/6: Merging all sources …")
+    # --- Step 7a: Merge all on (kommun_kod, year) ---
+    logger.info("Step 7/7: Merging, validating, and writing panel …")
     panel = (
         df_skatt_growth
         .merge(df_unemp[["kommun_kod", "year", "unemployment_rate"]], on=["kommun_kod", "year"], how="inner")
@@ -136,8 +136,8 @@ def build_panel(force_refresh: bool = False) -> pd.DataFrame:
     panel = panel[_FINAL_COLUMNS]
     panel = panel.sort_values(["kommun_kod", "year"]).reset_index(drop=True)
 
-    # --- Step 6: Validate and write ---
-    logger.info("Step 6/6: Validating and writing panel …")
+    # --- Validate and write ---
+    logger.info("Validating and writing panel …")
     _validate_panel(panel)
 
     _OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)

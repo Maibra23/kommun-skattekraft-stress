@@ -23,7 +23,8 @@ SUN 2000 education level codes used in UF0506:
   6 = eftergymnasial utbildning 3 år eller längre   ← numerator
   7 = forskarutbildning                              ← numerator
 
-Expected national mean edu_share ≈ 30 % (METHODOLOGY §6).
+Expected national mean edu_share ≈ 19–20 % for SUN codes 6+7 only (the broader
+"all post-secondary" figure of ~30 % includes SUN code 5, which we exclude).
 """
 
 import logging
@@ -598,7 +599,7 @@ def _verify(df: pd.DataFrame, years: list[int]) -> None:
 
     national_mean = df["edu_share"].mean()
     logger.info(
-        "National mean edu_share: %.1f %% (expected ~30 %%)", national_mean
+        "National mean edu_share: %.1f %% (expected ~19–20 %% for SUN 6+7)", national_mean
     )
     if not (10.0 <= national_mean <= 60.0):
         raise ValueError(

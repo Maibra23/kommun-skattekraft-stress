@@ -3,19 +3,14 @@
 Downloads "Andel öppet arbetslösa" (share of open unemployment, percent) for
 all 290 kommuner for the years 2010–2024 using the generic pxweb_client.
 
-Discovery strategy:
-  1. Try AA0003B/IntGr1KomKonUtb (primary; broken down by sex and education).
-  2. If the Tid dimension does not cover 2010 onwards, try the alternative
-     subtables listed in _ALTERNATIVE_URLS.
-  3. If no subtable covers the full requested window, raise NotImplementedError
-     with instructions to consult KRI §3 fallback strategies.
+Two-table strategy (SCB restructured AA0003 in 2022):
+  - 2010–2021: AA0003X/IntGr1KomKonUtb (archived table, 1997–2021)
+  - 2022–2024: AA0003B/IntGr1KomUtbBAS (current table, 2022–present)
 
-Because the primary subtable provides rates disaggregated by Kön (sex) and
-UtbildningsNivå (education level), the fetcher aggregates to a single rate per
-(kommun, year) by taking an unweighted mean across the available Kön ×
-UtbildningsNivå cells.  This is a simplifying assumption; differences from the
-true population-weighted aggregate are expected to be small (< 0.3 percentage
-points) and are documented in METHODOLOGY §7.9.
+The query uses SCB's total-aggregate codes (BakgrVar='TOT', Kön='1+2',
+UtbNiv='000') to select the pre-aggregated unemployment rate directly.
+No client-side averaging across sub-categories is performed.  See
+METHODOLOGY §7.9 for details.
 
 Raw JSON is cached to data/raw/unemployment.json.  Returns a tidy DataFrame
 with columns [kommun_kod, year, unemployment_rate].

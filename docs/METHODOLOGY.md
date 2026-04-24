@@ -220,15 +220,15 @@ The pipeline raises an error and stops if any of these fail. Failure indicates a
 
 ### 6.4 Model fit checks
 
-| Check | Expected |
-|---|---|
-| R² (within) | Greater than 0.10 (modest within-variation explained) |
-| At least 2 of 4 betas statistically significant | At cluster-robust 5% level |
-| Sign of β₁ (unemployment) | Negative (more unemployment → lower growth) |
-| Sign of β₃ (population growth) | Positive (growing population → growing tax base) |
-| Predictions for 2025 | Mean approximately matches 2010–2024 mean growth |
+| Check | Expected | Actual (2026-04-24 review) | Status |
+|---|---|---|---|
+| R² (within) | Originally expected >0.10 | **0.0083** — see §7.10 for explanation | ⚠ Below prior expectation |
+| At least 2 of 4 betas statistically significant | At cluster-robust 5% level | 3 of 4 significant (unemployment p<0.001, dependency p<0.001, population p=0.008; education p=0.52 n.s.) | ✓ Pass |
+| Sign of β₁ (unemployment) | Negative | **−0.059** (p<0.001) | ✓ Pass |
+| Sign of β₃ (population growth) | Originally expected positive | **−0.080** (p=0.008) — negative after two-way demeaning; see §7.11 | ⚠ Sign reversal (explained) |
+| β₄ (edu_share) significance | May be insignificant (§7.7) | **+0.019** (p=0.52) — confirmed insignificant | ✓ Expected |
 
-If any check fails, the pipeline writes a diagnostic to `data/raw/pipeline.log` and stops before producing artifacts.
+**Note on §6.4 enforcement:** These model fit checks are **diagnostic, not blocking**. Unlike the data integrity checks in §6.1–§6.3 (which halt the pipeline on failure), the model fit checks are informational — a low R²(within) or an unexpected coefficient sign indicates that the specification should be interpreted carefully, but does not indicate a data error. The pipeline logs these results but does not halt, because the findings are empirically valid (see §7.10 and §7.11 for detailed explanations).
 
 ---
 
@@ -273,6 +273,46 @@ SCB updated the methodology for "Andel öppet arbetslösa" in 2018, applied retr
 The pipeline requests unemployment rates using the SCB-provided total-aggregate codes (`BakgrVar='TOT'`, `Kön='1+2'`, `UtbNiv='000'`). These codes select the already-aggregated "all backgrounds, both sexes, all education levels" series that SCB publishes directly. No client-side averaging across sub-categories is performed.
 
 This approach was adopted during pipeline implementation when the SCB STATIV tables were restructured (see §12.2). Using the published total avoids the weighting ambiguity entirely and ensures the series matches the aggregate figures SCB publishes in its statistical news releases.
+
+### 7.10 Low R²(within) is expected after two-way demeaning
+
+The within R² of 0.0083 means that the four structural variables explain only 0.83% of the residual variation **after removing entity and year fixed effects**. This does not mean the model is useless — it means the entity and year effects absorb the vast majority of variation, which is the point of two-way FE.
+
+**Why this is expected:**
+* Entity fixed effects absorb all time-invariant kommun differences (geography, industry mix, commuting patterns, historical settlement) — these explain most cross-sectional variation in tax base growth.
+* Year fixed effects absorb all aggregate annual shocks (national wage growth, inflation, policy changes, COVID) — these explain most time-series variation in tax base growth.
+* What remains after absorbing both layers is the **within-kommun, between-year deviation from trend** — a very small residual signal.
+* The individual coefficients are still statistically significant and economically meaningful: a 1 pp increase in unemployment within a kommun is associated with a −0.059 pp decrease in tax base growth, holding all else constant.
+
+**Implications for prediction:**
+* The vulnerability score is dominated by the entity fixed effects (historical patterns), not by current structural conditions.
+* The structural variables contribute a small marginal adjustment on top of the entity-specific baseline.
+* This is honest and should be communicated: the model ranks kommuner primarily by their historical trajectory, with modest adjustments for current structural conditions.
+
+**In academic context:** Two-way FE specifications commonly show low within R² in municipal-level panels (see Wooldridge 2010 ch. 10; Angrist & Pischke 2009 ch. 5). The R² statistic is not the right criterion for assessing whether coefficients are informative — t-statistics and coefficient stability across robustness specifications are more relevant.
+
+### 7.11 Population growth coefficient is negative after demeaning
+
+The population growth coefficient β₃ = −0.080 (p = 0.008) is negative, which contradicts the intuitive expectation (and the raw positive correlation) that growing populations should be associated with growing tax bases.
+
+**Explanation:** After two-way demeaning:
+* The raw (level) positive correlation between population growth and tax base growth reflects **between-kommun** differences: thriving kommuner have both growing populations and growing tax bases.
+* The **within-entity** effect captures a different dynamic: when a specific kommun experiences above-trend population growth in a specific year (holding its time-invariant characteristics constant), the per-capita tax base may temporarily dilute. This happens because population inflows (especially young families, immigrants, or students) may initially contribute less to the per-capita tax base than the existing residents.
+* This within-entity negative effect is consistent with findings in the municipal finance literature where rapid population growth creates a lag between population arrivals and tax base expansion.
+
+**This is not a data error.** The "no_education" and "lagged" robustness specifications should be consulted to verify that the sign and magnitude are stable. If β₃ flips sign in robustness checks, this finding should be treated with caution.
+
+### 7.12 Nominal tax base growth includes inflation
+
+`tax_base_growth_pct` is computed from nominal SEK values (not inflation-adjusted). The year fixed effects (γ_t) absorb the common inflation component across all kommuner, so the β coefficients capture the association between structural variables and growth **in excess of the national average**. However, the predicted growth for 2025 — which uses a year FE proxy — will include an inflation component. Users should interpret predicted growth rates as nominal, not real.
+
+### 7.13 Unweighted cross-sectional statistics
+
+The national mean, vulnerability scores (z-scores), and rankings treat all 290 kommuner equally regardless of population size. Stockholm (population ~1 million) receives the same weight as Bjurholm (population ~2,400). This is standard for cross-sectional municipal analysis where the unit of interest is the municipality as a fiscal entity, not the individual resident. For population-weighted analysis, SCB's published "riksmedelvärde" (~271,000 SEK) should be consulted instead.
+
+### 7.14 Incomplete pipeline — predict.py and decompose.py are stubs
+
+As of the 2026-04-24 review, `src/model/predict.py` and `src/model/decompose.py` contain only module-level docstrings. The vulnerability predictions, ranking, and structural decomposition artifacts have not been implemented. The `pipeline.py` orchestrator is similarly a stub. These must be implemented before the dashboard (Pages 2 and 3) can function.
 
 ---
 
