@@ -310,10 +310,6 @@ The population growth coefficient β₃ = −0.080 (p = 0.008) is negative, whic
 
 The national mean, vulnerability scores (z-scores), and rankings treat all 290 kommuner equally regardless of population size. Stockholm (population ~1 million) receives the same weight as Bjurholm (population ~2,400). This is standard for cross-sectional municipal analysis where the unit of interest is the municipality as a fiscal entity, not the individual resident. For population-weighted analysis, SCB's published "riksmedelvärde" (~271,000 SEK) should be consulted instead.
 
-### 7.14 Incomplete pipeline — predict.py and decompose.py are stubs
-
-As of the 2026-04-24 review, `src/model/predict.py` and `src/model/decompose.py` contain only module-level docstrings. The vulnerability predictions, ranking, and structural decomposition artifacts have not been implemented. The `pipeline.py` orchestrator is similarly a stub. These must be implemented before the dashboard (Pages 2 and 3) can function.
-
 ---
 
 ## 8. Reproducibility
