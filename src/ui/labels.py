@@ -142,6 +142,21 @@ SWEDISH_LABELS = {
     "landing_step_3": "Estimering",
     "landing_step_4": "Prognos",
 
+    # Riksöversikt
+    "chart_ranking_title": "Rangordning",
+
+    # Kommunjämförelse
+    "chart_national_avg": "Riksgenomsnitt",
+    "chart_peers_title": "Jämförbara kommuner",
+    "subtitle_national": "Skattekraftens prognosticerade utveckling 2025, alla 290 kommuner",
+    "subtitle_kommun": "Strukturell dekomponering för vald kommun",
+
+    # Choropleth tooltip
+    "tooltip_population": "Befolkning",
+
+    # Coefficient chart axis
+    "axis_coefficient": "\u03b2 (koefficient)",
+
     # Units (use these everywhere)
     "unit_sek": "kr",
     "unit_pct": "%",

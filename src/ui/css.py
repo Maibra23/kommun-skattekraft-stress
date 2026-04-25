@@ -616,6 +616,82 @@ div[data-testid="stDataFrame"] td {
     margin-top: 2px;
 }
 
+/* ---- Sidebar pills (st.pills year / risk filter) ---- */
+section[data-testid="stSidebar"] div[data-testid="stPills"] button {
+    font-family: var(--font-mono) !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    color: rgba(255, 255, 255, 0.65) !important;
+    background: transparent !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 4px !important;
+    padding: 4px 10px !important;
+    transition: all 0.15s;
+}
+
+section[data-testid="stSidebar"] div[data-testid="stPills"] button:hover {
+    color: #FFFFFF !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+section[data-testid="stSidebar"] div[data-testid="stPills"] button[aria-checked="true"],
+section[data-testid="stSidebar"] div[data-testid="stPills"] button[data-selected="true"] {
+    color: var(--color-primary) !important;
+    background: var(--color-accent) !important;
+    border-color: var(--color-accent) !important;
+    font-weight: 500 !important;
+}
+
+/* ---- Sidebar st.page_link styling ---- */
+section[data-testid="stSidebar"] a[data-testid="stPageLink-NavLink"] {
+    font-family: var(--font-sans) !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: rgba(255, 255, 255, 0.65) !important;
+    padding: 8px 16px !important;
+    border-radius: 4px !important;
+    text-decoration: none !important;
+    transition: all 0.15s;
+}
+
+section[data-testid="stSidebar"] a[data-testid="stPageLink-NavLink"]:hover {
+    color: #FFFFFF !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ---- Sidebar label colors ---- */
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] .stSelectbox label {
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* ---- Download button styling ---- */
+button[data-testid="stDownloadButton"] {
+    font-family: var(--font-sans) !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: 4px !important;
+}
+
+/* ---- Selectbox on kommun page ---- */
+div[data-testid="stSelectbox"] label {
+    font-family: var(--font-sans) !important;
+    font-size: 10.5px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    color: var(--color-text-secondary) !important;
+}
+
+/* ---- Link button styling ---- */
+a[data-testid="stLinkButton"] {
+    font-family: var(--font-sans) !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+}
+
 /* ---- Accessibility: reduced motion ---- */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {

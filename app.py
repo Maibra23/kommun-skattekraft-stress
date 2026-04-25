@@ -255,7 +255,7 @@ fig_coefs.add_trace(
 layout = get_chart_layout(
     title=SWEDISH_LABELS["landing_vars_title"],
     height=260,
-    xaxis_title="\u03b2 (koefficient)",
+    xaxis_title=SWEDISH_LABELS["axis_coefficient"],
     showlegend=False,
 )
 layout["yaxis"]["tickfont"] = {

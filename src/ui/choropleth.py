@@ -39,7 +39,7 @@ _TOOLTIP_ALIASES = {
     "vulnerability_rank": SWEDISH_LABELS["th_rank"],
     "tax_base_per_capita_fmt": SWEDISH_LABELS["th_skattekraft"],
     "unemployment_rate_fmt": SWEDISH_LABELS["th_unemployment"],
-    "population_fmt": "Befolkning",
+    "population_fmt": SWEDISH_LABELS["tooltip_population"],
 }
 
 
