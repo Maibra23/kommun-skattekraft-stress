@@ -19,7 +19,7 @@ SWEDISH_LABELS = {
     "brand_mark": "KSS",
     "brand_title": "Skattekraft Stress",
     "brand_sub": "Kommunal panelmodell",
-    "nav_landing": "Översikt",
+    "nav_landing": "Startsida",
     "nav_national": "Riksöversikt",
     "nav_kommun": "Kommunjämförelse",
 
@@ -91,8 +91,8 @@ SWEDISH_LABELS = {
     # Map
     "map_title": "Geografisk fördelning",
     "map_subtitle": "Sårbarhetsindex per kommun",
-    "map_legend_caption": "Sårbarhetsindex \u00b7 Lägre = bättre, Högre = sämre",
-    "map_color_scale_note": "Färgskala: Grön = låg sårbarhet \u00b7 Gul = medel \u00b7 Röd = hög sårbarhet",
+    "map_legend_caption": "Sårbarhetsindex (Lägre = bättre, Högre = sämre)",
+    "map_color_scale_note": "Färgskala: Grön = låg sårbarhet, Gul = medel, Röd = hög sårbarhet",
 
     # Buttons and actions
     "btn_download_csv": "Ladda ned som CSV",
@@ -106,13 +106,13 @@ SWEDISH_LABELS = {
 
     # Footer
     "footer_source_label": "KÄLLA",
-    "footer_source": "SCB \u00b7 OE0101, BE0101, AA0003, UF0506",
+    "footer_source": "SCB (OE0101, BE0101, AA0003, UF0506)",
     "footer_method_link": "Metodologi",
 
     # Methodology callouts
     "method_model_name": "Tvåvägs fixed effects panelmodell",
-    "method_period": "Period: 2010\u20132024",
-    "method_units": "290 kommuner \u00d7 15 år = 4\u202f350 observationer",
+    "method_period": "Period: 2010 till 2024",
+    "method_units": "290 kommuner, 15 ar, 4 350 observationer",
 
     # Landing page
     "landing_lead": (
@@ -127,8 +127,41 @@ SWEDISH_LABELS = {
     "landing_model_title": "Modellöversikt",
     "landing_vars_title": "Variabler & vikter",
     "landing_pipeline_title": "Pipelinesteg",
-    "landing_nav_title": "Utforska",
+    "landing_nav_title": "Utforska dashboarden",
     "landing_sources_title": "Källor & metod",
+
+    # Landing page — section explanations (collapsible)
+    "landing_model_explanation": (
+        "Diagrammet ovan visar hur modellen fungerar: fyra strukturvariabler "
+        "(arbetslöshet, försörjningskvot, befolkningstillväxt och utbildningsnivå) "
+        "matas in i en regressionsmodell som producerar tre resultat: "
+        "en tillväxtprognos för 2025, en sårbarhetsrangordning och en "
+        "strukturell dekomponering av drivkrafterna."
+    ),
+    "landing_model_example": (
+        "Tänk dig en kommun med stigande arbetslöshet och åldrande befolkning. "
+        "Modellen fångar att dessa faktorer historiskt sett hänger samman med "
+        "lägre skattekraftstillväxt, och ger kommunen en högre sårbarhetspoäng. "
+        "Kommunalrådet kan sedan se exakt hur mycket arbetslösheten respektive "
+        "demografin bidrar till den svaga prognosen, och prioritera insatser därefter."
+    ),
+    "landing_model_expander": "Hur läser jag diagrammet?",
+    "landing_vars_explanation": (
+        "Staplarna visar hur starkt varje variabel påverkar skattekraftstillväxten. "
+        "Negativa värden (röda) innebär att en ökning av variabeln är förknippad "
+        "med lägre tillväxt. Stjärnorna (***) anger statistisk signifikans."
+    ),
+    "landing_vars_example": (
+        "Exempel: koefficienten för öppen arbetslöshet är ca −0,06. Det innebär "
+        "att om en kommuns arbetslöshet ökar med 1 procentenhet (t.ex. från 8 % "
+        "till 9 %), förväntas skattekraftstillväxten minska med ungefär 0,06 "
+        "procentenheter, allt annat lika. Effekten är liten per enhet men "
+        "kan bli betydande vid stora förändringar."
+    ),
+    "landing_vars_expander": "Hur tolkar jag koefficienterna?",
+    "landing_nav_explanation": (
+        "Dashboarden har två huvudvyer. Välj den som passar din frågeställning."
+    ),
     "landing_nav_national_desc": (
         "Kartvy och rangordning av alla 290 kommuners "
         "prognosticerade skattekraftstillväxt."
@@ -156,6 +189,44 @@ SWEDISH_LABELS = {
 
     # Coefficient chart axis
     "axis_coefficient": "\u03b2 (koefficient)",
+
+    # SVG diagram labels (landing page)
+    "svg_regression_model": "Regressionsmodell",
+    "svg_panel_ols": "PanelOLS, 2-way FE",
+    "svg_prognosis": "Prognos 2025",
+    "svg_ranking": "Rangordning",
+    "svg_decomposition": "Dekomponering",
+
+    # Contextual summary (Riksöversikt)
+    "national_summary_template": (
+        "Mediankommunen förväntas se {median} nominell tillväxt under 2025. "
+        "{count} kommuner klassas som högrisk, med störst förväntad nedgång "
+        "i {kommun} ({decline})."
+    ),
+
+    # Decomposition explanation (Kommunjämförelse)
+    "decomp_explanation": (
+        "Staplarna visar hur varje strukturvariabel bidrar till kommunens "
+        "avvikelse från riksgenomsnittet. Positiva staplar (gröna) drar "
+        "uppåt, negativa (röda) drar nedåt."
+    ),
+
+    # R² KPI tooltip
+    "kpi_r2_tooltip": (
+        "R\u00b2(within) mäter hur mycket av variationen inom kommuner "
+        "som förklaras av strukturvariablerna, efter att kommun- och "
+        "årseffekter absorberats. Lågt värde är förväntat."
+    ),
+
+    # Footer data freshness
+    "footer_updated": "Senast uppdaterad",
+
+    # Choropleth tooltip label for vulnerability score
+    "tooltip_vulnerability_score": "Sårbarhetsindex",
+
+    # Risk boundary labels (histogram)
+    "risk_boundary_high_medium": "Hög / Medel",
+    "risk_boundary_medium_low": "Medel / Låg",
 
     # Units (use these everywhere)
     "unit_sek": "kr",

@@ -15,6 +15,7 @@ All Swedish strings come from SWEDISH_LABELS in src/ui/labels.py.
 """
 
 import pickle
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -26,7 +27,7 @@ import streamlit as st
 # ---------------------------------------------------------------------------
 
 st.set_page_config(
-    page_title="KSS \u00b7 Riksöversikt",
+    page_title="KSS Riksöversikt",
     page_icon=None,
     layout="wide",
     menu_items={"Get Help": None, "Report a bug": None},
@@ -107,6 +108,12 @@ coef_df = _load_coefficients()
 within_r2 = _load_within_r2()
 panel_2024 = _load_panel_2024()
 
+_UPDATED_DATE = ""
+if (_ARTIFACTS_DIR / "predictions.parquet").exists():
+    _UPDATED_DATE = datetime.fromtimestamp(
+        (_ARTIFACTS_DIR / "predictions.parquet").stat().st_mtime
+    ).strftime("%Y-%m-%d")
+
 # ---------------------------------------------------------------------------
 # Section 1: Page title
 # ---------------------------------------------------------------------------
@@ -143,16 +150,26 @@ kpi_cards = [
     ),
     kpi_card(
         SWEDISH_LABELS["kpi_largest_decline"],
-        value=f"{format_signed_pct(min_predicted)} \u00b7 {worst_kommun}",
+        value=f"{format_signed_pct(min_predicted)}, {worst_kommun}",
         variant="danger",
     ),
     kpi_card(
         SWEDISH_LABELS["kpi_model_r2"],
         value=format_pct(within_r2 * 100),
         variant="default",
+        tooltip=SWEDISH_LABELS["kpi_r2_tooltip"],
     ),
 ]
 render_kpi_row(kpi_cards)
+
+# Contextual summary
+_summary_text = SWEDISH_LABELS["national_summary_template"].format(
+    median=format_pct(median_predicted_growth),
+    count=count_hog_risk,
+    kommun=worst_kommun,
+    decline=format_signed_pct(min_predicted),
+)
+st.html(f'<div class="shai-summary">{_summary_text}</div>')
 
 # ---------------------------------------------------------------------------
 # Sidebar filter: risk class mapping
@@ -217,6 +234,26 @@ with col_hist:
             )
         )
 
+        # Risk class boundary lines
+        _p20 = predictions_df["predicted_growth_2025"].quantile(0.2)
+        _p80 = predictions_df["predicted_growth_2025"].quantile(0.8)
+        fig_hist.add_vline(
+            x=_p20, line_dash="dash", line_width=1,
+            line_color=COLORS["high_risk"],
+            annotation_text=SWEDISH_LABELS["risk_boundary_high_medium"],
+            annotation_position="top left",
+            annotation_font_size=10,
+            annotation_font_color=COLORS["text_secondary"],
+        )
+        fig_hist.add_vline(
+            x=_p80, line_dash="dash", line_width=1,
+            line_color=COLORS["low_risk"],
+            annotation_text=SWEDISH_LABELS["risk_boundary_medium_low"],
+            annotation_position="top right",
+            annotation_font_size=10,
+            annotation_font_color=COLORS["text_secondary"],
+        )
+
         hist_layout = get_chart_layout(
             height=440,
             xaxis_title=SWEDISH_LABELS["axis_growth_pct"],
@@ -243,18 +280,50 @@ with st.container(border=True):
             SWEDISH_LABELS["th_rank"]: table_df["vulnerability_rank"].astype(int).values,
             SWEDISH_LABELS["th_kommun"]: table_df["kommun_name"].values,
             SWEDISH_LABELS["th_lan"]: table_df["lan_name"].values,
-            SWEDISH_LABELS["th_prognosis"]: table_df["predicted_growth_2025"]
-            .apply(lambda x: format_pct(x))
-            .values,
+            SWEDISH_LABELS["th_prognosis"]: table_df["predicted_growth_2025"].values,
             SWEDISH_LABELS["th_risk_class"]: table_df["risk_class"]
             .map(_RISK_CODE_TO_LABEL)
             .values,
         }
     )
 
-    st.dataframe(display_df, use_container_width=True, hide_index=True)
+    def _color_risk(val):
+        colors = {
+            SWEDISH_LABELS["risk_high"]: (
+                f"background-color: rgba(185, 74, 72, 0.12); "
+                f"color: {COLORS['high_risk']}; font-weight: 600;"
+            ),
+            SWEDISH_LABELS["risk_medium"]: (
+                f"background-color: rgba(212, 160, 60, 0.12); "
+                f"color: {COLORS['medium_risk']}; font-weight: 600;"
+            ),
+            SWEDISH_LABELS["risk_low"]: (
+                f"background-color: rgba(46, 125, 91, 0.12); "
+                f"color: {COLORS['low_risk']}; font-weight: 600;"
+            ),
+        }
+        return colors.get(val, "")
 
-    csv_data = display_df.to_csv(index=False).encode("utf-8")
+    styled_df = display_df.style.map(
+        _color_risk, subset=[SWEDISH_LABELS["th_risk_class"]]
+    )
+
+    st.dataframe(
+        styled_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            SWEDISH_LABELS["th_prognosis"]: st.column_config.NumberColumn(
+                format="%.1f %%",
+            ),
+        },
+    )
+
+    csv_export = display_df.copy()
+    csv_export[SWEDISH_LABELS["th_prognosis"]] = csv_export[
+        SWEDISH_LABELS["th_prognosis"]
+    ].apply(lambda x: format_pct(x))
+    csv_data = csv_export.to_csv(index=False).encode("utf-8")
     st.download_button(
         label=SWEDISH_LABELS["btn_download_csv"],
         data=csv_data,
@@ -266,4 +335,4 @@ with st.container(border=True):
 # Section 6: Footer
 # ---------------------------------------------------------------------------
 
-st.html(footer_note(SWEDISH_LABELS["footer_source"], "v1.0"))
+st.html(footer_note(SWEDISH_LABELS["footer_source"], "v1.0", updated=_UPDATED_DATE))

@@ -34,7 +34,7 @@ _VMAX = 2.5
 _TOOLTIP_ALIASES = {
     "kommun_name": SWEDISH_LABELS["th_kommun"],
     "risk_class_label": SWEDISH_LABELS["th_risk_class"],
-    "vulnerability_score_fmt": SWEDISH_LABELS["map_subtitle"],
+    "vulnerability_score_fmt": SWEDISH_LABELS["tooltip_vulnerability_score"],
     "predicted_growth_fmt": SWEDISH_LABELS["th_prognosis"],
     "vulnerability_rank": SWEDISH_LABELS["th_rank"],
     "tax_base_per_capita_fmt": SWEDISH_LABELS["th_skattekraft"],

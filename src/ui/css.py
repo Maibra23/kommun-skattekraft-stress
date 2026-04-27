@@ -89,6 +89,11 @@ header[data-testid="stHeader"] {display: none;}
 div[data-testid="stDecoration"] {display: none;}
 div[data-testid="stToolbar"] {display: none;}
 
+/* ---- Hide auto-generated sidebar page navigation ---- */
+div[data-testid="stSidebarNav"] {display: none !important;}
+section[data-testid="stSidebar"] > div > div > div > ul {display: none !important;}
+section[data-testid="stSidebar"] nav {display: none !important;}
+
 /* ---- Base layout ---- */
 .main .block-container {
     padding: 32px 40px !important;
@@ -98,11 +103,49 @@ div[data-testid="stToolbar"] {display: none;}
 section[data-testid="stSidebar"] {
     width: 260px !important;
     min-width: 260px !important;
+    max-width: 260px !important;
     background-color: var(--color-primary) !important;
+    transform: none !important;
+    transition: none !important;
+}
+
+/* Prevent sidebar from collapsing: hide toggle buttons */
+button[data-testid="stSidebarCollapse"],
+button[data-testid="baseButton-headerNoPadding"],
+section[data-testid="stSidebar"] button[kind="headerNoPadding"],
+div[data-testid="collapsedControl"] {
+    display: none !important;
+}
+
+/* Keep sidebar always visible even in collapsed state */
+section[data-testid="stSidebar"][aria-expanded="false"] {
+    display: block !important;
+    width: 260px !important;
+    min-width: 260px !important;
+    margin-left: 0 !important;
+    transform: none !important;
 }
 
 section[data-testid="stSidebar"] .block-container {
     padding-top: 0 !important;
+}
+
+/* Force all sidebar text to be light on navy background */
+section[data-testid="stSidebar"],
+section[data-testid="stSidebar"] * {
+    color: rgba(255, 255, 255, 0.65) !important;
+}
+
+section[data-testid="stSidebar"] .shai-brand-mark {
+    color: var(--color-accent) !important;
+}
+
+section[data-testid="stSidebar"] .shai-brand-title {
+    color: #FFFFFF !important;
+}
+
+section[data-testid="stSidebar"] .shai-sidebar-nav a.active {
+    color: var(--color-primary) !important;
 }
 
 /* ---- Typography ---- */
@@ -690,6 +733,28 @@ a[data-testid="stLinkButton"] {
     font-family: var(--font-sans) !important;
     font-size: 13px !important;
     font-weight: 600 !important;
+}
+
+/* ---- Summary text box ---- */
+.shai-summary {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    background: var(--color-bg);
+    border-left: 3px solid var(--color-accent);
+    padding: 14px 20px;
+    margin-bottom: 24px;
+    border-radius: 0 4px 4px 0;
+    line-height: 1.6;
+}
+
+/* ---- Explanation text ---- */
+.shai-explanation {
+    font-family: var(--font-sans);
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin-bottom: 12px;
+    line-height: 1.5;
 }
 
 /* ---- Accessibility: reduced motion ---- */

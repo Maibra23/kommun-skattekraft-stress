@@ -90,12 +90,9 @@ def kpi_card(
 
     delta_html = ""
     if delta is not None:
-        arrow = {"up": "\u2191", "down": "\u2193", "flat": "\u2192"}.get(
-            delta_direction, ""
-        )
         delta_html = (
             f'<div class="shai-kpi-delta delta-{delta_direction}">'
-            f"{arrow} {delta}</div>"
+            f"{delta}</div>"
         )
 
     return f"""
@@ -170,19 +167,27 @@ def risk_pill(level: str) -> str:
     return f'<span class="shai-pill {css_class}">{label}</span>'
 
 
-def footer_note(source: str, version: str) -> str:
-    """Render the page footer with source attribution and version.
+def footer_note(source: str, version: str, updated: str = "") -> str:
+    """Render the page footer with source attribution, version, and date.
 
     Args:
         source: Data source string (Swedish).
         version: Version code (e.g. 'v1.0').
+        updated: Optional last-updated date string (e.g. '2026-04-24').
 
     Returns:
         HTML string for the footer.
     """
+    updated_html = ""
+    if updated:
+        updated_html = (
+            f'<span class="shai-footer-source" style="margin-left:12px;">'
+            f'{SWEDISH_LABELS["footer_updated"]}: {updated}</span>'
+        )
     return f"""
     <div class="shai-footer">
         <span class="shai-footer-source">{SWEDISH_LABELS["footer_source_label"]}: {source}</span>
+        {updated_html}
         <span class="shai-footer-version">{version}</span>
     </div>
     """

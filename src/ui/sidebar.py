@@ -31,8 +31,6 @@ _RISK_OPTIONS = [
     SWEDISH_LABELS["risk_low"],
 ]
 
-_YEAR_OPTIONS = list(range(2024, 2009, -1))
-
 _RISK_LEGEND = [
     (COLORS["high_risk"], SWEDISH_LABELS["risk_high"]),
     (COLORS["medium_risk"], SWEDISH_LABELS["risk_medium"]),
@@ -87,20 +85,6 @@ def render_sidebar(page_key: str) -> dict:
 
         st.html('<div style="height: 8px;"></div>')
 
-        # ---- Year selector ----
-        st.html(
-            f'<div class="shai-sidebar-section-label">'
-            f'{SWEDISH_LABELS["label_year"]}</div>'
-        )
-        selected_year = st.pills(
-            label=SWEDISH_LABELS["label_year"],
-            options=_YEAR_OPTIONS,
-            default=2024,
-            label_visibility="collapsed",
-        )
-        if selected_year is None:
-            selected_year = 2024
-
         # ---- Risk filter ----
         st.html(
             f'<div class="shai-sidebar-section-label">'
@@ -137,6 +121,5 @@ def render_sidebar(page_key: str) -> dict:
         """)
 
     return {
-        "selected_year": int(selected_year),
         "selected_risks": list(selected_risks),
     }

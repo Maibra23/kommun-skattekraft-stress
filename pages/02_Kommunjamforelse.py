@@ -17,6 +17,7 @@ All data loaded from precomputed artifacts using @st.cache_data.
 All Swedish strings come from SWEDISH_LABELS in src/ui/labels.py.
 """
 
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -28,7 +29,7 @@ import streamlit as st
 # ---------------------------------------------------------------------------
 
 st.set_page_config(
-    page_title="KSS \u00b7 Kommunjämförelse",
+    page_title="KSS Kommunjämförelse",
     page_icon=None,
     layout="wide",
     menu_items={"Get Help": None, "Report a bug": None},
@@ -90,6 +91,32 @@ predictions_df = _load_predictions()
 decomposition_df = _load_decomposition()
 panel_df = _load_panel()
 
+_UPDATED_DATE = ""
+if (_ARTIFACTS_DIR / "predictions.parquet").exists():
+    _UPDATED_DATE = datetime.fromtimestamp(
+        (_ARTIFACTS_DIR / "predictions.parquet").stat().st_mtime
+    ).strftime("%Y-%m-%d")
+
+# ---------------------------------------------------------------------------
+# Sidebar filter: risk class mapping
+# ---------------------------------------------------------------------------
+
+_RISK_LABEL_TO_CODE = {
+    SWEDISH_LABELS["risk_high"]: "hog",
+    SWEDISH_LABELS["risk_medium"]: "medel",
+    SWEDISH_LABELS["risk_low"]: "lag",
+}
+
+_selected_risk_codes = [
+    _RISK_LABEL_TO_CODE[lbl]
+    for lbl in sidebar_state["selected_risks"]
+    if lbl in _RISK_LABEL_TO_CODE
+]
+
+_filtered_predictions = predictions_df[
+    predictions_df["risk_class"].isin(_selected_risk_codes)
+].copy()
+
 # ---------------------------------------------------------------------------
 # Section 1: Page title
 # ---------------------------------------------------------------------------
@@ -98,7 +125,6 @@ st.html(
     page_title(
         eyebrow=SWEDISH_LABELS["eyebrow_kommun"],
         title=SWEDISH_LABELS["title_kommun"],
-        subtitle=SWEDISH_LABELS["subtitle_kommun"],
     )
 )
 
@@ -106,7 +132,7 @@ st.html(
 # Section 2: Kommun selector
 # ---------------------------------------------------------------------------
 
-sorted_predictions = predictions_df.sort_values("vulnerability_rank")
+sorted_predictions = _filtered_predictions.sort_values("vulnerability_rank")
 
 
 def _shorten_lan(lan_name: str) -> str:
@@ -119,7 +145,7 @@ def _shorten_lan(lan_name: str) -> str:
 
 kommun_options = [
     f"{row['kommun_name']} ({_shorten_lan(row['lan_name'])}) "
-    f"\u2014 Rang {int(row['vulnerability_rank'])}"
+    f"(Rang {int(row['vulnerability_rank'])})"
     for _, row in sorted_predictions.iterrows()
 ]
 kommun_koder = sorted_predictions["kommun_kod"].tolist()
@@ -147,6 +173,18 @@ selected_decomp = decomposition_df[
 
 # Latest panel data (2024)
 latest_panel = selected_panel[selected_panel["year"] == 2024].iloc[0]
+
+# Dynamic subtitle with kommun name
+st.html(f"""<div style="margin-bottom: 20px;">
+    <span style="font-family: 'Source Sans 3', sans-serif; font-size: 14px;
+                 color: {COLORS['text_secondary']};">
+        {SWEDISH_LABELS["subtitle_kommun"]}:
+    </span>
+    <span style="font-family: 'Source Sans 3', sans-serif; font-size: 14px;
+                 font-weight: 700; color: {COLORS['text_primary']};">
+        {selected_pred["kommun_name"]}
+    </span>
+</div>""")
 
 # ---------------------------------------------------------------------------
 # Section 3: KPI row
@@ -258,6 +296,7 @@ with st.container(border=True):
 
 with st.container(border=True):
     st.html(card_header(SWEDISH_LABELS["chart_decomposition"]))
+    st.html(f'<div class="shai-explanation">{SWEDISH_LABELS["decomp_explanation"]}</div>')
 
     decomp_components = [
         ("decomp_unemployment", SWEDISH_LABELS["contrib_unemployment"]),
@@ -291,6 +330,11 @@ with st.container(border=True):
         )
     )
 
+    fig_decomp.add_vline(
+        x=0, line_width=1.5, line_dash="dash",
+        line_color=COLORS["text_tertiary"],
+    )
+
     decomp_layout = get_chart_layout(
         height=300,
         xaxis_title=SWEDISH_LABELS["axis_growth_pct"],
@@ -317,17 +361,36 @@ with st.container(border=True):
     peers = peers[peers["kommun_kod"] != selected_kod]
     peers = peers.nsmallest(5, "_score_diff")
 
+    # Merge 2024 structural data for richer peer comparison
+    _panel_2024_peers = panel_df[panel_df["year"] == 2024][
+        ["kommun_kod", "unemployment_rate", "dependency_ratio",
+         "population_growth_pct", "edu_share"]
+    ]
+    peers_enriched = peers.merge(_panel_2024_peers, on="kommun_kod", how="left")
+
     peer_display = pd.DataFrame(
         {
-            SWEDISH_LABELS["th_kommun"]: peers["kommun_name"].values,
-            SWEDISH_LABELS["th_lan"]: peers["lan_name"].values,
-            SWEDISH_LABELS["th_prognosis"]: peers["predicted_growth_2025"]
+            SWEDISH_LABELS["th_kommun"]: peers_enriched["kommun_name"].values,
+            SWEDISH_LABELS["th_lan"]: peers_enriched["lan_name"].values,
+            SWEDISH_LABELS["th_prognosis"]: peers_enriched["predicted_growth_2025"]
             .apply(lambda x: format_pct(x))
             .values,
-            SWEDISH_LABELS["kpi_vulnerability_rank"]: peers[
+            SWEDISH_LABELS["kpi_vulnerability_rank"]: peers_enriched[
                 "vulnerability_rank"
             ]
             .astype(int)
+            .values,
+            SWEDISH_LABELS["th_unemployment"]: peers_enriched["unemployment_rate"]
+            .apply(lambda x: format_pct(x))
+            .values,
+            SWEDISH_LABELS["th_dependency"]: peers_enriched["dependency_ratio"]
+            .apply(lambda x: f"{x:.2f}".replace(".", ","))
+            .values,
+            SWEDISH_LABELS["th_pop_growth"]: peers_enriched["population_growth_pct"]
+            .apply(lambda x: format_signed_pct(x))
+            .values,
+            SWEDISH_LABELS["th_education"]: peers_enriched["edu_share"]
+            .apply(lambda x: format_pct(x))
             .values,
         }
     )
@@ -348,4 +411,4 @@ with st.container(border=True):
 # Section 8: Footer
 # ---------------------------------------------------------------------------
 
-st.html(footer_note(SWEDISH_LABELS["footer_source"], "v1.0"))
+st.html(footer_note(SWEDISH_LABELS["footer_source"], "v1.0", updated=_UPDATED_DATE))

@@ -1,19 +1,20 @@
-"""Streamlit entry point — Landing page (Översikt).
+"""Streamlit entry point, Landing page (Startsida).
 
-Configures the page with st.set_page_config (title 'KSS · Översikt',
+Configures the page with st.set_page_config (title 'KSS Startsida',
 layout='wide'), injects the global CSS, and renders the sidebar.  Page
 sections (in order):
   1. Hero block with navy gradient and gold accent border
-  2. Stat strip: 290 KOMMUNER · 15 ÅR PANEL · 4 STRUKTURVARIABLER · FIXED EFFECTS
-  3. Modellöversikt: SVG flow diagram showing inputs → regression → outputs
-  4. Variabler & vikter: regression coefficients from artifacts/coefficients.parquet
-  5. Pipeline steps: Datainsamling → Rensning → Estimering → Prognos
-  6. Navigation cards linking to Riksöversikt and Kommunjämförelse
-  7. Källor & metod credibility block
+  2. Stat strip: 290 KOMMUNER, 15 AR PANEL, 4 STRUKTURVARIABLER, FIXED EFFECTS
+  3. Modelloversikt: SVG flow diagram with explanation and collapsible example
+  4. Variabler och vikter: regression coefficients bar chart with collapsible guide
+  5. Pipeline steps: Datainsamling, Rensning, Estimering, Prognos
+  6. Navigation cards linking to Riksoversikt and Kommunjaemfoerelse
+  7. Kaellor och metod credibility block
 
 All Swedish strings come from SWEDISH_LABELS in src/ui/labels.py.
 """
 
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -25,7 +26,7 @@ import streamlit as st
 # ---------------------------------------------------------------------------
 
 st.set_page_config(
-    page_title="KSS \u00b7 Översikt",
+    page_title="KSS Startsida",
     page_icon=None,
     layout="wide",
     menu_items={"Get Help": None, "Report a bug": None},
@@ -63,6 +64,12 @@ def _load_coefficients() -> pd.DataFrame:
 
 
 coef_df = _load_coefficients()
+
+_UPDATED_DATE = ""
+if (_ARTIFACTS_DIR / "predictions.parquet").exists():
+    _UPDATED_DATE = datetime.fromtimestamp(
+        (_ARTIFACTS_DIR / "predictions.parquet").stat().st_mtime
+    ).strftime("%Y-%m-%d")
 
 # ---------------------------------------------------------------------------
 # Section 1: Hero block
@@ -152,10 +159,10 @@ st.html(f"""
               fill="{COLORS['primary']}" stroke="none" />
         <text x="400" y="52" text-anchor="middle"
               font-family="Source Sans 3" font-size="12" font-weight="700"
-              fill="#FFFFFF">Regressionsmodell</text>
+              fill="#FFFFFF">{SWEDISH_LABELS["svg_regression_model"]}</text>
         <text x="400" y="70" text-anchor="middle"
               font-family="IBM Plex Mono" font-size="9" fill="{COLORS['accent']}">
-            PanelOLS · 2-way FE</text>
+            {SWEDISH_LABELS["svg_panel_ols"]}</text>
 
         <!-- Arrows from regression box -->
         <line x1="480" y1="45" x2="520" y2="28" stroke="{COLORS['accent']}"
@@ -170,19 +177,19 @@ st.html(f"""
               fill="{COLORS['bg']}" stroke="{COLORS['border']}" />
         <text x="585" y="33" text-anchor="middle"
               font-family="Source Sans 3" font-size="11" fill="{COLORS['text_primary']}">
-            Prognos 2025</text>
+            {SWEDISH_LABELS["svg_prognosis"]}</text>
 
         <rect x="520" y="54" width="130" height="36" rx="4"
               fill="{COLORS['bg']}" stroke="{COLORS['border']}" />
         <text x="585" y="77" text-anchor="middle"
               font-family="Source Sans 3" font-size="11" fill="{COLORS['text_primary']}">
-            Rangordning</text>
+            {SWEDISH_LABELS["svg_ranking"]}</text>
 
         <rect x="660" y="32" width="130" height="36" rx="4"
               fill="{COLORS['bg']}" stroke="{COLORS['border']}" />
         <text x="725" y="55" text-anchor="middle"
               font-family="Source Sans 3" font-size="11" fill="{COLORS['text_primary']}">
-            Dekomponering</text>
+            {SWEDISH_LABELS["svg_decomposition"]}</text>
 
         <!-- Arrow marker definition -->
         <defs>
@@ -192,8 +199,16 @@ st.html(f"""
             </marker>
         </defs>
     </svg>
+    <p style="font-family: 'Source Sans 3', sans-serif; font-size: 14px;
+              color: {COLORS['text_secondary']}; margin: 12px 20px 4px 20px;
+              line-height: 1.6;">
+        {SWEDISH_LABELS["landing_model_explanation"]}
+    </p>
 </div>
 """)
+
+with st.expander(SWEDISH_LABELS["landing_model_expander"]):
+    st.markdown(SWEDISH_LABELS["landing_model_example"])
 
 # ---------------------------------------------------------------------------
 # Section 4: Variabler & vikter (regression coefficients as bars)
@@ -224,50 +239,63 @@ def _sig_star(p: float) -> str:
 
 main_coefs["star"] = main_coefs["p_value"].apply(_sig_star)
 
+# Round coefficients for display (2 decimals preserves the message)
+main_coefs["coef_rounded"] = main_coefs["coefficient"].round(2)
+
 # Build horizontal bar chart
 fig_coefs = go.Figure()
 
 bar_colors = [
     COLORS["low_risk"] if c >= 0 else COLORS["high_risk"]
-    for c in main_coefs["coefficient"]
+    for c in main_coefs["coef_rounded"]
 ]
 
 fig_coefs.add_trace(
     go.Bar(
-        x=main_coefs["coefficient"],
+        x=main_coefs["coef_rounded"],
         y=main_coefs["label"],
         orientation="h",
         marker_color=bar_colors,
+        marker_line_width=0,
         text=[
-            f"\u03b2 = {c:+.4f}{s}"
-            for c, s in zip(main_coefs["coefficient"], main_coefs["star"])
+            f"{c:+.2f}{s}"
+            for c, s in zip(main_coefs["coef_rounded"], main_coefs["star"])
         ],
         textposition="outside",
-        textfont={"family": "IBM Plex Mono", "size": 11},
+        textfont={"family": "IBM Plex Mono", "size": 12, "color": COLORS["text_primary"]},
         hovertemplate=(
             "<b>%{y}</b><br>"
-            "\u03b2 = %{x:.4f}<br>"
+            "Koefficient: %{x:+.2f}<br>"
             "<extra></extra>"
         ),
     )
 )
 
+fig_coefs.add_vline(
+    x=0, line_width=1, line_color=COLORS["border"],
+)
+
 layout = get_chart_layout(
-    title=SWEDISH_LABELS["landing_vars_title"],
-    height=260,
+    height=280,
     xaxis_title=SWEDISH_LABELS["axis_coefficient"],
     showlegend=False,
 )
 layout["yaxis"]["tickfont"] = {
     "family": "Source Sans 3, sans-serif",
-    "size": 12,
+    "size": 13,
     "color": COLORS["text_primary"],
 }
-layout["margin"]["l"] = 200
+layout["margin"]["l"] = 220
+layout["margin"]["r"] = 80
+layout["bargap"] = 0.35
 fig_coefs.update_layout(**layout)
 
-st.html(f'<div class="shai-card">{card_header(SWEDISH_LABELS["landing_vars_title"], tag=SWEDISH_LABELS["method_period"])}</div>')
-st.plotly_chart(fig_coefs, use_container_width=True, config={"displayModeBar": False})
+with st.container(border=True):
+    st.html(card_header(SWEDISH_LABELS["landing_vars_title"], tag=SWEDISH_LABELS["method_period"]))
+    st.html(f'<div class="shai-explanation">{SWEDISH_LABELS["landing_vars_explanation"]}</div>')
+    st.plotly_chart(fig_coefs, use_container_width=True, config={"displayModeBar": False})
+    with st.expander(SWEDISH_LABELS["landing_vars_expander"]):
+        st.markdown(SWEDISH_LABELS["landing_vars_example"])
 
 # ---------------------------------------------------------------------------
 # Section 5: Pipeline steps
@@ -289,7 +317,7 @@ for i, (num, label) in enumerate(steps):
     </div>
     """
     if i < len(steps) - 1:
-        pipeline_html += '<span class="shai-pipeline-arrow">\u2192</span>'
+        pipeline_html += '<span class="shai-pipeline-arrow">&gt;</span>'
 pipeline_html += '</div>'
 st.html(pipeline_html)
 
@@ -298,10 +326,15 @@ st.html(pipeline_html)
 # ---------------------------------------------------------------------------
 
 st.html(f"""
-<div class="shai-card">
-    <div class="shai-card-header">
-        <div><h3>{SWEDISH_LABELS["landing_nav_title"]}</h3></div>
-    </div>
+<div style="margin-top: 32px; margin-bottom: 8px;">
+    <h3 style="font-family: 'Source Sans 3', sans-serif; font-size: 18px;
+               font-weight: 700; color: {COLORS['text_primary']}; margin: 0;">
+        {SWEDISH_LABELS["landing_nav_title"]}
+    </h3>
+    <p style="font-family: 'Source Sans 3', sans-serif; font-size: 14px;
+              color: {COLORS['text_secondary']}; margin: 4px 0 0 0;">
+        {SWEDISH_LABELS["landing_nav_explanation"]}
+    </p>
 </div>
 """)
 
@@ -314,7 +347,7 @@ with col1:
         <p>{SWEDISH_LABELS["landing_nav_national_desc"]}</p>
     </div>
     """)
-    st.page_link("pages/01_Riksoversikt.py", label=f"\u2192 {SWEDISH_LABELS['nav_national']}")
+    st.page_link("pages/01_Riksoversikt.py", label=SWEDISH_LABELS['nav_national'])
 
 with col2:
     st.html(f"""
@@ -323,7 +356,7 @@ with col2:
         <p>{SWEDISH_LABELS["landing_nav_kommun_desc"]}</p>
     </div>
     """)
-    st.page_link("pages/02_Kommunjamforelse.py", label=f"\u2192 {SWEDISH_LABELS['nav_kommun']}")
+    st.page_link("pages/02_Kommunjamforelse.py", label=SWEDISH_LABELS['nav_kommun'])
 
 # ---------------------------------------------------------------------------
 # Section 7: Källor & metod
@@ -349,8 +382,8 @@ st.html(f"""
         {pills_html}
     </div>
     <p style="font-size:12px;color:{COLORS['text_secondary']};margin-top:12px;">
-        {SWEDISH_LABELS["method_model_name"]} &middot;
-        {SWEDISH_LABELS["method_period"]} &middot;
+        {SWEDISH_LABELS["method_model_name"]},
+        {SWEDISH_LABELS["method_period"]},
         {SWEDISH_LABELS["method_units"]}
     </p>
 </div>
@@ -360,4 +393,4 @@ st.html(f"""
 # Section 8: Footer
 # ---------------------------------------------------------------------------
 
-st.html(footer_note(SWEDISH_LABELS["footer_source"], "v1.0"))
+st.html(footer_note(SWEDISH_LABELS["footer_source"], "v1.0", updated=_UPDATED_DATE))
