@@ -1,4 +1,4 @@
-# PRD.md — Product Requirements Document
+# PRD.md - Product Requirements Document
 
 **Project:** Kommunal Skattekraft Stress Monitor
 **Repository name:** `kommun-skattekraft-stress`
@@ -11,7 +11,7 @@
 
 ## Purpose of This Document
 
-This is the master reference file that Cursor and Claude Code load as project context for every task. Every prompt in `TASKS.md` references sections of this document. If a design decision is not in this PRD, it is not part of the project.
+This is the master reference file for every implementation task. Every prompt in `TASKS.md` references sections of this document. If a design decision is not in this PRD, it is not part of the project.
 
 **Two layer language rule (enforced everywhere):**
 
@@ -133,7 +133,7 @@ kommun-skattekraft-stress/
 | Code name | Swedish display | Definition | Source | pxweb table |
 |---|---|---|---|---|
 | `tax_base_per_capita` | "Skattekraft per invånare" | Beskattningsbar förvärvsinkomst per invånare, kr | SCB | OE0101 SkatteKraft |
-| `tax_base_growth_pct` | "Skattekraftstillväxt (%)" | Year-over-year percent change, computed | derived | — |
+| `tax_base_growth_pct` | "Skattekraftstillväxt (%)" | Year-over-year percent change, computed | derived | - |
 
 ### Independent variables
 
@@ -161,7 +161,7 @@ kommun-skattekraft-stress/
 | `predicted_growth_2025` | "Prognos 2025 (%)" | Out-of-sample prediction for 2025 |
 | `vulnerability_score` | "Sårbarhetsindex" | Standardized predicted growth (z-score, sign-flipped so high = vulnerable) |
 | `vulnerability_rank` | "Rang" | Rank 1 to 290, 1 = most vulnerable |
-| `risk_class` | "Riskklass" | Categorical: "lag", "medel", "hog" — bottom quintile = "hog" |
+| `risk_class` | "Riskklass" | Categorical: "lag", "medel", "hog" - bottom quintile = "hog" |
 | `decomp_unemployment` | "Bidrag: arbetslöshet" | Contribution of unemployment differential to gap vs national mean |
 | `decomp_dependency` | "Bidrag: försörjningskvot" | Contribution of dependency ratio differential |
 | `decomp_population` | "Bidrag: befolkning" | Contribution of population growth differential |
@@ -173,7 +173,7 @@ kommun-skattekraft-stress/
 ## 5. Empirical Model (Locked)
 
 ```
-ΔTax_base_it = α_i + γ_t + β₁·Unemployment_it + β₂·DependencyRatio_it + β₃·PopGrowth_it + β₄·EduShare_it + ε_it
+DeltaTax_base_it = alpha_i + gamma_t + beta_1,Unemployment_it + beta_2,DependencyRatio_it + beta_3,PopGrowth_it + beta_4,EduShare_it + epsilon_it
 ```
 
 Where i indexes kommun (290), t indexes year (2010 to 2024). Two-way fixed effects (kommun and year). Standard errors clustered at kommun level. Estimated with `linearmodels.PanelOLS(entity_effects=True, time_effects=True)`. Robustness: lagged independents, drop COVID years, larger-kommuner subsample.
@@ -185,11 +185,11 @@ Where i indexes kommun (290), t indexes year (2010 to 2024). Two-way fixed effec
 * Year fixed effect = mean of last 3 years (proxy)
 * Compute predicted growth, standardize across kommuner, sign-flip so high score = high vulnerability
 * Bottom quintile (58 kommuner) = "hog" risk class
-* Quintiles 2–4 = "medel"
+* Quintiles 2-4 = "medel"
 * Top quintile = "lag"
 
 **Decomposition (gap vs national mean):**
-For each kommun and each independent variable, compute (kommun value − national mean) × β. Plus residual = α_i + ε_i.
+For each kommun and each independent variable, compute (kommun value - national mean) x beta. Plus residual = alpha_i + ε_i.
 
 Full methodology in `METHODOLOGY.md`.
 
@@ -203,13 +203,13 @@ Defined in `src/ui/css.py` as `COLORS` dict:
 
 ```python
 COLORS = {
-    "primary":        "#0B1F3F",   # Navy — sidebar, KPI bars, hero
-    "primary_light":  "#1B2A4A",   # Lighter navy — hero gradient mid
-    "secondary":      "#4A6FA5",   # Blue — chart series 1
-    "accent":         "#C4A35A",   # Gold — eyebrows, brand bar, active
-    "low_risk":       "#2E7D5B",   # Green — låg risk
-    "medium_risk":    "#D4A03C",   # Amber — medel risk
-    "high_risk":      "#B94A48",   # Red — hög risk
+    "primary":        "#0B1F3F",   # Navy - sidebar, KPI bars, hero
+    "primary_light":  "#1B2A4A",   # Lighter navy - hero gradient mid
+    "secondary":      "#4A6FA5",   # Blue - chart series 1
+    "accent":         "#C4A35A",   # Gold - eyebrows, brand bar, active
+    "low_risk":       "#2E7D5B",   # Green - låg risk
+    "medium_risk":    "#D4A03C",   # Amber - medel risk
+    "high_risk":      "#B94A48",   # Red - hög risk
     "bg":             "#F7F8FA",
     "card_bg":        "#FFFFFF",
     "text_primary":   "#1A1A2E",
@@ -245,9 +245,9 @@ Loaded via Google Fonts `@import` in `GLOBAL_CSS`:
 | Hero headline | Source Sans 3 | 700 | clamp(24px, 3vw, 36px) |
 | Card title | Source Sans 3 | 700 | 15px |
 | Eyebrow | Source Sans 3 | 600 | 11px uppercase, 1.5px tracking |
-| Body | Source Sans 3 | 400 | 14–15px |
+| Body | Source Sans 3 | 400 | 14-15px |
 | KPI value | Source Sans 3 | 700 | 32px tabular-nums |
-| Numeric data | IBM Plex Mono | 400–500 | 11–12px |
+| Numeric data | IBM Plex Mono | 400-500 | 11-12px |
 | Table headers | Source Sans 3 | 600 | 10.5px uppercase |
 
 ### 6.3 Layout
@@ -258,7 +258,7 @@ Same as SHAI reference: page padding 32px 40px, max-width 1480px, section gap 24
 
 ```python
 st.set_page_config(
-    page_title="KSS · <Page Name>",
+    page_title="KSS , <Page Name>",
     page_icon=None,
     layout="wide",
     menu_items={"Get Help": None, "Report a bug": None},
@@ -283,13 +283,13 @@ inject_css()
 ### 6.6 Components
 
 All in `src/ui/components.py`:
-* `page_title(eyebrow, title, subtitle, year)` — page header
-* `kpi_card(label, value, unit, delta, delta_direction, variant, tooltip)` — KPI tile
-* `render_kpi_row(cards)` — equal-width column layout for KPIs
-* `card_header(title, subtitle, tag)` — card top
-* `card(title, subtitle, tag, content)` — full card
-* `risk_pill(level)` — Låg/Medel/Hög pill
-* `footer_note(source, version)` — page bottom
+* `page_title(eyebrow, title, subtitle, year)` - page header
+* `kpi_card(label, value, unit, delta, delta_direction, variant, tooltip)` - KPI tile
+* `render_kpi_row(cards)` - equal-width column layout for KPIs
+* `card_header(title, subtitle, tag)` - card top
+* `card(title, subtitle, tag, content)` - full card
+* `risk_pill(level)` - Låg/Medel/Hög pill
+* `footer_note(source, version)` - page bottom
 
 Delta direction semantics for skattekraft growth:
 * `up` = growth, GREEN (good for kommun)
@@ -300,9 +300,9 @@ This is **inverted from SHAI** (where rising prices = bad). Document in code.
 
 ### 6.7 Choropleth map
 
-`src/ui/choropleth.py`. Folium polygon-based. Diverging green→neutral→red scale on `vulnerability_score`. Height 480px. Uses `data/geo/kommuner.geojson` from okfse/sweden-geojson (see KRI_Dataset_Identification.md §5).
+`src/ui/choropleth.py`. Folium polygon-based. Diverging green to neutral to red scale on `vulnerability_score`. Height 480px. Uses `data/geo/kommuner.geojson` from okfse/sweden-geojson (see KRI_Dataset_Identification.md 5).
 
-Legend caption (Swedish): "Sårbarhetsindex · Lägre = bättre, Högre = sämre"
+Legend caption (Swedish): "Sårbarhetsindex , Lägre = bättre, Högre = sämre"
 
 ### 6.8 Chart theme
 
@@ -312,10 +312,10 @@ Legend caption (Swedish): "Sårbarhetsindex · Lägre = bättre, Högre = sämre
 
 ## 7. Page Structure (3 Pages)
 
-### Page 1: `app.py` — Landing (Översikt)
+### Page 1: `app.py` - Landing (Översikt)
 
 **Route:** `/`
-**Page title:** "KSS · Översikt"
+**Page title:** "KSS , Översikt"
 **Eyebrow:** "KOMMUNAL SKATTEKRAFT STRESS MONITOR"
 **Headline:** "Skattekraftens utveckling i Sveriges 290 kommuner"
 **Lead:** "En panelmodell som identifierar kommuner med svag prognosticerad skattekraftstillväxt och dekomponerar drivkrafterna bakom skillnaderna mellan kommuner."
@@ -323,32 +323,32 @@ Legend caption (Swedish): "Sårbarhetsindex · Lägre = bättre, Högre = sämre
 **Sections:**
 1. Hero block (navy gradient, gold border)
 2. Stat strip (4 cells): "290 KOMMUNER", "15 ÅR PANEL", "4 STRUKTURVARIABLER", "FIXED EFFECTS"
-3. Modellöversikt (3 input boxes → Regressionsmodell box → 3 output boxes; SVG flow)
-4. Variabler & vikter (regression coefficients displayed as bars, NOT arbitrary index weights — this is the key adaptation from SHAI)
-5. Pipeline steps (4 steps with arrow connectors): Datainsamling → Rensning → Estimering → Prognos
+3. Modellöversikt (3 input boxes to Regressionsmodell box to 3 output boxes; SVG flow)
+4. Variabler & vikter (regression coefficients displayed as bars, NOT arbitrary index weights - this is the key adaptation from SHAI)
+5. Pipeline steps (4 steps with arrow connectors): Datainsamling to Rensning to Estimering to Prognos
 6. Navigation cards (2 cards): Riksöversikt, Kommunjämförelse
 7. Källor & metod block (credibility): SCB OE0101, SCB BE0101, SCB AA0003, SCB UF0506
 
-### Page 2: `pages/01_Riksoversikt.py` — National Overview
+### Page 2: `pages/01_Riksoversikt.py` - National Overview
 
-**Page title:** "KSS · Riksöversikt"
+**Page title:** "KSS , Riksöversikt"
 **Eyebrow:** "NATIONELL VY"
 **Title:** "Riksöversikt"
 **Subtitle:** "Skattekraftens prognosticerade utveckling 2025, alla 290 kommuner"
 
 **Sections:**
 1. KPI row (4 cards):
-   * "Median prognos 2025" — predicted growth, national median
-   * "Kommuner i hög risk" — count of bottom quintile
-   * "Största nedgång (prognos)" — most negative predicted growth, with kommun name
-   * "Modellens R²" — within R² from regression
+   * "Median prognos 2025" - predicted growth, national median
+   * "Kommuner i hög risk" - count of bottom quintile
+   * "Största nedgång (prognos)" - most negative predicted growth, with kommun name
+   * "Modellens R2" - within R2 from regression
 2. Geografisk fördelning (choropleth map, Folium, full-width or 3:2 split with histogram)
 3. Histogram of predicted growth across kommuner (right side of choropleth in 3:2 layout)
 4. Rangordning (sortable table, all 290 kommuner): Rang, Kommun, Län, Prognos 2025 (%), Riskklass. CSV download.
 
-### Page 3: `pages/02_Kommunjamforelse.py` — Kommun Detail
+### Page 3: `pages/02_Kommunjamforelse.py` - Kommun Detail
 
-**Page title:** "KSS · Kommunjämförelse"
+**Page title:** "KSS , Kommunjämförelse"
 **Eyebrow:** "KOMMUNDETALJ"
 **Title:** "Kommunjämförelse"
 **Subtitle:** "Strukturell dekomponering för vald kommun"
@@ -361,7 +361,7 @@ Legend caption (Swedish): "Sårbarhetsindex · Lägre = bättre, Högre = sämre
    * "Tillväxt 2024 (%)"
    * "Prognos 2025 (%)"
    * "Sårbarhetsrang" (X / 290)
-2. Historisk trend (line chart): kommun vs riksgenomsnitt, 2010–2024
+2. Historisk trend (line chart): kommun vs riksgenomsnitt, 2010-2024
 3. Dekomponering (horizontal bar chart): contribution of each variable to gap vs national mean, 2024. Color-coded: positive = green, negative = red.
 4. Peer comparison table: 5 most similar kommuner by vulnerability score, with their values for each input variable
 5. Metod-länk: link to METHODOLOGY.md on GitHub
@@ -397,10 +397,10 @@ A page is "done" when ALL of these pass:
 * No hardcoded paths (use `pathlib.Path` relative to project root)
 * No print statements (use `logging`)
 
-**Data integrity (sanity checks, see METHODOLOGY §6):**
+**Data integrity (sanity checks, see METHODOLOGY 6):**
 * Danderyd has highest skattekraft level in 2024 data
 * Dorotea or similar small Norrland kommun has lowest skattekraft level
-* Predictions sum/average is in plausible range (3–5% growth typical)
+* Predictions sum/average is in plausible range (3-5% growth typical)
 * No kommun has missing values across all years
 
 ---
@@ -441,7 +441,7 @@ SWEDISH_LABELS = {
     "kpi_median_prognosis": "Median prognos 2025",
     "kpi_high_risk_count": "Kommuner i hög risk",
     "kpi_largest_decline": "Största nedgång (prognos)",
-    "kpi_model_r2": "Modellens R²",
+    "kpi_model_r2": "Modellens R2",
 
     # KPI labels (kommun)
     "kpi_skattekraft_2024": "Skattekraft 2024",
@@ -487,8 +487,8 @@ SWEDISH_LABELS = {
     # Map
     "map_title": "Geografisk fördelning",
     "map_subtitle": "Sårbarhetsindex per kommun",
-    "map_legend_caption": "Sårbarhetsindex · Lägre = bättre, Högre = sämre",
-    "map_color_scale_note": "Färgskala: Grön = låg sårbarhet · Gul = medel · Röd = hög sårbarhet",
+    "map_legend_caption": "Sårbarhetsindex , Lägre = bättre, Högre = sämre",
+    "map_color_scale_note": "Färgskala: Grön = låg sårbarhet , Gul = medel , Röd = hög sårbarhet",
 
     # Buttons and actions
     "btn_download_csv": "Ladda ned som CSV",
@@ -502,13 +502,13 @@ SWEDISH_LABELS = {
 
     # Footer
     "footer_source_label": "KÄLLA",
-    "footer_source": "SCB · OE0101, BE0101, AA0003, UF0506",
+    "footer_source": "SCB , OE0101, BE0101, AA0003, UF0506",
     "footer_method_link": "Metodologi",
 
     # Methodology callouts
     "method_model_name": "Tvåvägs fixed effects panelmodell",
-    "method_period": "Period: 2010–2024",
-    "method_units": "290 kommuner × 15 år = 4 350 observationer",
+    "method_period": "Period: 2010-2024",
+    "method_units": "290 kommuner x 15 år = 4 350 observationer",
 
     # Units (use these everywhere)
     "unit_sek": "kr",
@@ -581,9 +581,9 @@ This is the most violated rule in projects of this kind. Every prompt in `TASKS.
 
 ## 13. Document Cross-References
 
-* Tasks: `docs/TASKS.md` — every task references PRD sections
-* Methodology details: `docs/METHODOLOGY.md` — theoretical foundation, formulas, sanity checks
-* Data audit: `docs/KRI_Dataset_Identification.md` — every variable's source URL, query, schema
+* Tasks: `docs/TASKS.md` - every task references PRD sections
+* Methodology details: `docs/METHODOLOGY.md` - theoretical foundation, formulas, sanity checks
+* Data audit: `docs/KRI_Dataset_Identification.md` - every variable's source URL, query, schema
 
 ---
 

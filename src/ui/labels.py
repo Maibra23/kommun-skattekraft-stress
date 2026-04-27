@@ -2,12 +2,12 @@
 
 SWEDISH_LABELS is the single source of truth for every string visible to
 dashboard users.  Code that hardcodes Swedish text in component logic is
-rejected in code review — always import from here.
+rejected in code review, always import from here.
 
 Also provides three number formatting helpers:
-  format_sek(value)              — integer SEK with narrow no-break space thousands separator
-  format_pct(value, decimals)    — percentage with comma decimal and % suffix
-  format_signed_pct(value, decimals) — signed percentage with explicit + or - sign
+  format_sek(value)              - integer SEK with narrow no-break space thousands separator
+  format_pct(value, decimals)    - percentage with comma decimal and % suffix
+  format_signed_pct(value, decimals) - signed percentage with explicit + or - sign
 """
 
 # ---------------------------------------------------------------------------
@@ -45,7 +45,7 @@ SWEDISH_LABELS = {
     "kpi_median_prognosis": "Median prognos 2025",
     "kpi_high_risk_count": "Kommuner i hög risk",
     "kpi_largest_decline": "Största nedgång (prognos)",
-    "kpi_model_r2": "Modellens R²",
+    "kpi_model_r2": "Modellens R2",
 
     # KPI labels (kommun)
     "kpi_skattekraft_2024": "Skattekraft 2024",
@@ -188,7 +188,7 @@ SWEDISH_LABELS = {
     "tooltip_population": "Befolkning",
 
     # Coefficient chart axis
-    "axis_coefficient": "\u03b2 (koefficient)",
+    "axis_coefficient": "Koefficient (beta)",
 
     # SVG diagram labels (landing page)
     "svg_regression_model": "Regressionsmodell",
@@ -213,7 +213,7 @@ SWEDISH_LABELS = {
 
     # R² KPI tooltip
     "kpi_r2_tooltip": (
-        "R\u00b2(within) mäter hur mycket av variationen inom kommuner "
+        "R2(within) mäter hur mycket av variationen inom kommuner "
         "som förklaras av strukturvariablerna, efter att kommun- och "
         "årseffekter absorberats. Lågt värde är förväntat."
     ),

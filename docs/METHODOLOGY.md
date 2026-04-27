@@ -1,8 +1,8 @@
-# METHODOLOGY.md — Methodology Bible
+# METHODOLOGY.md - Methodology Bible
 
 **Project:** Kommunal Skattekraft Stress Monitor
 
-This document is both a development reference (read by Cursor and Claude Code during implementation) and the basis for the methodology section displayed in the dashboard. It documents the theoretical foundation, the exact regression specification, every formula, the evaluation criteria, and all known limitations.
+This document is both a development reference and the basis for the methodology section displayed in the dashboard. It documents the theoretical foundation, the exact regression specification, every formula, the evaluation criteria, and all known limitations.
 
 For data sources and URLs, see `KRI_Dataset_Identification.md`. This document focuses on **why** and **how**, not **where the data lives**.
 
@@ -12,7 +12,7 @@ For data sources and URLs, see `KRI_Dataset_Identification.md`. This document fo
 
 ### 1.1 The economic question
 
-Swedish kommuner finance their operations primarily through municipal income tax (kommunalskatt) levied on residents' taxable employment income. The tax base per inhabitant — *skattekraft* — is therefore the central determinant of a kommun's fiscal capacity.
+Swedish kommuner finance their operations primarily through municipal income tax (kommunalskatt) levied on residents' taxable employment income. The tax base per inhabitant, *skattekraft*, is therefore the central determinant of a kommun's fiscal capacity.
 
 Skattekraft varies enormously across the 290 kommuner: in 2024, Danderyd reported approximately 481 000 SEK per inhabitant while small Norrland kommuner reported under 150 000 SEK. The Swedish kommunalekonomisk utjämningssystem partially offsets these differences through grants from high-skattekraft to low-skattekraft kommuner, but the underlying tax base remains a real constraint on each kommun's fiscal autonomy and creditworthiness.
 
@@ -26,16 +26,16 @@ Growth rates are also stationary, which is required for valid panel inference. L
 
 Standard public-finance literature (e.g. Bergvall et al. on Nordic municipal finance; OECD reports on subnational fiscal sustainability) identifies four structural drivers of municipal tax base trajectories:
 
-1. **Labor market conditions** (unemployment) — direct effect on income tax collected
-2. **Demographic composition** (dependency ratio) — share of population in tax-paying ages
-3. **Population dynamics** (growth or decline) — net migration affects future tax base
-4. **Human capital** (education levels) — predicts wage growth and labor force participation
+1. **Labor market conditions** (unemployment): direct effect on income tax collected
+2. **Demographic composition** (dependency ratio): share of population in tax-paying ages
+3. **Population dynamics** (growth or decline): net migration affects future tax base
+4. **Human capital** (education levels): predicts wage growth and labor force participation
 
 These are the four right-hand-side variables in our model.
 
 ### 1.4 What this model is NOT
 
-* **Not a causal model.** The estimated coefficients describe associations within a panel, not causal effects. Reverse causality (low growth → unemployment) is plausible. The fixed-effects specification controls for time-invariant confounders but not for simultaneity.
+* **Not a causal model.** The estimated coefficients describe associations within a panel, not causal effects. Reverse causality (low growth leads to unemployment) is plausible. The fixed-effects specification controls for time-invariant confounders but not for simultaneity.
 * **Not a long-horizon forecast.** Predictions are one-year-ahead only. Out-of-sample accuracy beyond 2025 is not claimed.
 * **Not a substitute for the official utjämningssystem analysis.** That analysis uses confidential micro-data and richer covariates. This is a public-data, replicable analog.
 
@@ -52,11 +52,11 @@ $$
 $$
 
 Where:
-* `ΔTaxBase_it` = year-over-year percent change in skattekraft per inhabitant, current SEK
-* `α_i` = kommun fixed effect (290 dummies, one omitted)
-* `γ_t` = year fixed effect (15 dummies, one omitted)
-* `β_1, β_2, β_3, β_4` = structural coefficients
-* `ε_it` = idiosyncratic error
+* `DeltaTaxBase_it` = year-over-year percent change in skattekraft per inhabitant, current SEK
+* `alpha_i` = kommun fixed effect (290 dummies, one omitted)
+* `gamma_t` = year fixed effect (15 dummies, one omitted)
+* `beta_1, beta_2, beta_3, beta_4` = structural coefficients
+* `epsilon_it` = idiosyncratic error
 
 ### 2.2 Variable construction
 
@@ -81,9 +81,9 @@ Where:
 
 ### 2.5 Why two-way fixed effects
 
-* `α_i` absorbs all time-invariant kommun characteristics: geography, industry mix, historical settlement, distance to Stockholm, language minority status, etc.
-* `γ_t` absorbs all aggregate annual shocks: national wage growth, federal policy changes, COVID, inflation surges, business cycle.
-* What's left in `β_1..β_4` is the within-kommun, between-year association after both layers of fixed effects.
+* `alpha_i` absorbs all time-invariant kommun characteristics: geography, industry mix, historical settlement, distance to Stockholm, language minority status, etc.
+* `gamma_t` absorbs all aggregate annual shocks: national wage growth, federal policy changes, COVID, inflation surges, business cycle.
+* What's left in `beta_1..beta_4` is the within-kommun, between-year association after both layers of fixed effects.
 
 This is the standard specification in modern applied micro for panel data. It is not the only specification (random effects, between estimator, dynamic panel) but it is the most defensible default when both kommun and year heterogeneity matter.
 
@@ -94,7 +94,7 @@ This is the standard specification in modern applied micro for panel data. It is
 | Lagged independents | Replace `X_it` with `X_{i,t-1}` on RHS | Mitigates simultaneity |
 | Drop COVID | Exclude 2020 and 2021 | COVID may dominate year FE |
 | Larger kommuner only | Subsample with 2024 population > 10 000 | Small kommuner have noisier growth |
-| Without education | Drop β₄ | Education stock varies slowly; check if it materially changes other betas |
+| Without education | Drop beta_4 | Education stock varies slowly; check if it materially changes other betas |
 
 If the main coefficients are stable across these specifications, the model is robust. If they flip sign or change magnitude dramatically, document and discuss.
 
@@ -111,9 +111,9 @@ $$
 $$
 
 Where:
-* `α̂_i` = estimated kommun fixed effect
-* `γ̄_recent` = mean of estimated year fixed effects for 2022, 2023, 2024 (proxy for unobserved 2025)
-* `β̂_k` = estimated coefficients
+* `alpha_hat_i` = estimated kommun fixed effect
+* `gamma_bar_recent` = mean of estimated year fixed effects for 2022, 2023, 2024 (proxy for unobserved 2025)
+* `beta_hat_k` = estimated coefficients
 * RHS values are most recent observed (2024)
 
 ### 3.2 Standardization to vulnerability_score
@@ -124,7 +124,7 @@ $$
 \text{vulnerability\_score}_i = -1 \times \frac{\widehat{\Delta\text{TaxBase}}_{i, 2025} - \mu_{\text{predictions}}}{\sigma_{\text{predictions}}}
 $$
 
-Where μ and σ are mean and standard deviation across all 290 predictions. The `-1` flips the sign so that **higher score = more vulnerable** (lower predicted growth).
+Where mu and sigma are mean and standard deviation across all 290 predictions. The `-1` flips the sign so that **higher score = more vulnerable** (lower predicted growth).
 
 ### 3.3 Risk class assignment
 
@@ -198,7 +198,7 @@ The pipeline raises an error and stops if any of these fail. Failure indicates a
 |---|---|---|
 | Highest 2024 skattekraft | Danderyd (kod 0162), approximately 481 000 kr | SCB OE0101 fetched data |
 | Bottom 5 skattekraft kommuner 2024 | All from Norrland or sparsely populated regions | Domain knowledge |
-| National mean skattekraft 2024 | Unweighted mean approximately 231 000 kr (range 200 000–350 000 kr) | Pipeline computed; note: SCB's published "riksmedelvärde" (~271 000 kr) is population-weighted and therefore higher |
+| National mean skattekraft 2024 | Unweighted mean approximately 231 000 kr (range 200 000-350 000 kr) | Pipeline computed; note: SCB's published "riksmedelvärde" (~271 000 kr) is population-weighted and therefore higher |
 | All 290 kommuner present in every year | Yes | Implementation |
 
 ### 6.2 Population checks
@@ -213,22 +213,22 @@ The pipeline raises an error and stops if any of these fail. Failure indicates a
 
 | Check | Expected |
 |---|---|
-| Mean tax_base_growth_pct over 2010–2024 | Positive, between 2.5% and 5% annually (observed: 2.65 %) |
-| No kommun has tax_base_growth_pct below -10% in any year | True (observed min: −4.9 %; extreme outliers indicate data error) |
+| Mean tax_base_growth_pct over 2010-2024 | Positive, between 2.5% and 5% annually (observed: 2.65 %) |
+| No kommun has tax_base_growth_pct below -10% in any year | True (observed min: -4.9 %; extreme outliers indicate data error) |
 | 2020 growth distribution | Lower than 2019 (COVID effect visible; observed: 2019 mean 3.2 %, 2020 mean 2.2 %) |
-| Dependency ratio range | 0.5 to 1.25 across kommuner (observed: 0.508–1.241) |
+| Dependency ratio range | 0.5 to 1.25 across kommuner (observed: 0.508-1.241) |
 
 ### 6.4 Model fit checks
 
 | Check | Expected | Actual (2026-04-24 review) | Status |
 |---|---|---|---|
-| R² (within) | Originally expected >0.10 | **0.0083** — see §7.10 for explanation | ⚠ Below prior expectation |
-| At least 2 of 4 betas statistically significant | At cluster-robust 5% level | 3 of 4 significant (unemployment p<0.001, dependency p<0.001, population p=0.008; education p=0.52 n.s.) | ✓ Pass |
-| Sign of β₁ (unemployment) | Negative | **−0.059** (p<0.001) | ✓ Pass |
-| Sign of β₃ (population growth) | Originally expected positive | **−0.080** (p=0.008) — negative after two-way demeaning; see §7.11 | ⚠ Sign reversal (explained) |
-| β₄ (edu_share) significance | May be insignificant (§7.7) | **+0.019** (p=0.52) — confirmed insignificant | ✓ Expected |
+| R2 (within) | Originally expected >0.10 | **0.0083** - see 7.10 for explanation | Note: Below prior expectation |
+| At least 2 of 4 betas statistically significant | At cluster-robust 5% level | 3 of 4 significant (unemployment p<0.001, dependency p<0.001, population p=0.008; education p=0.52 n.s.) | Pass |
+| Sign of beta_1 (unemployment) | Negative | **-0.059** (p<0.001) | Pass |
+| Sign of beta_3 (population growth) | Originally expected positive | **-0.080** (p=0.008) - negative after two-way demeaning; see 7.11 | Note: Sign reversal (explained) |
+| beta_4 (edu_share) significance | May be insignificant (7.7) | **+0.019** (p=0.52) - confirmed insignificant | Pass - Expected |
 
-**Note on §6.4 enforcement:** These model fit checks are **diagnostic, not blocking**. Unlike the data integrity checks in §6.1–§6.3 (which halt the pipeline on failure), the model fit checks are informational — a low R²(within) or an unexpected coefficient sign indicates that the specification should be interpreted carefully, but does not indicate a data error. The pipeline logs these results but does not halt, because the findings are empirically valid (see §7.10 and §7.11 for detailed explanations).
+**Note on 6.4 enforcement:** These model fit checks are **diagnostic, not blocking**. Unlike the data integrity checks in 6.1-6.3 (which halt the pipeline on failure), the model fit checks are informational - a low R2(within) or an unexpected coefficient sign indicates that the specification should be interpreted carefully, but does not indicate a data error. The pipeline logs these results but does not halt, because the findings are empirically valid (see 7.10 and 7.11 for detailed explanations).
 
 ---
 
@@ -242,15 +242,15 @@ The unemployment variable comes from Arbetsförmedlingen registrations, not from
 
 ### 7.2 No causal identification claim
 
-Two-way FE controls for time-invariant confounders and aggregate year shocks. It does not address simultaneity (low growth → unemployment), measurement error, or omitted time-varying variables. The model is descriptive and predictive, not causal.
+Two-way FE controls for time-invariant confounders and aggregate year shocks. It does not address simultaneity (low growth leads to unemployment), measurement error, or omitted time-varying variables. The model is descriptive and predictive, not causal.
 
 ### 7.3 Predictions assume structural stability
 
-The model is trained on 2010–2024 patterns. A 2025 shock unlike anything in the training period would not be captured. COVID is in the training data, which helps for similar future shocks, but a unique event (e.g. a major industrial closure in a single kommun) would be missed.
+The model is trained on 2010-2024 patterns. A 2025 shock unlike anything in the training period would not be captured. COVID is in the training data, which helps for similar future shocks, but a unique event (e.g. a major industrial closure in a single kommun) would be missed.
 
 ### 7.4 Year fixed effect proxy in prediction
 
-The 2025 year fixed effect is unobserved. We proxy with the mean of 2022–2024 estimated year FE. This is a standard shortcut but introduces uncertainty not reflected in displayed prediction intervals. A more sophisticated approach would model year FE as a time series.
+The 2025 year fixed effect is unobserved. We proxy with the mean of 2022-2024 estimated year FE. This is a standard shortcut but introduces uncertainty not reflected in displayed prediction intervals. A more sophisticated approach would model year FE as a time series.
 
 ### 7.5 No housing or migration variables
 
@@ -262,7 +262,7 @@ The skattekraft figure for year *t* reflects income earned in year *t-2*. The 20
 
 ### 7.7 Education variable moves slowly
 
-The within-kommun variation in education share across 15 years is modest. β₄ may have a wide confidence interval and may not be statistically significant. This is a known feature of slow-moving demographic stocks, not a defect in the model. If β₄ is insignificant, we report it honestly and discuss interpretation.
+The within-kommun variation in education share across 15 years is modest. beta_4 may have a wide confidence interval and may not be statistically significant. This is a known feature of slow-moving demographic stocks, not a defect in the model. If beta_4 is insignificant, we report it honestly and discuss interpretation.
 
 ### 7.8 Definition change in unemployment series (2018)
 
@@ -272,39 +272,39 @@ SCB updated the methodology for "Andel öppet arbetslösa" in 2018, applied retr
 
 The pipeline requests unemployment rates using the SCB-provided total-aggregate codes (`BakgrVar='TOT'`, `Kön='1+2'`, `UtbNiv='000'`). These codes select the already-aggregated "all backgrounds, both sexes, all education levels" series that SCB publishes directly. No client-side averaging across sub-categories is performed.
 
-This approach was adopted during pipeline implementation when the SCB STATIV tables were restructured (see §12.2). Using the published total avoids the weighting ambiguity entirely and ensures the series matches the aggregate figures SCB publishes in its statistical news releases.
+This approach was adopted during pipeline implementation when the SCB STATIV tables were restructured (see 12.2). Using the published total avoids the weighting ambiguity entirely and ensures the series matches the aggregate figures SCB publishes in its statistical news releases.
 
-### 7.10 Low R²(within) is expected after two-way demeaning
+### 7.10 Low R2(within) is expected after two-way demeaning
 
-The within R² of 0.0083 means that the four structural variables explain only 0.83% of the residual variation **after removing entity and year fixed effects**. This does not mean the model is useless — it means the entity and year effects absorb the vast majority of variation, which is the point of two-way FE.
+The within R2 of 0.0083 means that the four structural variables explain only 0.83% of the residual variation **after removing entity and year fixed effects**. This does not mean the model is useless - it means the entity and year effects absorb the vast majority of variation, which is the point of two-way FE.
 
 **Why this is expected:**
-* Entity fixed effects absorb all time-invariant kommun differences (geography, industry mix, commuting patterns, historical settlement) — these explain most cross-sectional variation in tax base growth.
-* Year fixed effects absorb all aggregate annual shocks (national wage growth, inflation, policy changes, COVID) — these explain most time-series variation in tax base growth.
-* What remains after absorbing both layers is the **within-kommun, between-year deviation from trend** — a very small residual signal.
-* The individual coefficients are still statistically significant and economically meaningful: a 1 pp increase in unemployment within a kommun is associated with a −0.059 pp decrease in tax base growth, holding all else constant.
+* Entity fixed effects absorb all time-invariant kommun differences (geography, industry mix, commuting patterns, historical settlement) - these explain most cross-sectional variation in tax base growth.
+* Year fixed effects absorb all aggregate annual shocks (national wage growth, inflation, policy changes, COVID) - these explain most time-series variation in tax base growth.
+* What remains after absorbing both layers is the **within-kommun, between-year deviation from trend** - a very small residual signal.
+* The individual coefficients are still statistically significant and economically meaningful: a 1 pp increase in unemployment within a kommun is associated with a -0.059 pp decrease in tax base growth, holding all else constant.
 
 **Implications for prediction:**
 * The vulnerability score is dominated by the entity fixed effects (historical patterns), not by current structural conditions.
 * The structural variables contribute a small marginal adjustment on top of the entity-specific baseline.
 * This is honest and should be communicated: the model ranks kommuner primarily by their historical trajectory, with modest adjustments for current structural conditions.
 
-**In academic context:** Two-way FE specifications commonly show low within R² in municipal-level panels (see Wooldridge 2010 ch. 10; Angrist & Pischke 2009 ch. 5). The R² statistic is not the right criterion for assessing whether coefficients are informative — t-statistics and coefficient stability across robustness specifications are more relevant.
+**In academic context:** Two-way FE specifications commonly show low within R2 in municipal-level panels (see Wooldridge 2010 ch. 10; Angrist & Pischke 2009 ch. 5). The R2 statistic is not the right criterion for assessing whether coefficients are informative - t-statistics and coefficient stability across robustness specifications are more relevant.
 
 ### 7.11 Population growth coefficient is negative after demeaning
 
-The population growth coefficient β₃ = −0.080 (p = 0.008) is negative, which contradicts the intuitive expectation (and the raw positive correlation) that growing populations should be associated with growing tax bases.
+The population growth coefficient beta_3 = -0.080 (p = 0.008) is negative, which contradicts the intuitive expectation (and the raw positive correlation) that growing populations should be associated with growing tax bases.
 
 **Explanation:** After two-way demeaning:
 * The raw (level) positive correlation between population growth and tax base growth reflects **between-kommun** differences: thriving kommuner have both growing populations and growing tax bases.
 * The **within-entity** effect captures a different dynamic: when a specific kommun experiences above-trend population growth in a specific year (holding its time-invariant characteristics constant), the per-capita tax base may temporarily dilute. This happens because population inflows (especially young families, immigrants, or students) may initially contribute less to the per-capita tax base than the existing residents.
 * This within-entity negative effect is consistent with findings in the municipal finance literature where rapid population growth creates a lag between population arrivals and tax base expansion.
 
-**This is not a data error.** The "no_education" and "lagged" robustness specifications should be consulted to verify that the sign and magnitude are stable. If β₃ flips sign in robustness checks, this finding should be treated with caution.
+**This is not a data error.** The "no_education" and "lagged" robustness specifications should be consulted to verify that the sign and magnitude are stable. If beta_3 flips sign in robustness checks, this finding should be treated with caution.
 
 ### 7.12 Nominal tax base growth includes inflation
 
-`tax_base_growth_pct` is computed from nominal SEK values (not inflation-adjusted). The year fixed effects (γ_t) absorb the common inflation component across all kommuner, so the β coefficients capture the association between structural variables and growth **in excess of the national average**. However, the predicted growth for 2025 — which uses a year FE proxy — will include an inflation component. Users should interpret predicted growth rates as nominal, not real.
+`tax_base_growth_pct` is computed from nominal SEK values (not inflation-adjusted). The year fixed effects (gamma_t) absorb the common inflation component across all kommuner, so the beta coefficients capture the association between structural variables and growth **in excess of the national average**. However, the predicted growth for 2025 - which uses a year FE proxy - will include an inflation component. Users should interpret predicted growth rates as nominal, not real.
 
 ### 7.13 Unweighted cross-sectional statistics
 
@@ -358,7 +358,7 @@ The decomposition shows which structural factors are pulling your kommun above o
 
 ## 11. Pipeline Implementation Decisions
 
-This section documents technical decisions made during the implementation of the data fetching pipeline (Tasks 1.2–1.6) that affect data quality, reliability, or reproducibility. These decisions are recorded here so that future maintainers and reviewers understand the rationale.
+This section documents technical decisions made during the implementation of the data fetching pipeline (Tasks 1.2-1.6) that affect data quality, reliability, or reproducibility. These decisions are recorded here so that future maintainers and reviewers understand the rationale.
 
 ### 11.1 Shared infrastructure in pxweb_client
 
@@ -389,7 +389,7 @@ The `fetch_education` module uses a `TableConfig` named tuple to bundle the 8 pa
 All fetcher verification checks follow a consistent severity policy:
 
 * **Hard checks** (raise `ValueError`): missing kommuner, implausible value ranges, structural data integrity failures (e.g. Danderyd not highest skattekraft, national mean outside expected range). These indicate a data integrity problem that would corrupt downstream artifacts.
-* **Soft checks** (log warning): unexpected but non-fatal observations (e.g. Stockholm not the largest kommune, unemployment mean outside the narrow 3–8 % historical range but within the wider 1–15 % plausible range). These may indicate data quality issues worth investigating but do not block the pipeline.
+* **Soft checks** (log warning): unexpected but non-fatal observations (e.g. Stockholm not the largest kommune, unemployment mean outside the narrow 3-8 % historical range but within the wider 1-15 % plausible range). These may indicate data quality issues worth investigating but do not block the pipeline.
 
 ---
 
@@ -409,24 +409,24 @@ This section documents the SCB PxWeb API changes encountered and adapted to duri
 
 **Symptom:** Metadata GET for the old `AA0003B/IntGr1KomKonUtb` subtable returned HTTP 400 ("table not found").
 
-**Root cause:** SCB reorganized the STATIV unemployment tables around 2023–2024. The old subtable `AA0003B/IntGr1KomKonUtb` (and its siblings `IntGr1KomKon`, `IntGr1Kom`) were moved to an archive path `AA0003X`. A new subtable `AA0003B/IntGr1KomUtbBAS` was introduced but only covers 2022 onwards.
+**Root cause:** SCB reorganized the STATIV unemployment tables around 2023-2024. The old subtable `AA0003B/IntGr1KomKonUtb` (and its siblings `IntGr1KomKon`, `IntGr1Kom`) were moved to an archive path `AA0003X`. A new subtable `AA0003B/IntGr1KomUtbBAS` was introduced but only covers 2022 onwards.
 
 **Fix applied:** The `fetch_unemployment` module uses a two-table strategy:
 
 | Year range | Table URL | Coverage |
 |---|---|---|
-| 2010–2021 | `AA0003X/IntGr1KomKonUtb` | 1997–2021 (archived, still accessible) |
-| 2022–2024 | `AA0003B/IntGr1KomUtbBAS` | 2022–present |
+| 2010-2021 | `AA0003X/IntGr1KomKonUtb` | 1997-2021 (archived, still accessible) |
+| 2022-2024 | `AA0003B/IntGr1KomUtbBAS` | 2022-present |
 
-Results from both tables are concatenated to form the complete 2010–2024 series. Constants `_OLD_TABLE_LAST_YEAR = 2021` and `_NEW_TABLE_FIRST_YEAR = 2022` control the split. If SCB updates the new table to cover earlier years in the future, adjusting these constants is sufficient to change the routing.
+Results from both tables are concatenated to form the complete 2010-2024 series. Constants `_OLD_TABLE_LAST_YEAR = 2021` and `_NEW_TABLE_FIRST_YEAR = 2022` control the split. If SCB updates the new table to cover earlier years in the future, adjusting these constants is sufficient to change the routing.
 
-**Total-code optimization:** Both tables provide total-aggregate codes (`BakgrVar='TOT'`, `Kön='1+2'`, `UtbNiv='000'`). The pipeline selects these codes directly, reducing each POST to 290 × 1 × 1 × 1 × n_years cells (well within SCB's ~150 000-cell limit). This also avoids the unweighted-mean approximation described previously in §7.9.
+**Total-code optimization:** Both tables provide total-aggregate codes (`BakgrVar='TOT'`, `Kön='1+2'`, `UtbNiv='000'`). The pipeline selects these codes directly, reducing each POST to 290 x 1 x 1 x 1 x n_years cells (well within SCB's ~150 000-cell limit). This also avoids the unweighted-mean approximation described previously in 7.9.
 
 ### 12.3 SCB UF0506 education table renamed
 
 **Symptom:** Metadata GET for candidate URLs `UF0506B/Utbildning4`, `UF0506B/Utbildning3`, and `UF0506B/Utbildning4C` all returned HTTP 400.
 
-**Root cause:** SCB consolidated the UF0506 education disaggregation tables. The active subtable is now `UF0506B/Utbildning` (covering 1985–2024). A backup candidate `UF0506B/UtbBefRegionR` is tried if the primary fails.
+**Root cause:** SCB consolidated the UF0506 education disaggregation tables. The active subtable is now `UF0506B/Utbildning` (covering 1985-2024). A backup candidate `UF0506B/UtbBefRegionR` is tried if the primary fails.
 
 **Fix applied:** Updated `_CANDIDATE_URLS` in `fetch_education.py` to the current table names.
 
@@ -434,15 +434,15 @@ Results from both tables are concatenated to form the complete 2010–2024 serie
 
 **Symptom:** POST queries to `UF0506B/Utbildning` returned HTTP 403 (cell limit exceeded).
 
-**Root cause:** The new education table disaggregates by Kön (sex) using only individual codes `'1'` and `'2'` (no `'1+2'` total). With 290 municipalities × 40 age codes × 8 education levels × 2 sex codes = 185 600 cells per year, the SCB limit of ~150 000 cells is exceeded.
+**Root cause:** The new education table disaggregates by Kön (sex) using only individual codes `'1'` and `'2'` (no `'1+2'` total). With 290 municipalities x 40 age codes x 8 education levels x 2 sex codes = 185 600 cells per year, the SCB limit of ~150 000 cells is exceeded.
 
-**Fix applied:** The pipeline detects this condition (`len(sex_codes) > 1 and '1+2' not in sex_codes and len(age_codes) > 5`) and switches to `_fetch_chunked_by_sex_year`: one POST per (year, sex) combination. Each POST covers 290 × 40 × 8 × 1 = 92 800 cells, well within the limit. The two sex-specific frames are concatenated before aggregation. The `edu_share` variable (share with tertiary education, SUN codes 6+7) is computed after aggregating across sex, yielding the correct population-level share.
+**Fix applied:** The pipeline detects this condition (`len(sex_codes) > 1 and '1+2' not in sex_codes and len(age_codes) > 5`) and switches to `_fetch_chunked_by_sex_year`: one POST per (year, sex) combination. Each POST covers 290 x 40 x 8 x 1 = 92 800 cells, well within the limit. The two sex-specific frames are concatenated before aggregation. The `edu_share` variable (share with tertiary education, SUN codes 6+7) is computed after aggregating across sex, yielding the correct population-level share.
 
 ### 12.5 2009 skattekraft baseline required for 2010 growth computation
 
-**Background:** The `tax_base_growth_pct` variable for year *t* is computed as `(skattekraft_t / skattekraft_{t-1} − 1) × 100`. The first year in the analysis window is 2010, so 2009 values are needed as the lag baseline.
+**Background:** The `tax_base_growth_pct` variable for year *t* is computed as `(skattekraft_t / skattekraft_{t-1} - 1) x 100`. The first year in the analysis window is 2010, so 2009 values are needed as the lag baseline.
 
-**Fix applied:** `build_panel.py` fetches skattekraft for years 2009–2024 (constant `_FETCH_YEARS_SKATTEKRAFT`). After computing growth rates, the 2009 rows are dropped (`df_skatt_growth = df_skatt_growth[df_skatt_growth["year"].isin(_PANEL_YEARS)]`). The skattekraft cache file (`data/raw/skattekraft.json`) therefore covers 2009–2024, while the final panel covers only 2010–2024. The same logic applies to population: `_FETCH_YEARS_POPULATION` includes 2009 for the population growth computation.
+**Fix applied:** `build_panel.py` fetches skattekraft for years 2009-2024 (constant `_FETCH_YEARS_SKATTEKRAFT`). After computing growth rates, the 2009 rows are dropped (`df_skatt_growth = df_skatt_growth[df_skatt_growth["year"].isin(_PANEL_YEARS)]`). The skattekraft cache file (`data/raw/skattekraft.json`) therefore covers 2009-2024, while the final panel covers only 2010-2024. The same logic applies to population: `_FETCH_YEARS_POPULATION` includes 2009 for the population growth computation.
 
 ---
 

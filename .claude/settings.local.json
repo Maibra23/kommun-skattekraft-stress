@@ -16,7 +16,8 @@
       "Bash(.venv/Scripts/python.exe:*)",
       "Bash(.venv/Scripts/pip install:*)",
       "Bash(timeout 15 streamlit run:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(grep:*)"
     ]
   }
 }

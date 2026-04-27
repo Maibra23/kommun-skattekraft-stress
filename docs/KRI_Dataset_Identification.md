@@ -1,4 +1,4 @@
-# KRI_Dataset_Identification.md — Dataset Identification & Audit
+# KRI_Dataset_Identification.md - Dataset Identification & Audit
 
 **Project:** Kommunal Skattekraft Stress Monitor
 **Purpose:** Implementation-ready audit of every data source. For each variable: source authority, full URL, pxweb table ID, query parameters, response schema, expected row count, known data quality issues, refresh cadence, and join keys.
@@ -99,13 +99,13 @@ query_body = {
 ```
 
 ### Expected row count
-290 kommuner × 16 years (2009–2024) = **4 640 rows** from API; after dropping 2009 growth-baseline rows, the final panel contains 290 × 15 = **4 350 rows**.
+290 kommuner x 16 years (2009-2024) = **4 640 rows** from API; after dropping 2009 growth-baseline rows, the final panel contains 290 x 15 = **4 350 rows**.
 
 ### Known issues
 1. **Reference year vs income year:** Skattekraft for year t is based on income from year t-2. The 2025 published number reflects 2023 income. Document this explicitly in tooltips.
-2. **Cell limit:** pxweb caps cells per query at ~150,000. 290 × 1 metric × 16 years = 4 640 cells, well under limit. No chunking needed.
-3. **Kommun code changes:** None within 2010–2024 window. (Knivsta separated from Uppsala in 2003, before window.) Verified.
-4. **Value-set filter deprecated:** `vs:RegionKommun07EjAggr` returns HTTP 400 as of 2024. Pipeline uses explicit 290 codes from metadata. See METHODOLOGY §12.1.
+2. **Cell limit:** pxweb caps cells per query at ~150,000. 290 x 1 metric x 16 years = 4 640 cells, well under limit. No chunking needed.
+3. **Kommun code changes:** None within 2010-2024 window. (Knivsta separated from Uppsala in 2003, before window.) Verified.
+4. **Value-set filter deprecated:** `vs:RegionKommun07EjAggr` returns HTTP 400 as of 2024. Pipeline uses explicit 290 codes from metadata. See METHODOLOGY 12.1.
 5. **ContentsCode change:** The legacy code `000001LB` was replaced by `OE0101A0`. Pipeline confirms code at runtime via metadata.
 
 ### Join key
@@ -118,7 +118,7 @@ Annual, typically published in December for the following budget year (skattekra
 After fetching, verify:
 * Exactly 290 unique `kommun_kod` values per year
 * `Danderyd` (kod 0162) has the highest 2024 value (observed: 481 069 SEK)
-* Unweighted mean of 2024 values within 200 000–350 000 SEK range (observed: 230 660 SEK). Note: SCB's published "riksmedelvärde" (~271 000 SEK) is population-weighted and therefore higher than the unweighted municipality mean
+* Unweighted mean of 2024 values within 200 000-350 000 SEK range (observed: 230 660 SEK). Note: SCB's published "riksmedelvärde" (~271 000 SEK) is population-weighted and therefore higher than the unweighted municipality mean
 
 ---
 
@@ -126,29 +126,29 @@ After fetching, verify:
 
 ### Identification
 * **Authority:** SCB STATIV (data originally from Arbetsförmedlingen)
-* **Statistic name:** Integration och arbetsmarknad — andel öppet arbetslösa
-* **Table ID:** AA0003 (two subtables — see coverage below)
+* **Statistic name:** Integration och arbetsmarknad - andel öppet arbetslösa
+* **Table ID:** AA0003 (two subtables - see coverage below)
 * **API endpoints:**
-  * **2010–2021:** `https://api.scb.se/OV0104/v1/doris/sv/ssd/START/AA/AA0003/AA0003X/IntGr1KomKonUtb` (archived table, 1997–2021)
-  * **2022–2024:** `https://api.scb.se/OV0104/v1/doris/sv/ssd/START/AA/AA0003/AA0003B/IntGr1KomUtbBAS` (current table, 2022–present)
+  * **2010-2021:** `https://api.scb.se/OV0104/v1/doris/sv/ssd/START/AA/AA0003/AA0003X/IntGr1KomKonUtb` (archived table, 1997-2021)
+  * **2022-2024:** `https://api.scb.se/OV0104/v1/doris/sv/ssd/START/AA/AA0003/AA0003B/IntGr1KomUtbBAS` (current table, 2022-present)
 
 ### Definition
-"Andelen personer som någon gång under året registrerats som öppet arbetslösa i sökandekategori för öppen arbetslöshet, dividerat med befolkningen 20–64 år."
+"Andelen personer som någon gång under året registrerats som öppet arbetslösa i sökandekategori för öppen arbetslöshet, dividerat med befolkningen 20-64 år."
 
 This is a **flow measure** (registered at any point during the year), not a point-in-time stock. Values are therefore higher than AKU survey-based unemployment.
 
 ### Coverage
-* **Time:** 2010–2024 via two-table strategy. SCB reorganized the STATIV tables around 2023–2024: the old subtable `AA0003B/IntGr1KomKonUtb` was moved to the archive path `AA0003X` and a new subtable `AA0003B/IntGr1KomUtbBAS` was introduced covering 2022 onwards. See METHODOLOGY §12.2.
+* **Time:** 2010-2024 via two-table strategy. SCB reorganized the STATIV tables around 2023-2024: the old subtable `AA0003B/IntGr1KomKonUtb` was moved to the archive path `AA0003X` and a new subtable `AA0003B/IntGr1KomUtbBAS` was introduced covering 2022 onwards. See METHODOLOGY 12.2.
 * **Geography:** All 290 kommuner
-* **Unit:** Percent (share of population 20–64)
+* **Unit:** Percent (share of population 20-64)
 
 ### Two-table strategy (implemented)
 The pipeline splits the requested year range at the 2021/2022 boundary:
 
 | Year range | Table URL | Coverage |
 |---|---|---|
-| 2010–2021 | `AA0003X/IntGr1KomKonUtb` | 1997–2021 (archived, still accessible) |
-| 2022–2024 | `AA0003B/IntGr1KomUtbBAS` | 2022–present |
+| 2010-2021 | `AA0003X/IntGr1KomKonUtb` | 1997-2021 (archived, still accessible) |
+| 2022-2024 | `AA0003B/IntGr1KomUtbBAS` | 2022-present |
 
 Results from both tables are concatenated. Constants `_OLD_TABLE_LAST_YEAR = 2021` and `_NEW_TABLE_FIRST_YEAR = 2022` in `fetch_unemployment.py` control the split.
 
@@ -175,26 +175,26 @@ query_body = {
 }
 ```
 
-**Total-code optimization:** Using `Kön='1+2'`, `UtbNiv='000'`, `BakgrVar='TOT'` selects the pre-aggregated SCB total directly. This reduces each POST to 290 × 1 × 1 × 1 × n_years cells (well within the ~150 000 cell limit) and avoids any need for client-side averaging.
+**Total-code optimization:** Using `Kön='1+2'`, `UtbNiv='000'`, `BakgrVar='TOT'` selects the pre-aggregated SCB total directly. This reduces each POST to 290 x 1 x 1 x 1 x n_years cells (well within the ~150 000 cell limit) and avoids any need for client-side averaging.
 
 ### Expected row count
-290 × 15 = **4 350 rows** (concatenated from both tables)
+290 x 15 = **4 350 rows** (concatenated from both tables)
 
 ### Known issues
-1. **Definition change in 2018:** SCB updated the methodology — "från och med uppdatering år 2018 av nya uppgifter från 1997 och framåt justerades även innehållet i Andel öppet arbetslösa." Pre-2018 values may differ slightly from post-2018 series. The table notes this; we accept it and document.
-2. **STATIV table restructure (2023–2024):** The old `AA0003B/IntGr1KomKonUtb` subtable (and its siblings `IntGr1KomKon`, `IntGr1Kom`) was moved to archive path `AA0003X`. The new `AA0003B/IntGr1KomUtbBAS` only covers 2022+. The pipeline uses both tables. See METHODOLOGY §12.2.
-3. **Not the same as AKU:** AKU (Arbetskraftsundersökningarna) is the official survey-based unemployment rate but is unavailable at kommun level for small kommuner. The STATIV register-based measure is a flow measure (higher values than AKU). Volunteer this limitation in interviews (METHODOLOGY §7).
-4. **Value-set filter deprecated:** `vs:RegionKommun07EjAggr` returns HTTP 400. Pipeline uses explicit codes from metadata. See METHODOLOGY §12.1.
+1. **Definition change in 2018:** SCB updated the methodology - "från och med uppdatering år 2018 av nya uppgifter från 1997 och framåt justerades även innehållet i Andel öppet arbetslösa." Pre-2018 values may differ slightly from post-2018 series. The table notes this; we accept it and document.
+2. **STATIV table restructure (2023-2024):** The old `AA0003B/IntGr1KomKonUtb` subtable (and its siblings `IntGr1KomKon`, `IntGr1Kom`) was moved to archive path `AA0003X`. The new `AA0003B/IntGr1KomUtbBAS` only covers 2022+. The pipeline uses both tables. See METHODOLOGY 12.2.
+3. **Not the same as AKU:** AKU (Arbetskraftsundersökningarna) is the official survey-based unemployment rate but is unavailable at kommun level for small kommuner. The STATIV register-based measure is a flow measure (higher values than AKU). Volunteer this limitation in interviews (METHODOLOGY 7).
+4. **Value-set filter deprecated:** `vs:RegionKommun07EjAggr` returns HTTP 400. Pipeline uses explicit codes from metadata. See METHODOLOGY 12.1.
 
 ### Join key
-`region` → `kommun_kod` (4-digit, zero-padded).
+`region` to `kommun_kod` (4-digit, zero-padded).
 
 ### Refresh cadence
 Annual, published mid-year for previous reference year.
 
 ### Verification check (Day 1)
 * All 290 kommuner present per year
-* National mean in plausible range for register-based flow measure: 8–15 % (observed: 11.6 % mean across 2010–2024). Note: this is higher than AKU point-in-time unemployment (3–8 %) because the STATIV measure counts anyone registered as unemployed at any point during the year
+* National mean in plausible range for register-based flow measure: 8-15 % (observed: 11.6 % mean across 2010-2024). Note: this is higher than AKU point-in-time unemployment (3-8 %) because the STATIV measure counts anyone registered as unemployed at any point during the year
 * Norrland and Bergslagen kommuner should generally show higher values than Stockholm/Mälardalen
 
 ---
@@ -203,7 +203,7 @@ Annual, published mid-year for previous reference year.
 
 ### Identification
 * **Authority:** SCB
-* **Statistic name:** Befolkningsstatistik — folkmängd efter region, ålder, kön, civilstånd
+* **Statistic name:** Befolkningsstatistik - folkmängd efter region, ålder, kön, civilstånd
 * **Table ID:** BE0101 (specifically the population by region and age subtable)
 * **Web reference:** `https://www.statistikdatabasen.scb.se/pxweb/sv/ssd/START__BE__BE0101/`
 * **Likely subtable:** `BE0101A/BefolkningNy` or `BE0101A/FolkmangdNov` (verify via metadata)
@@ -213,7 +213,7 @@ Annual, published mid-year for previous reference year.
 Folkmängd by kommun, single-year age, sex. We aggregate to age groups for our derived variables.
 
 ### Coverage
-* **Time:** 1968 onwards (we use 2009–2024 to compute population_growth_pct for 2010–2024)
+* **Time:** 1968 onwards (we use 2009-2024 to compute population_growth_pct for 2010-2024)
 * **Geography:** All 290 kommuner + aggregations
 * **Unit:** Number of persons
 
@@ -243,10 +243,10 @@ query_body = {
 ```
 
 ### Expected row count and chunking
-* 290 kommuner × 101 ages × 2 sexes × 16 years = **937 280 cells total**
+* 290 kommuner x 101 ages x 2 sexes x 16 years = **937 280 cells total**
 * **Exceeds pxweb cell limit (~150 000).** Chunked by year.
-* **Chunking strategy:** One year per POST → 290 × 101 × 2 = 58 580 cells per query. Well under limit. 16 sequential queries with per-year caching (`data/raw/population_{year}.json`).
-* After fetching, single-year ages are aggregated to three broad age groups: `0-19`, `20-64`, `65+` (summing across both sexes). This produces 290 × 3 age groups per year.
+* **Chunking strategy:** One year per POST to 290 x 101 x 2 = 58 580 cells per query. Well under limit. 16 sequential queries with per-year caching (`data/raw/population_{year}.json`).
+* After fetching, single-year ages are aggregated to three broad age groups: `0-19`, `20-64`, `65+` (summing across both sexes). This produces 290 x 3 age groups per year.
 
 ### Derived variables
 * `dependency_ratio_t = (pop_aged_0_19_t + pop_aged_65plus_t) / pop_aged_20_64_t`
@@ -254,21 +254,21 @@ query_body = {
 * `population_growth_pct_t = (population_total_t / population_total_{t-1} - 1) * 100`
 
 ### Join key
-`region` → `kommun_kod`.
+`region` to `kommun_kod`.
 
 ### Refresh cadence
 Annual, published February for previous year-end.
 
 ### Known issues
-1. **Value-set filter deprecated:** `vs:RegionKommun07EjAggr` returns HTTP 400. Pipeline uses explicit codes from metadata. See METHODOLOGY §12.1.
+1. **Value-set filter deprecated:** `vs:RegionKommun07EjAggr` returns HTTP 400. Pipeline uses explicit codes from metadata. See METHODOLOGY 12.1.
 2. **Table URL may change:** Primary table `BefolkningNy` has a fallback to `FolkmangdNov`. The fetcher tries both.
-3. **Long-format output:** The aggregated DataFrame has 3 rows per (municipality, year) — one per age group. The `validate_and_harmonize` step in `build_panel.py` uses a deduplicated slice to avoid false duplicate errors.
+3. **Long-format output:** The aggregated DataFrame has 3 rows per (municipality, year) - one per age group. The `validate_and_harmonize` step in `build_panel.py` uses a deduplicated slice to avoid false duplicate errors.
 
 ### Verification check (Day 1)
 * National total approximately matches SCB published 10.55 million (observed 2024: 10 587 710)
 * Stockholm kommun (kod 0180) is largest by population (observed: 995 574)
 * Bjurholm (kod 2403) or similar small Norrland kommun is among smallest
-* `dependency_ratio` range approximately 0.5–1.25 nationally (observed: 0.508–1.241), with rural kommuner higher
+* `dependency_ratio` range approximately 0.5-1.25 nationally (observed: 0.508-1.241), with rural kommuner higher
 
 ---
 
@@ -279,14 +279,14 @@ Annual, published February for previous year-end.
 * **Statistic name:** Befolkningens utbildning
 * **Table ID:** UF0506
 * **Web reference:** `https://www.statistikdatabasen.scb.se/pxweb/sv/ssd/START__UF__UF0506/`
-* **Current subtable:** `UF0506B/Utbildning` (1985–2024). Fallback: `UF0506B/UtbBefRegionR`
+* **Current subtable:** `UF0506B/Utbildning` (1985-2024). Fallback: `UF0506B/UtbBefRegionR`
 * **API endpoint:** `https://api.scb.se/OV0104/v1/doris/sv/ssd/START/UF/UF0506/UF0506B/Utbildning`
 
 ### Definition
-Andel av befolkningen 25–64 år med eftergymnasial utbildning 3 år eller längre (SUN 2020 codes 6+7), per kommun.
+Andel av befolkningen 25-64 år med eftergymnasial utbildning 3 år eller längre (SUN 2020 codes 6+7), per kommun.
 
 ### Coverage
-* **Time:** Annual, available for full 2010–2024 window (typically published spring of following year)
+* **Time:** Annual, available for full 2010-2024 window (typically published spring of following year)
 * **Geography:** All 290 kommuner
 * **Unit:** Number of persons per (kommun, age, sex, education level) cell; pipeline computes percent share
 
@@ -300,10 +300,10 @@ region_codes = sorted(
 )
 # Education codes for SUN 6+7 (eftergymnasial 3+ år + forskarutbildning)
 # Age codes for 25-64 range (individual year codes, e.g. "25", "26", ..., "64")
-# Sex codes: "1" (men) and "2" (women) — no combined "1+2" code in current table
+# Sex codes: "1" (men) and "2" (women) - no combined "1+2" code in current table
 
-# Step 2: POST query — chunked by (year, sex) to stay under cell limit
-# Per chunk: 290 × 40 ages × 8 edu levels × 1 sex = 92 800 cells (under 150 000 limit)
+# Step 2: POST query - chunked by (year, sex) to stay under cell limit
+# Per chunk: 290 x 40 ages x 8 edu levels x 1 sex = 92 800 cells (under 150 000 limit)
 for year in years:
     for sex_code in ["1", "2"]:
         query_body = {
@@ -319,30 +319,30 @@ for year in years:
         }
 ```
 
-**Per-sex-year chunking:** The current `UF0506B/Utbildning` table has no combined sex code (`1+2`). With 290 × 40 ages × 8 education levels × 2 sexes = 185 600 cells per year, the SCB cell limit (~150 000) is exceeded. The pipeline detects this and fetches one (year, sex) pair at a time (92 800 cells each), then aggregates across sex to compute `edu_share`. See METHODOLOGY §12.4.
+**Per-sex-year chunking:** The current `UF0506B/Utbildning` table has no combined sex code (`1+2`). With 290 x 40 ages x 8 education levels x 2 sexes = 185 600 cells per year, the SCB cell limit (~150 000) is exceeded. The pipeline detects this and fetches one (year, sex) pair at a time (92 800 cells each), then aggregates across sex to compute `edu_share`. See METHODOLOGY 12.4.
 
-**Education share formula:** `edu_share = sum(population with SUN 6+7) / sum(population with any SUN code)`, computed per (kommun, year) after aggregating across all age codes in the 25–64 range and both sexes.
+**Education share formula:** `edu_share = sum(population with SUN 6+7) / sum(population with any SUN code)`, computed per (kommun, year) after aggregating across all age codes in the 25-64 range and both sexes.
 
 ### Expected row count
-290 × 15 = **4 350 rows** (after aggregation to edu_share per kommun-year)
+290 x 15 = **4 350 rows** (after aggregation to edu_share per kommun-year)
 
 ### Known issues
-1. **Slow-moving:** Education stocks change slowly within a kommun. Within-kommun variation across 15 years is modest. β₄ may have wide confidence interval. Document in METHODOLOGY §7.7.
+1. **Slow-moving:** Education stocks change slowly within a kommun. Within-kommun variation across 15 years is modest. beta_4 may have wide confidence interval. Document in METHODOLOGY 7.7.
 2. **Definition stable:** SUN 2020 has been used consistently across the time window. No series break.
-3. **Table renamed (2024):** Old subtable names `Utbildning4`, `Utbildning3`, `Utbildning4C` all return HTTP 400. Current table is `UF0506B/Utbildning`. See METHODOLOGY §12.3.
-4. **Value-set filter deprecated:** `vs:RegionKommun07EjAggr` returns HTTP 400. Pipeline uses explicit codes from metadata. See METHODOLOGY §12.1.
-5. **No combined sex code:** Unlike older tables, `Utbildning` has only `Kön='1','2'` (no `'1+2'`). Requires per-sex chunking. See METHODOLOGY §12.4.
+3. **Table renamed (2024):** Old subtable names `Utbildning4`, `Utbildning3`, `Utbildning4C` all return HTTP 400. Current table is `UF0506B/Utbildning`. See METHODOLOGY 12.3.
+4. **Value-set filter deprecated:** `vs:RegionKommun07EjAggr` returns HTTP 400. Pipeline uses explicit codes from metadata. See METHODOLOGY 12.1.
+5. **No combined sex code:** Unlike older tables, `Utbildning` has only `Kön='1','2'` (no `'1+2'`). Requires per-sex chunking. See METHODOLOGY 12.4.
 
 ### Join key
-`region` → `kommun_kod`.
+`region` to `kommun_kod`.
 
 ### Refresh cadence
-Annual, typically published April–May.
+Annual, typically published April-May.
 
 ### Verification check (Day 1)
 * Lund kommun (kod 1281) and Stockholm should have highest values
 * Rural Norrland kommuner should have lowest
-* National mean approximately 19–20 % for SUN codes 6+7 only (observed: 19.5 %). Note: the broader "all post-secondary" figure (~30 %) includes SUN code 5 (eftergymnasial <3 år), which we exclude
+* National mean approximately 19-20 % for SUN codes 6+7 only (observed: 19.5 %). Note: the broader "all post-secondary" figure (~30 %) includes SUN code 5 (eftergymnasial <3 år), which we exclude
 
 ---
 
@@ -351,7 +351,7 @@ Annual, typically published April–May.
 ### Source
 * **Repository:** `okfse/sweden-geojson` on GitHub
 * **URL:** `https://github.com/okfse/sweden-geojson`
-* **License:** Permissive (per repository README — verify before use)
+* **License:** Permissive (per repository README - verify before use)
 * **Recommended file:** the kommun-level GeoJSON file in the repository (file path varies; use the highest-resolution version that fits under 10 MB).
 
 ### Alternative source (fallback)
@@ -378,7 +378,7 @@ Place in `data/geo/kommuner.geojson`. Commit to repo (small file; verify under 1
 ## 7. Kommun code harmonization
 
 ### Why needed
-Kommun boundaries can change over time. While 2010–2024 has been mostly stable, any code that joins multiple SCB tables across years must defend against:
+Kommun boundaries can change over time. While 2010-2024 has been mostly stable, any code that joins multiple SCB tables across years must defend against:
 * New codes appearing
 * Old codes disappearing
 * Renames (rare)
@@ -389,59 +389,59 @@ SCB publishes the official kommun code list at:
 
 ### Implementation
 * Static CSV at `data/lookup/kommunkod_harmonization.csv` with columns: `kod`, `namn`, `lan_kod`, `lan_namn`, `valid_from`, `valid_to`
-* For 2010–2024 window, expect 290 stable codes. If pipeline detects unexpected codes during cleaning, raise an error and require manual reconciliation (don't silently drop).
+* For 2010-2024 window, expect 290 stable codes. If pipeline detects unexpected codes during cleaning, raise an error and require manual reconciliation (don't silently drop).
 
 ---
 
 ## 8. Pipeline orchestration: full data flow
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ pipeline.py (run locally, writes artifacts to repo)         │
-└─────────────────────────────────────────────────────────────┘
-        │
-        ├─→ src/fetch/fetch_skattekraft.py
-        │     POST OE0101/SkatteKraft
-        │     → data/raw/skattekraft.json
-        │
-        ├─→ src/fetch/fetch_population.py
-        │     POST BE0101/... (chunked by year)
-        │     → data/raw/population_{year}.json (16 files)
-        │
-        ├─→ src/fetch/fetch_unemployment.py
-        │     POST AA0003/...
-        │     → data/raw/unemployment.json
-        │
-        ├─→ src/fetch/fetch_education.py
-        │     POST UF0506/...
-        │     → data/raw/education.json
-        │
-        ├─→ src/clean/build_panel.py
-        │     - Load all raw JSON
-        │     - Harmonize kommun_kod (zfill, validate against lookup)
-        │     - Compute dependency_ratio, population_growth_pct, tax_base_growth_pct
-        │     - Merge into single dataframe with key (kommun_kod, year)
-        │     → data/processed/panel.parquet
-        │
-        ├─→ src/model/estimate.py
-        │     - Load panel.parquet
-        │     - Estimate two-way FE PanelOLS
-        │     - Save model object and coefficients
-        │     → artifacts/model_results.pkl
-        │     → artifacts/coefficients.parquet
-        │
-        ├─→ src/model/predict.py
-        │     - Use estimated betas + 2024 values
-        │     - Generate predicted_growth_2025 for all 290 kommuner
-        │     - Compute vulnerability_score (z-score, sign-flipped)
-        │     - Assign risk_class (quintile-based)
-        │     → artifacts/predictions.parquet
-        │     → artifacts/ranking.parquet
-        │
-        └─→ src/model/decompose.py
++-------------------------------------------------------------+
+| pipeline.py (run locally, writes artifacts to repo)         |
++-------------------------------------------------------------+
+        |
+        | to  src/fetch/fetch_skattekraft.py
+        |     POST OE0101/SkatteKraft
+        |     to data/raw/skattekraft.json
+        |
+        | to  src/fetch/fetch_population.py
+        |     POST BE0101/... (chunked by year)
+        |     to data/raw/population_{year}.json (16 files)
+        |
+        | to  src/fetch/fetch_unemployment.py
+        |     POST AA0003/...
+        |     to data/raw/unemployment.json
+        |
+        | to  src/fetch/fetch_education.py
+        |     POST UF0506/...
+        |     to data/raw/education.json
+        |
+        | to  src/clean/build_panel.py
+        |     - Load all raw JSON
+        |     - Harmonize kommun_kod (zfill, validate against lookup)
+        |     - Compute dependency_ratio, population_growth_pct, tax_base_growth_pct
+        |     - Merge into single dataframe with key (kommun_kod, year)
+        |     to data/processed/panel.parquet
+        |
+        | to  src/model/estimate.py
+        |     - Load panel.parquet
+        |     - Estimate two-way FE PanelOLS
+        |     - Save model object and coefficients
+        |     to artifacts/model_results.pkl
+        |     to artifacts/coefficients.parquet
+        |
+        | to  src/model/predict.py
+        |     - Use estimated betas + 2024 values
+        |     - Generate predicted_growth_2025 for all 290 kommuner
+        |     - Compute vulnerability_score (z-score, sign-flipped)
+        |     - Assign risk_class (quintile-based)
+        |     to artifacts/predictions.parquet
+        |     to artifacts/ranking.parquet
+        |
+        + to  src/model/decompose.py
               - For each kommun, decompose 2024 gap vs national mean
               - Contribution = (kommun_value - national_mean) * beta
-              → artifacts/decomposition.parquet
+              to artifacts/decomposition.parquet
 ```
 
 ---
@@ -465,7 +465,7 @@ Save log to `data/raw/pipeline.log` for traceability.
 * **Idempotent:** Running twice produces the same artifacts
 * **Cached:** If `data/raw/` files exist and were fetched within 7 days, reuse them. CLI flag `--force-refresh` to override.
 * **Fast on cached:** Under 30 seconds when all raw data is cached
-* **Slow on fresh:** 2–5 minutes including pxweb calls (depends on SCB API responsiveness)
+* **Slow on fresh:** 2-5 minutes including pxweb calls (depends on SCB API responsiveness)
 
 ---
 
