@@ -12,7 +12,7 @@ Each task has the same structure:
 * **Task number and title**
 * **Day** (1 to 5)
 * **Estimated time**
-* **Actor:** Claude Code or Cursor
+* **Actor:** Developer
 * **What:** what this task produces
 * **Why:** why it matters
 * **How:** technical approach
@@ -21,8 +21,8 @@ Each task has the same structure:
 
 ### Division of labor (locked principle)
 
-* **Claude Code** handles: scaffolding, data pipeline logic, backend modules, generation from scratch, tests. Anything where you can specify the spec and let it generate without seeing the running output.
-* **Cursor** handles: interactive UI iteration, visual debugging, polishing the Streamlit pages, choropleth tuning. Anything where you need to see the running output and iterate quickly.
+* **Backend tasks** include: scaffolding, data pipeline logic, backend modules, generation from scratch, tests.
+* **Frontend tasks** include: interactive UI iteration, visual debugging, polishing the Streamlit pages, choropleth tuning.
 
 ### Critical reminders embedded in every prompt
 
@@ -30,22 +30,19 @@ Each task has the same structure:
 2. **Reference PRD.md and METHODOLOGY.md by section, not by paraphrase.** Tools should read the source.
 3. **No hardcoded paths.** Always use `pathlib.Path` relative to project root.
 
-### Prompt template recommended for Cursor
+### Context loading
 
-When pasting a prompt into Cursor, prepend:
-```
-@PRD.md @METHODOLOGY.md @KRI_Dataset_Identification.md
-
-[task prompt below]
-```
-This loads all three context files into Cursor's session.
+Always reference the three context files when working on a task:
+- `PRD.md` (master spec)
+- `METHODOLOGY.md` (model and formulas)
+- `KRI_Dataset_Identification.md` (data sources and pxweb queries)
 
 ---
 
 ## Day 1: Scaffolding and Data Pipeline (10 to 12 hours)
 
 ### TASK 1.1 — Project scaffold and dependency setup
-**Day:** 1 · **Time:** 1 hour · **Actor:** Claude Code
+**Day:** 1 · **Time:** 1 hour · **Actor:** Backend
 
 **What:** Create the full folder structure from PRD §3, write `pyproject.toml`, `requirements.txt`, `.gitignore`, `.streamlit/config.toml`, an empty `README.md` with Swedish title and English abstract placeholder, and stub files for every module.
 
@@ -53,7 +50,7 @@ This loads all three context files into Cursor's session.
 
 **How:** Single shell + file generation pass. No business logic.
 
-**Prompt for Claude Code:**
+**Implementation notes:**
 ```
 Read /docs/PRD.md sections 1, 2, 3, and 11.
 
@@ -90,7 +87,7 @@ After scaffolding, run `tree -I '__pycache__|.venv'` and report the resulting st
 ---
 
 ### TASK 1.2 — pxweb client (generic POST + chunking)
-**Day:** 1 · **Time:** 1.5 hours · **Actor:** Claude Code
+**Day:** 1 · **Time:** 1.5 hours · **Actor:** Backend
 
 **What:** Implement `src/fetch/pxweb_client.py` with a generic `query_pxweb(table_url: str, query_body: dict) -> pd.DataFrame` function and a chunking helper.
 
@@ -98,7 +95,7 @@ After scaffolding, run `tree -I '__pycache__|.venv'` and report the resulting st
 
 **How:** `requests.post()` with retries, exponential backoff, JSON parsing into a flat dataframe.
 
-**Prompt for Claude Code:**
+**Implementation notes:**
 ```
 Read /docs/PRD.md §2 and /docs/KRI_Dataset_Identification.md §1 and §2.
 
@@ -132,7 +129,7 @@ Add unit-style smoke tests in tests/test_pxweb_client.py that mock requests.post
 ---
 
 ### TASK 1.3 — Skattekraft fetcher
-**Day:** 1 · **Time:** 1 hour · **Actor:** Claude Code
+**Day:** 1 · **Time:** 1 hour · **Actor:** Backend
 
 **What:** `src/fetch/fetch_skattekraft.py` fetches OE0101 skattekraft for all 290 kommuner, 2010 to 2024, and saves to `data/raw/skattekraft.json`.
 
@@ -140,7 +137,7 @@ Add unit-style smoke tests in tests/test_pxweb_client.py that mock requests.post
 
 **How:** Use generic client. Confirm ContentsCode via metadata call.
 
-**Prompt for Claude Code:**
+**Implementation notes:**
 ```
 Read /docs/KRI_Dataset_Identification.md §2 carefully. Read /docs/PRD.md §4.
 
@@ -176,7 +173,7 @@ CRITICAL: All variable names, log messages, error messages in English.
 ---
 
 ### TASK 1.4 — Population fetcher (with chunking)
-**Day:** 1 · **Time:** 2 hours · **Actor:** Claude Code
+**Day:** 1 · **Time:** 2 hours · **Actor:** Backend
 
 **What:** `src/fetch/fetch_population.py` fetches BE0101 population by single-year age, sex, kommun, 2009 to 2024 (16 years to allow 2010 growth calculation), chunked by year. Saves to `data/raw/population_{year}.json` and returns aggregated panel.
 
@@ -184,7 +181,7 @@ CRITICAL: All variable names, log messages, error messages in English.
 
 **How:** Loop over years, one pxweb query per year.
 
-**Prompt for Claude Code:**
+**Implementation notes:**
 ```
 Read /docs/KRI_Dataset_Identification.md §4 carefully.
 
@@ -216,7 +213,7 @@ CRITICAL: English code, English logs, type hints, docstrings.
 ---
 
 ### TASK 1.5 — Unemployment fetcher (with metadata fallback strategy)
-**Day:** 1 · **Time:** 2 hours · **Actor:** Claude Code
+**Day:** 1 · **Time:** 2 hours · **Actor:** Backend
 
 **What:** `src/fetch/fetch_unemployment.py` fetches "Andel öppet arbetslösa" per kommun for 2010 to 2024.
 
@@ -224,7 +221,7 @@ CRITICAL: English code, English logs, type hints, docstrings.
 
 **How:** Probe metadata, identify the right subtable, fetch, document fallback path if primary fails.
 
-**Prompt for Claude Code:**
+**Implementation notes:**
 ```
 Read /docs/KRI_Dataset_Identification.md §3 carefully, including the fallback strategies.
 
@@ -258,7 +255,7 @@ CRITICAL: This is the riskiest fetcher. If you hit a dead end, do NOT silently p
 ---
 
 ### TASK 1.6 — Education fetcher
-**Day:** 1 · **Time:** 1.5 hours · **Actor:** Claude Code
+**Day:** 1 · **Time:** 1.5 hours · **Actor:** Backend
 
 **What:** `src/fetch/fetch_education.py` fetches UF0506 education share for ages 25-64, eftergymnasial 3+ år, all kommuner, 2010 to 2024.
 
@@ -266,7 +263,7 @@ CRITICAL: This is the riskiest fetcher. If you hit a dead end, do NOT silently p
 
 **How:** Sum SUN codes 6 and 7, divide by population 25-64.
 
-**Prompt for Claude Code:**
+**Implementation notes:**
 ```
 Read /docs/KRI_Dataset_Identification.md §5.
 
@@ -295,7 +292,7 @@ CRITICAL: English code throughout.
 ---
 
 ### TASK 1.7 — Kommun code harmonization lookup
-**Day:** 1 · **Time:** 1 hour · **Actor:** Claude Code
+**Day:** 1 · **Time:** 1 hour · **Actor:** Backend
 
 **What:** Generate `data/lookup/kommunkod_harmonization.csv` with all 290 kommun codes valid for 2024, and implement `src/clean/harmonize_kommunkod.py` to validate and harmonize.
 
@@ -303,7 +300,7 @@ CRITICAL: English code throughout.
 
 **How:** Hard-code the 290 codes from SCB's published list, validate every fetched DataFrame against it.
 
-**Prompt for Claude Code:**
+**Implementation notes:**
 ```
 Read /docs/PRD.md §4 and /docs/KRI_Dataset_Identification.md §7.
 
@@ -337,7 +334,7 @@ Add tests/test_harmonize.py covering: valid input, unknown code, duplicate (kod,
 ---
 
 ### TASK 1.8 — Build panel
-**Day:** 1 · **Time:** 1.5 hours · **Actor:** Claude Code
+**Day:** 1 · **Time:** 1.5 hours · **Actor:** Backend
 
 **What:** `src/clean/build_panel.py` and `src/clean/compute_derived.py` merge all four fetchers' outputs, compute derived variables (`tax_base_growth_pct`, `dependency_ratio`, `population_growth_pct`), and save `data/processed/panel.parquet`.
 
@@ -345,7 +342,7 @@ Add tests/test_harmonize.py covering: valid input, unknown code, duplicate (kod,
 
 **How:** Sequential merge on `(kommun_kod, year)`, derived variable computation, harmonization validation, parquet write.
 
-**Prompt for Claude Code:**
+**Implementation notes:**
 ```
 Read /docs/METHODOLOGY.md §2 and /docs/PRD.md §4.
 
@@ -387,7 +384,7 @@ CRITICAL: All English. Type hints. Docstrings.
 ## Day 2: Modeling (6 to 8 hours)
 
 ### TASK 2.1 — Exploratory analysis notebook
-**Day:** 2 · **Time:** 2 hours · **Actor:** Cursor (better for notebooks)
+**Day:** 2 · **Time:** 2 hours · **Actor:** Frontend
 
 **What:** `notebooks/01_exploratory.ipynb` with descriptive statistics, distributions, correlation matrix, top-and-bottom rankings, missing value report.
 
@@ -395,7 +392,7 @@ CRITICAL: All English. Type hints. Docstrings.
 
 **How:** Standard EDA workflow on `data/processed/panel.parquet`.
 
-**Prompt for Cursor (paste in chat with notebook open):**
+**Implementation notes:**
 ```
 @PRD.md @METHODOLOGY.md @KRI_Dataset_Identification.md
 
@@ -433,7 +430,7 @@ CRITICAL: This is exploratory; comments and markdown can be longer/freer. Variab
 ---
 
 ### TASK 2.2 — Estimate the panel regression
-**Day:** 2 · **Time:** 2 hours · **Actor:** Claude Code
+**Day:** 2 · **Time:** 2 hours · **Actor:** Backend
 
 **What:** `src/model/estimate.py` with `estimate_panel_model()`. Runs main spec + 4 robustness specs. Saves model object and coefficients table to artifacts.
 
@@ -441,7 +438,7 @@ CRITICAL: This is exploratory; comments and markdown can be longer/freer. Variab
 
 **How:** `linearmodels.PanelOLS` with `entity_effects=True, time_effects=True`, clustered SEs.
 
-**Prompt for Claude Code:**
+**Implementation notes:**
 ```
 Read /docs/METHODOLOGY.md §2.
 
@@ -483,7 +480,7 @@ CRITICAL: All English code. Add tests/test_estimate.py with a small synthetic pa
 ---
 
 ### TASK 2.3 — Predict and compute vulnerability
-**Day:** 2 · **Time:** 1.5 hours · **Actor:** Claude Code
+**Day:** 2 · **Time:** 1.5 hours · **Actor:** Backend
 
 **What:** `src/model/predict.py` generates `predicted_growth_2025` for all 290 kommuner, computes `vulnerability_score`, assigns `risk_class`, saves `artifacts/predictions.parquet` and `artifacts/ranking.parquet`.
 
@@ -491,7 +488,7 @@ CRITICAL: All English code. Add tests/test_estimate.py with a small synthetic pa
 
 **How:** Apply METHODOLOGY §3 formulas.
 
-**Prompt for Claude Code:**
+**Implementation notes:**
 ```
 Read /docs/METHODOLOGY.md §3 carefully.
 
@@ -528,7 +525,7 @@ Add tests/test_predict.py with synthetic main_results and panel.
 ---
 
 ### TASK 2.4 — Decomposition
-**Day:** 2 · **Time:** 1 hour · **Actor:** Claude Code
+**Day:** 2 · **Time:** 1 hour · **Actor:** Backend
 
 **What:** `src/model/decompose.py` computes structural decomposition for each kommun's 2024 growth gap vs national mean. Saves `artifacts/decomposition.parquet`.
 
@@ -536,7 +533,7 @@ Add tests/test_predict.py with synthetic main_results and panel.
 
 **How:** Apply METHODOLOGY §4.1 formula.
 
-**Prompt for Claude Code:**
+**Implementation notes:**
 ```
 Read /docs/METHODOLOGY.md §4 carefully.
 
@@ -570,13 +567,13 @@ CRITICAL: English code.
 ---
 
 ### TASK 2.5 — Pipeline orchestrator
-**Day:** 2 · **Time:** 0.5 hour · **Actor:** Claude Code
+**Day:** 2 · **Time:** 0.5 hour · **Actor:** Backend
 
 **What:** `pipeline.py` runs all of the above in sequence, with logging and `--force-refresh` flag.
 
 **Why:** One-command reproducibility.
 
-**Prompt for Claude Code:**
+**Implementation notes:**
 ```
 Read /docs/KRI_Dataset_Identification.md §8 and §10.
 
@@ -609,7 +606,7 @@ Requirements:
 ## Day 3: Streamlit App (8 to 10 hours)
 
 ### TASK 3.1 — UI primitives: CSS, components, sidebar, chart theme, labels
-**Day:** 3 · **Time:** 2 hours · **Actor:** Claude Code
+**Day:** 3 · **Time:** 2 hours · **Actor:** Backend
 
 **What:** Implement `src/ui/css.py`, `src/ui/components.py`, `src/ui/sidebar.py`, `src/ui/chart_theme.py`, `src/ui/labels.py` per the SHAI design reference adapted to KSS.
 
@@ -617,7 +614,7 @@ Requirements:
 
 **How:** Direct port from the SHAI reference, with KSS branding and `SWEDISH_LABELS` from PRD §9.
 
-**Prompt for Claude Code:**
+**Implementation notes:**
 ```
 Read /docs/PRD.md §6, §7, §9, §10. The SHAI reference design is described there in full.
 
@@ -670,7 +667,7 @@ CRITICAL:
 ---
 
 ### TASK 3.2 — Choropleth module
-**Day:** 3 · **Time:** 1.5 hours · **Actor:** Claude Code
+**Day:** 3 · **Time:** 1.5 hours · **Actor:** Backend
 
 **What:** `src/ui/choropleth.py` adapted from the SHAI reference for our `vulnerability_score`.
 
@@ -678,7 +675,7 @@ CRITICAL:
 
 **How:** Port the SHAI Folium implementation, swap data fields to KSS fields, swap legend to Swedish from `SWEDISH_LABELS`.
 
-**Prompt for Claude Code:**
+**Implementation notes:**
 ```
 Read the choropleth reference document attached to this project (the SHAI choropleth complete reference, sections 1-3) and /docs/PRD.md §6.7. Read /docs/KRI_Dataset_Identification.md §6 for the GeoJSON source.
 
@@ -716,7 +713,7 @@ CRITICAL:
 
 **Then create scripts/download_geojson.py:**
 
-**Prompt for Claude Code (continuation):**
+**Implementation notes (continuation):**
 ```
 Create scripts/download_geojson.py:
 
@@ -737,15 +734,15 @@ Idempotent: skip download if file exists and has 290 features.
 ---
 
 ### TASK 3.3 — Landing page (`app.py`)
-**Day:** 3 · **Time:** 2 hours · **Actor:** Cursor (UI iteration)
+**Day:** 3 · **Time:** 2 hours · **Actor:** Frontend
 
 **What:** Build `app.py` per PRD §7 (Page 1).
 
 **Why:** First impression. Every section per spec.
 
-**How:** Iterate visually in Cursor with `streamlit run app.py` open.
+**How:** Iterate visually with `streamlit run app.py` open.
 
-**Prompt for Cursor:**
+**Implementation notes:**
 ```
 @PRD.md @METHODOLOGY.md
 
@@ -782,7 +779,7 @@ Iterate visually. After each major section, take a screenshot and check against 
 ---
 
 ### TASK 3.4 — Riksöversikt page
-**Day:** 3 · **Time:** 2 hours · **Actor:** Cursor
+**Day:** 3 · **Time:** 2 hours · **Actor:** Frontend
 
 **What:** Build `pages/01_Riksoversikt.py` per PRD §7 Page 2.
 
@@ -790,7 +787,7 @@ Iterate visually. After each major section, take a screenshot and check against 
 
 **How:** Iterate visually with the choropleth as centerpiece.
 
-**Prompt for Cursor:**
+**Implementation notes:**
 ```
 @PRD.md @METHODOLOGY.md
 
@@ -828,11 +825,11 @@ Run and visually verify. Test the choropleth tooltips show Swedish content. Test
 ---
 
 ### TASK 3.5 — Kommunjämförelse page
-**Day:** 3 · **Time:** 1.5 hours · **Actor:** Cursor
+**Day:** 3 · **Time:** 1.5 hours · **Actor:** Frontend
 
 **What:** Build `pages/02_Kommunjamforelse.py` per PRD §7 Page 3.
 
-**Prompt for Cursor:**
+**Implementation notes:**
 ```
 @PRD.md @METHODOLOGY.md
 
@@ -871,11 +868,11 @@ Visually verify each section.
 ---
 
 ### TASK 3.6 — Visual polish and accessibility pass
-**Day:** 3 · **Time:** 1 hour · **Actor:** Cursor
+**Day:** 3 · **Time:** 1 hour · **Actor:** Frontend
 
 **What:** Final pass across all three pages: visual consistency, hover states, accessibility.
 
-**Prompt for Cursor:**
+**Implementation notes:**
 ```
 @PRD.md (especially §6 design system, §8 acceptance criteria)
 
@@ -914,11 +911,11 @@ Iterate until acceptance criteria PRD §8 pass.
 ## Day 4: Documentation, Tests, Deployment (4 to 6 hours)
 
 ### TASK 4.1 — README and documentation
-**Day:** 4 · **Time:** 2 hours · **Actor:** Cursor (writing benefits from interactive editing)
+**Day:** 4 · **Time:** 2 hours · **Actor:** Frontend (writing benefits from interactive editing)
 
 **What:** Polish `README.md` (Swedish, with English abstract). Embed screenshots. Link to dashboard.
 
-**Prompt for Cursor:**
+**Implementation notes:**
 ```
 @PRD.md @METHODOLOGY.md @KRI_Dataset_Identification.md
 
@@ -953,11 +950,11 @@ Use markdown that renders well on GitHub (syntax highlighting, tables, badges).
 ---
 
 ### TASK 4.2 — Test suite completion
-**Day:** 4 · **Time:** 1 hour · **Actor:** Claude Code
+**Day:** 4 · **Time:** 1 hour · **Actor:** Backend
 
 **What:** Ensure `pytest` covers harmonization, derived computation, decomposition. Add a smoke test that loads each artifact.
 
-**Prompt for Claude Code:**
+**Implementation notes:**
 ```
 Read /docs/PRD.md §8 (acceptance criteria, code quality).
 
@@ -986,13 +983,13 @@ CRITICAL: Test code in English. Test function names start with test_.
 ---
 
 ### TASK 4.3 — Streamlit Cloud deployment
-**Day:** 4 · **Time:** 1 hour · **Actor:** Cursor (visual deployment workflow)
+**Day:** 4 · **Time:** 1 hour · **Actor:** Frontend (visual deployment workflow)
 
 **What:** Deploy to Streamlit Community Cloud. Get the public URL. Update README badge.
 
-**Prompt for Cursor / manual steps:**
+**Implementation notes:**
 ```
-Manual deployment steps (Cursor can help only with file edits):
+Manual deployment steps:
 
 1. Verify all artifacts/ files committed
 2. Verify data/geo/kommuner.geojson committed
@@ -1053,32 +1050,32 @@ Do NOT use Day 5 to add features. Scope creep at the end of a portfolio project 
 
 | # | Task | Day | Hours | Actor |
 |---|---|---|---|---|
-| 1.1 | Project scaffold | 1 | 1 | Claude Code |
-| 1.2 | pxweb client | 1 | 1.5 | Claude Code |
-| 1.3 | Skattekraft fetcher | 1 | 1 | Claude Code |
-| 1.4 | Population fetcher | 1 | 2 | Claude Code |
-| 1.5 | Unemployment fetcher | 1 | 2 | Claude Code |
-| 1.6 | Education fetcher | 1 | 1.5 | Claude Code |
-| 1.7 | Kommunkod harmonization | 1 | 1 | Claude Code |
-| 1.8 | Build panel | 1 | 1.5 | Claude Code |
-| 2.1 | Exploratory notebook | 2 | 2 | Cursor |
-| 2.2 | Estimate regression | 2 | 2 | Claude Code |
-| 2.3 | Predict + vulnerability | 2 | 1.5 | Claude Code |
-| 2.4 | Decomposition | 2 | 1 | Claude Code |
-| 2.5 | Pipeline orchestrator | 2 | 0.5 | Claude Code |
-| 3.1 | UI primitives | 3 | 2 | Claude Code |
-| 3.2 | Choropleth module | 3 | 1.5 | Claude Code |
-| 3.3 | Landing page | 3 | 2 | Cursor |
-| 3.4 | Riksöversikt page | 3 | 2 | Cursor |
-| 3.5 | Kommunjämförelse page | 3 | 1.5 | Cursor |
-| 3.6 | Visual polish | 3 | 1 | Cursor |
-| 4.1 | README | 4 | 2 | Cursor |
-| 4.2 | Tests completion | 4 | 1 | Claude Code |
-| 4.3 | Deploy | 4 | 1 | Cursor |
+| 1.1 | Project scaffold | 1 | 1 | Backend |
+| 1.2 | pxweb client | 1 | 1.5 | Backend |
+| 1.3 | Skattekraft fetcher | 1 | 1 | Backend |
+| 1.4 | Population fetcher | 1 | 2 | Backend |
+| 1.5 | Unemployment fetcher | 1 | 2 | Backend |
+| 1.6 | Education fetcher | 1 | 1.5 | Backend |
+| 1.7 | Kommunkod harmonization | 1 | 1 | Backend |
+| 1.8 | Build panel | 1 | 1.5 | Backend |
+| 2.1 | Exploratory notebook | 2 | 2 | Frontend |
+| 2.2 | Estimate regression | 2 | 2 | Backend |
+| 2.3 | Predict + vulnerability | 2 | 1.5 | Backend |
+| 2.4 | Decomposition | 2 | 1 | Backend |
+| 2.5 | Pipeline orchestrator | 2 | 0.5 | Backend |
+| 3.1 | UI primitives | 3 | 2 | Backend |
+| 3.2 | Choropleth module | 3 | 1.5 | Backend |
+| 3.3 | Landing page | 3 | 2 | Frontend |
+| 3.4 | Riksöversikt page | 3 | 2 | Frontend |
+| 3.5 | Kommunjämförelse page | 3 | 1.5 | Frontend |
+| 3.6 | Visual polish | 3 | 1 | Frontend |
+| 4.1 | README | 4 | 2 | Frontend |
+| 4.2 | Tests completion | 4 | 1 | Backend |
+| 4.3 | Deploy | 4 | 1 | Frontend |
 | 4.4 | Interview prep | 4 | 1 | You |
 
-**Total Claude Code tasks:** 12 (≈ 17 hours)
-**Total Cursor tasks:** 7 (≈ 10 hours)
+**Total backend tasks:** 12
+**Total frontend tasks:** 7
 **Total your direct hours:** 1 (interview prep) + supervision time
 **Total project hours:** ≈ 28 hours over 5 days
 

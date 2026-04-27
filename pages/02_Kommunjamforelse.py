@@ -225,6 +225,16 @@ render_kpi_row(kpi_cards)
 with st.container(border=True):
     st.html(card_header(SWEDISH_LABELS["chart_historical"]))
 
+    # Multi-select for side-by-side comparison
+    _all_kommun_names = sorted(predictions_df["kommun_name"].unique())
+    _compare_options = [n for n in _all_kommun_names if n != selected_pred["kommun_name"]]
+    compare_kommuner = st.multiselect(
+        SWEDISH_LABELS["compare_label"],
+        options=_compare_options,
+        default=[],
+        max_selections=4,
+    )
+
     # National average per year (unweighted across 290 kommuner)
     national_avg = (
         panel_df.groupby("year")["tax_base_per_capita"]
@@ -235,7 +245,7 @@ with st.container(border=True):
 
     fig_trend = go.Figure()
 
-    # Selected kommun line
+    # Selected kommun line (primary, bold)
     fig_trend.add_trace(
         go.Scatter(
             x=selected_panel["year"],
@@ -255,6 +265,34 @@ with st.container(border=True):
             ),
         )
     )
+
+    # Comparison municipality lines
+    from src.ui.css import CHART_PALETTE  # noqa: E402
+    for i, comp_name in enumerate(compare_kommuner):
+        comp_kod = predictions_df.loc[
+            predictions_df["kommun_name"] == comp_name, "kommun_kod"
+        ].iloc[0]
+        comp_panel = panel_df[panel_df["kommun_kod"] == comp_kod].sort_values("year")
+        line_color = CHART_PALETTE[(i + 2) % len(CHART_PALETTE)]
+        fig_trend.add_trace(
+            go.Scatter(
+                x=comp_panel["year"],
+                y=comp_panel["tax_base_per_capita"],
+                name=comp_name,
+                line=dict(color=line_color, width=1.8),
+                mode="lines+markers",
+                marker=dict(size=3),
+                hovertemplate=(
+                    f"<b>{comp_name}</b><br>"
+                    + SWEDISH_LABELS["axis_year"]
+                    + ": %{x}<br>"
+                    + SWEDISH_LABELS["axis_skattekraft"]
+                    + ": %{y:,.0f} "
+                    + SWEDISH_LABELS["unit_sek"]
+                    + "<extra></extra>"
+                ),
+            )
+        )
 
     # National average line (gray dashed)
     fig_trend.add_trace(
@@ -289,6 +327,8 @@ with st.container(border=True):
         use_container_width=True,
         config={"displayModeBar": False},
     )
+    with st.expander(SWEDISH_LABELS["explain_trend_expander"]):
+        st.markdown(SWEDISH_LABELS["explain_trend_text"])
 
 # ---------------------------------------------------------------------------
 # Section 5: Dekomponering (horizontal bar chart)
@@ -347,6 +387,8 @@ with st.container(border=True):
         use_container_width=True,
         config={"displayModeBar": False},
     )
+    with st.expander(SWEDISH_LABELS["explain_decomp_expander"]):
+        st.markdown(SWEDISH_LABELS["explain_decomp_text"])
 
 # ---------------------------------------------------------------------------
 # Section 6: Peer comparison (5 closest by vulnerability_score)
@@ -396,6 +438,8 @@ with st.container(border=True):
     )
 
     st.dataframe(peer_display, use_container_width=True, hide_index=True)
+    with st.expander(SWEDISH_LABELS["explain_peers_expander"]):
+        st.markdown(SWEDISH_LABELS["explain_peers_text"])
 
 # ---------------------------------------------------------------------------
 # Section 7: Methodology link

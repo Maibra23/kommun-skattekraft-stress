@@ -212,6 +212,8 @@ with col_map:
             panel_2024, on="kommun_kod", how="left"
         )
         render_choropleth(choropleth_data)
+        with st.expander(SWEDISH_LABELS["explain_choropleth_expander"]):
+            st.markdown(SWEDISH_LABELS["explain_choropleth_text"])
 
 with col_hist:
     with st.container(border=True):
@@ -266,6 +268,8 @@ with col_hist:
             use_container_width=True,
             config={"displayModeBar": False},
         )
+        with st.expander(SWEDISH_LABELS["explain_histogram_expander"]):
+            st.markdown(SWEDISH_LABELS["explain_histogram_text"])
 
 # ---------------------------------------------------------------------------
 # Section 5: Rangordning (sortable table + CSV download)
@@ -273,6 +277,8 @@ with col_hist:
 
 with st.container(border=True):
     st.html(card_header(SWEDISH_LABELS["chart_ranking_title"]))
+    with st.expander(SWEDISH_LABELS["explain_ranking_expander"]):
+        st.markdown(SWEDISH_LABELS["explain_ranking_text"])
 
     table_df = filtered_df.sort_values("vulnerability_rank")
     display_df = pd.DataFrame(

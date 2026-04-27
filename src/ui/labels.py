@@ -232,6 +232,174 @@ SWEDISH_LABELS = {
     "unit_sek": "kr",
     "unit_pct": "%",
     "unit_per_capita": "per invånare",
+
+    # Concept explanation (landing page, collapsible)
+    "concept_skattekraft_expander": "Vad är Skattekraft och varför är det viktigt?",
+    "concept_skattekraft_text": (
+        "**Skattekraft** (beskattningsbar förvärvsinkomst per invånare) är det "
+        "centrala måttet på en kommuns skattemässiga kapacitet. Det anger hur "
+        "mycket inkomstskatt kommunen kan ta in per person, och avgör i praktiken "
+        "vilka tjänster kommunen har råd att erbjuda sina invånare.\n\n"
+        "Skillnaderna är enorma: 2024 hade Danderyd ca 481 000 kr per invånare "
+        "medan flera Norrlandskommuner låg under 180 000 kr. Det innebär att "
+        "vissa kommuner har mer än dubbelt så stor skattebas per invånare.\n\n"
+        "Sverige har ett utjämningssystem som delvis kompenserar för dessa "
+        "skillnader, men den underliggande skattekraften förblir en avgörande "
+        "faktor för kommunens ekonomiska handlingsutrymme.\n\n"
+        "### Varför är det viktigt att följa skattekraftens utveckling?\n\n"
+        "**Scenario 1: Kreditanalytiker på en bank**\n"
+        "Du bedömer en kommuns kreditvärdighet inför ett obligationslån. "
+        "Dashboarden visar att kommunen har sjunkande skattekraftstillväxt och "
+        "hög försörjningskvot. Det signalerar ökad risk och påverkar din "
+        "kreditbedömning.\n\n"
+        "**Scenario 2: Kommunal controller**\n"
+        "Du planerar nästa års budget. Modellen visar att er kommun rankas "
+        "som 45:e mest sårbara av 290. Dekomponeringen avslöjar att det "
+        "främst beror på stigande arbetslöshet, inte demografi. Du kan rikta "
+        "insatser mot arbetsmarknadsåtgärder.\n\n"
+        "**Scenario 3: Regional beslutsfattare (SKR/länsstyrelse)**\n"
+        "Du behöver identifiera vilka kommuner i ditt län som riskerar "
+        "ekonomisk stress de kommande åren. Riksöversikten visar kartan och "
+        "rangordningen direkt, utan att du behöver samla in data manuellt.\n\n"
+        "**Scenario 4: Forskare eller student**\n"
+        "Du studerar kommunal ekonomi och vill förstå vilka strukturella "
+        "faktorer som driver skillnaderna. Dekomponeringen bryter ner exakt "
+        "hur mycket arbetslöshet, demografi, befolkning och utbildning "
+        "bidrar för varje kommun."
+    ),
+
+    # Usage guide (landing page, collapsible)
+    "guide_expander": "Hur använder jag dashboarden?",
+    "guide_text": (
+        "### Sidorna\n\n"
+        "Dashboarden har tre sidor som du navigerar via sidopanelen till vänster:\n\n"
+        "1. **Startsida** (denna sida): Ger en översikt av modellen, variablerna "
+        "och pipelinestegen.\n"
+        "2. **Riksöversikt**: Visar alla 290 kommuner på en karta och i en "
+        "rangordningstabell. Här ser du vilka kommuner som har starkast respektive "
+        "svagast prognosticerad skattekraftstillväxt.\n"
+        "3. **Kommunjämförelse**: Välj en specifik kommun och se dess historiska "
+        "skattekraftsutveckling, strukturella dekomponering och jämförbara "
+        "kommuner.\n\n"
+        "### Riskklasser i sidopanelen\n\n"
+        "Filtret **Riskklass** i sidopanelen låter dig filtrera kommuner efter "
+        "deras prognosticerade sårbarhet:\n\n"
+        "- **Hög**: De 20 % av kommunerna (58 st) med svagast prognosticerad "
+        "tillväxt. Dessa kommuner har den mest ogynnsamma kombinationen av "
+        "strukturella faktorer.\n"
+        "- **Medel**: De mellersta 60 % (174 kommuner). Varken tydligt utsatta "
+        "eller tydligt gynnade.\n"
+        "- **Låg**: De 20 % (58 st) med starkast prognosticerad tillväxt. "
+        "Dessa kommuner har de mest gynnsamma strukturella förutsättningarna.\n\n"
+        "Du kan välja en eller flera riskklasser samtidigt. Valet påverkar vilka "
+        "kommuner som visas i tabeller och histogram.\n\n"
+        "### Hur läser jag resultaten?\n\n"
+        "- **Sårbarhetsrang**: Rang 1 = mest sårbar kommun, rang 290 = minst "
+        "sårbar. Baserat på modellens prognosticerade tillväxt för 2025.\n"
+        "- **Prognos 2025 (%)**: Modellens beräknade nominella "
+        "skattekraftstillväxt. Inkluderar inflation.\n"
+        "- **Dekomponering**: Visar hur mycket varje faktor (arbetslöshet, "
+        "försörjningskvot, befolkning, utbildning) bidrar till skillnaden "
+        "mot riksgenomsnittet."
+    ),
+
+    # Variabler & vikter table header
+    "vars_table_header": "Koefficientvärden",
+    "vars_table_variable": "Variabel",
+    "vars_table_coef": "Koefficient",
+    "vars_table_sig": "Signifikans",
+    "vars_table_interpretation": "Tolkning",
+
+    # Graph explanations (collapsible, standardized)
+    "explain_coef_chart_expander": "Hur läser jag detta diagram?",
+    "explain_coef_chart_text": (
+        "Staplarna visar regressionskoefficienten (beta) för varje variabel. "
+        "Koefficientens storlek anger hur starkt variabeln samvarierar med "
+        "skattekraftstillväxten. Observera att försörjningskvoten mäts i en "
+        "annan skala (kvot, inte procent) och har därför ett större absolutvärde.\n\n"
+        "**Exempel**: Försörjningskvotens koefficient på ca -3,75 innebär att om "
+        "en kommuns försörjningskvot ökar med 0,1 (t.ex. från 0,70 till 0,80), "
+        "förväntas skattekraftstillväxten minska med ca 0,38 procentenheter. "
+        "Stjärnorna anger statistisk signifikans: *** = p < 0,001, ** = p < 0,01, "
+        "* = p < 0,05."
+    ),
+
+    "explain_choropleth_expander": "Hur läser jag kartan?",
+    "explain_choropleth_text": (
+        "Kartan visar alla 290 kommuner färgkodade efter sårbarhetsindex. "
+        "Gröna kommuner har låg sårbarhet (stark prognosticerad tillväxt), "
+        "gula har medelsårbarhet, och röda har hög sårbarhet (svag tillväxt).\n\n"
+        "**Exempel**: Om du ser att kommunerna i norra Norrland lyser rött "
+        "medan Stockholmsregionen är grön, indikerar det att norrlandskommunerna "
+        "har en mer ogynnsam kombination av arbetslöshet, försörjningskvot, "
+        "befolkningsutveckling och utbildningsnivå. Håll muspekaren över en "
+        "kommun för att se detaljerad information."
+    ),
+
+    "explain_histogram_expander": "Hur läser jag fördelningen?",
+    "explain_histogram_text": (
+        "Histogrammet visar hur de 290 kommunernas prognosticerade "
+        "skattekraftstillväxt fördelar sig. Varje stapel representerar ett "
+        "intervall av tillväxtvärden, och höjden anger hur många kommuner "
+        "som hamnar i det intervallet.\n\n"
+        "De streckade linjerna visar gränserna mellan riskklasserna. "
+        "Kommuner till vänster om den röda linjen klassas som Hög risk, "
+        "kommuner till höger om den gröna som Låg risk.\n\n"
+        "**Exempel**: Om de flesta kommuner samlas kring 3 % tillväxt men "
+        "du ser en svans åt vänster (ned mot 1 %), representerar den svansen "
+        "de mest sårbara kommunerna."
+    ),
+
+    "explain_trend_expander": "Hur läser jag trenddiagrammet?",
+    "explain_trend_text": (
+        "Linjediagrammet visar den valda kommunens skattekraft per invånare "
+        "(kr) från 2010 till 2024 jämfört med riksgenomsnittet (streckad linje). "
+        "Om kommunens linje ligger under riksgenomsnittet har den lägre "
+        "skattekraft per invånare än en genomsnittskommun.\n\n"
+        "**Exempel**: Om linjen lutar uppåt men inte lika brant som "
+        "riksgenomsnittet, betyder det att kommunen visserligen växer, men "
+        "halkar efter relativt sett. Tvärtom, om linjen stiger brantare, "
+        "stärks kommunens relativa position."
+    ),
+
+    "explain_decomp_expander": "Hur läser jag dekomponeringen?",
+    "explain_decomp_text": (
+        "Staplarna visar hur varje strukturfaktor bidrar till kommunens "
+        "avvikelse från riksgenomsnittet. Gröna staplar (positiva) innebär "
+        "att faktorn drar kommunen uppåt, röda (negativa) drar nedåt.\n\n"
+        "**Exempel**: Om 'Bidrag: arbetslöshet' visar -0,3 % innebär det "
+        "att kommunens högre arbetslöshet (jämfört med riksgenomsnittet) "
+        "bidrar med 0,3 procentenheter lägre skattekraftstillväxt. "
+        "Residualen fångar kommunspecifika faktorer som inte förklaras av "
+        "de fyra variablerna."
+    ),
+
+    "explain_ranking_expander": "Hur läser jag tabellen?",
+    "explain_ranking_text": (
+        "Tabellen rangordnar alla kommuner efter prognosticerad "
+        "skattekraftstillväxt 2025. Rang 1 = mest sårbar (svagast prognos). "
+        "Riskklass anger om kommunen tillhör de 20 % mest sårbara (Hög), "
+        "de mellersta 60 % (Medel), eller de 20 % starkaste (Låg).\n\n"
+        "**Exempel**: En kommun på rang 15 med riskklass Hög och prognos "
+        "+1,5 % har en av de svagaste prognoserna i landet, trots att "
+        "tillväxten fortfarande är positiv (nominellt). Tabellen kan sorteras "
+        "genom att klicka på kolumnrubrikerna."
+    ),
+
+    "explain_peers_expander": "Hur läser jag jämförelsetabellen?",
+    "explain_peers_text": (
+        "Tabellen visar de fem kommuner som liknar den valda kommunen mest, "
+        "baserat på sårbarhetsindex. Jämförbara kommuner har liknande "
+        "kombination av strukturella förutsättningar.\n\n"
+        "**Exempel**: Om din kommun har sårbarhetsrang 50 och de jämförbara "
+        "kommunerna visar liknande arbetslöshet men lägre försörjningskvot, "
+        "tyder det på att demografin är en relativt sett viktigare faktor "
+        "för just din kommun."
+    ),
+
+    # Kommun comparison (multi-select)
+    "compare_label": "Jämför med andra kommuner",
+    "compare_legend_national_avg": "Riksgenomsnitt",
 }
 
 # ---------------------------------------------------------------------------

@@ -83,6 +83,14 @@ st.html(f"""
 </div>
 """)
 
+# Collapsible concept explanation
+with st.expander(SWEDISH_LABELS["concept_skattekraft_expander"]):
+    st.markdown(SWEDISH_LABELS["concept_skattekraft_text"])
+
+# Collapsible usage guide
+with st.expander(SWEDISH_LABELS["guide_expander"]):
+    st.markdown(SWEDISH_LABELS["guide_text"])
+
 # ---------------------------------------------------------------------------
 # Section 2: Stat strip
 # ---------------------------------------------------------------------------
@@ -211,6 +219,8 @@ with st.expander(SWEDISH_LABELS["landing_model_expander"]):
     st.markdown(SWEDISH_LABELS["landing_model_example"])
 
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # Section 4: Variabler & vikter (regression coefficients as bars)
 # ---------------------------------------------------------------------------
 
@@ -294,8 +304,41 @@ with st.container(border=True):
     st.html(card_header(SWEDISH_LABELS["landing_vars_title"], tag=SWEDISH_LABELS["method_period"]))
     st.html(f'<div class="shai-explanation">{SWEDISH_LABELS["landing_vars_explanation"]}</div>')
     st.plotly_chart(fig_coefs, use_container_width=True, config={"displayModeBar": False})
+
+    # Show all coefficient values in a table for clarity
+    _sig_label = lambda p: "***" if p < 0.001 else ("**" if p < 0.01 else ("*" if p < 0.05 else "ej sign."))
+    _interp = {
+        "unemployment_rate": "1 procentenhets ökning i arbetslöshet ger ca {v} procentenheter tillväxt",
+        "dependency_ratio": "0,1 ökning i försörjningskvot ger ca {v} procentenheter tillväxt",
+        "population_growth_pct": "1 procentenhets befolkningstillväxt ger ca {v} procentenheter tillväxt",
+        "edu_share": "1 procentenhets ökning i utbildningsandel ger ca {v} procentenheter tillväxt",
+    }
+    coef_table_data = []
+    for _, row in main_coefs.iterrows():
+        var_name = row["variable"]
+        coef_val = row["coefficient"]
+        if var_name == "dependency_ratio":
+            effect_str = f"{coef_val / 10:+.3f}".replace(".", ",")
+        else:
+            effect_str = f"{coef_val:+.3f}".replace(".", ",")
+        interp_template = _interp.get(var_name, "")
+        interp_text = interp_template.format(v=effect_str) if interp_template else ""
+        coef_table_data.append({
+            SWEDISH_LABELS["vars_table_variable"]: row["label"],
+            SWEDISH_LABELS["vars_table_coef"]: f"{coef_val:+.4f}".replace(".", ","),
+            SWEDISH_LABELS["vars_table_sig"]: _sig_label(row["p_value"]),
+            SWEDISH_LABELS["vars_table_interpretation"]: interp_text,
+        })
+    st.dataframe(
+        pd.DataFrame(coef_table_data),
+        use_container_width=True,
+        hide_index=True,
+    )
+
     with st.expander(SWEDISH_LABELS["landing_vars_expander"]):
         st.markdown(SWEDISH_LABELS["landing_vars_example"])
+    with st.expander(SWEDISH_LABELS["explain_coef_chart_expander"]):
+        st.markdown(SWEDISH_LABELS["explain_coef_chart_text"])
 
 # ---------------------------------------------------------------------------
 # Section 5: Pipeline steps
