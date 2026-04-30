@@ -112,7 +112,7 @@ SWEDISH_LABELS = {
     # Methodology callouts
     "method_model_name": "Tvåvägs fixed effects panelmodell",
     "method_period": "Period: 2010 till 2024",
-    "method_units": "290 kommuner, 15 ar, 4 350 observationer",
+    "method_units": "290 kommuner, 15 år, 4 350 observationer",
 
     # Landing page
     "landing_lead": (
