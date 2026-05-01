@@ -112,7 +112,7 @@ SWEDISH_LABELS = {
     # Methodology callouts
     "method_model_name": "Tvåvägs fixed effects panelmodell",
     "method_period": "Period: 2010 till 2024",
-    "method_units": "290 kommuner, 15 ar, 4 350 observationer",
+    "method_units": "290 kommuner, 15 år, 4 350 observationer",
 
     # Landing page
     "landing_lead": (
@@ -400,6 +400,21 @@ SWEDISH_LABELS = {
     # Kommun comparison (multi-select)
     "compare_label": "Jämför med andra kommuner",
     "compare_legend_national_avg": "Riksgenomsnitt",
+
+    # Coefficient table — significance label for non-significant results
+    "sig_not_significant": "ej sign.",
+
+    # Choropleth — missing GeoJSON warning
+    "choropleth_missing_geojson": (
+        "GeoJSON-fil saknas. Kör scripts/download_geojson.py för att "
+        "ladda ned kommunkartan."
+    ),
+
+    # Coefficient table — interpretation templates (use .format(v=effect_str))
+    "interp_unemployment": "1 procentenhets ökning i arbetslöshet ger ca {v} procentenheter tillväxt",
+    "interp_dependency": "0,1 ökning i försörjningskvot ger ca {v} procentenheter tillväxt",
+    "interp_population": "1 procentenhets befolkningstillväxt ger ca {v} procentenheter tillväxt",
+    "interp_education": "1 procentenhets ökning i utbildningsandel ger ca {v} procentenheter tillväxt",
 }
 
 # ---------------------------------------------------------------------------

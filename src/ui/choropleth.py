@@ -66,10 +66,7 @@ def render_choropleth(
         key: Streamlit component key for st_folium.
     """
     if not _GEOJSON_PATH.exists():
-        st.warning(
-            "GeoJSON-fil saknas. Kör scripts/download_geojson.py för att "
-            "ladda ned kommunkartan."
-        )
+        st.warning(SWEDISH_LABELS["choropleth_missing_geojson"])
         return
 
     geojson = _load_geojson()

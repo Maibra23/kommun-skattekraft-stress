@@ -306,12 +306,12 @@ with st.container(border=True):
     st.plotly_chart(fig_coefs, use_container_width=True, config={"displayModeBar": False})
 
     # Show all coefficient values in a table for clarity
-    _sig_label = lambda p: "***" if p < 0.001 else ("**" if p < 0.01 else ("*" if p < 0.05 else "ej sign."))
+    _sig_label = lambda p: "***" if p < 0.001 else ("**" if p < 0.01 else ("*" if p < 0.05 else SWEDISH_LABELS["sig_not_significant"]))
     _interp = {
-        "unemployment_rate": "1 procentenhets ökning i arbetslöshet ger ca {v} procentenheter tillväxt",
-        "dependency_ratio": "0,1 ökning i försörjningskvot ger ca {v} procentenheter tillväxt",
-        "population_growth_pct": "1 procentenhets befolkningstillväxt ger ca {v} procentenheter tillväxt",
-        "edu_share": "1 procentenhets ökning i utbildningsandel ger ca {v} procentenheter tillväxt",
+        "unemployment_rate": SWEDISH_LABELS["interp_unemployment"],
+        "dependency_ratio": SWEDISH_LABELS["interp_dependency"],
+        "population_growth_pct": SWEDISH_LABELS["interp_population"],
+        "edu_share": SWEDISH_LABELS["interp_education"],
     }
     coef_table_data = []
     for _, row in main_coefs.iterrows():
