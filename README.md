@@ -91,7 +91,7 @@ pytest
 
 ```
 kommun-skattekraft-stress/
-    app.py                          # Startsida (Oversikt)
+    app.py                          # Startsida (Översikt)
     pipeline.py                     # Orkestrerar fetch, clean, estimate, predict, decompose
     pages/
         01_Riksoversikt.py          # Nationell vy med karta och rangordning
@@ -100,19 +100,19 @@ kommun-skattekraft-stress/
         fetch/                      # SCB PxWeb API-klienter
             pxweb_client.py         # Generisk POST + chunking
             fetch_skattekraft.py    # OE0101
-            fetch_population.py     # BE0101 (med per-ars-chunkning)
-            fetch_unemployment.py   # AA0003 (tvatabellssplitsa)
+            fetch_population.py     # BE0101 (med per-års-chunkning)
+            fetch_unemployment.py   # AA0003 (tvåtabellsstrategi)
             fetch_education.py      # UF0506
-        clean/                      # Harmonisering och harledda variabler
-            harmonize_kommunkod.py  # Kommunkodsmapping till 2024 granser
-            compute_derived.py      # Forsorjningskvot, tillvaxttakt
+        clean/                      # Harmonisering och härledda variabler
+            harmonize_kommunkod.py  # Kommunkodsmapping till 2024 gränser
+            compute_derived.py      # Försörjningskvot, tillväxttakt
             build_panel.py          # Bygg balanserad 290x15 panel
         model/                      # Ekonometri
             estimate.py             # PanelOLS med robusthetsspecifikationer
             predict.py              # Prognos 2025
             decompose.py            # Strukturell dekomponering
         ui/                         # Streamlit-komponenter
-            css.py                  # Designsystem (farger, typografi, CSS)
+            css.py                  # Designsystem (färger, typografi, CSS)
             components.py           # KPI-kort, sidtitel, footer
             sidebar.py              # Gemensam sidebar
             chart_theme.py          # Plotly-tema
@@ -127,14 +127,14 @@ kommun-skattekraft-stress/
     data/
         raw/                        # Cachade SCB-svar (JSON)
         processed/panel.parquet     # Rensad 290x15 panel
-        geo/kommuner.geojson        # Kommungrenser
+        geo/kommuner.geojson        # Kommungränser
         lookup/                     # Statisk kommunkodsmapping
     tests/                          # pytest-tester
     docs/                           # Dokumentation
-        PRD.md                      # Produktkrav (last specifikation)
+        PRD.md                      # Produktkrav (läst specifikation)
         TASKS.md                    # Implementeringsuppgifter
         METHODOLOGY.md              # Ekonometrisk metod
-        KRI_Dataset_Identification.md  # Datakallrevision
+        KRI_Dataset_Identification.md  # Datakällrevision
     notebooks/
         01_exploratory.ipynb        # EDA
 ```
@@ -156,7 +156,7 @@ Modellen har flera kända begränsningar, dokumenterade i [`docs/METHODOLOGY.md`
   - [BE0101 Folkmängd](https://www.statistikdatabasen.scb.se/pxweb/sv/ssd/START__BE__BE0101__BE0101A/BefolkningNy/)
   - [AA0003 Öppen arbetslöshet](https://www.statistikdatabasen.scb.se/pxweb/sv/ssd/START__AA__AA0003/)
   - [UF0506 Utbildningsnivå](https://www.statistikdatabasen.scb.se/pxweb/sv/ssd/START__UF__UF0506__UF0506B/Utbildning/)
-- Kommungrenser: [okfse/sweden-geojson](https://github.com/okfse/sweden-geojson)
+- Kommungränser: [okfse/sweden-geojson](https://github.com/okfse/sweden-geojson)
 
 ## Licens
 
