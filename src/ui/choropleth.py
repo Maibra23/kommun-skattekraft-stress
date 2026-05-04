@@ -81,7 +81,7 @@ def render_choropleth(
         "medel": SWEDISH_LABELS["risk_medium"],
         "hog": SWEDISH_LABELS["risk_high"],
     }
-    df["risk_class_label"] = df["risk_class"].map(risk_label_map).fillna("")
+    df["risk_class_label"] = df["risk_class"].astype(object).map(risk_label_map).fillna("")
     df["vulnerability_score_fmt"] = df["vulnerability_score"].apply(
         lambda x: f"{x:+.2f}".replace(".", ",")
     )

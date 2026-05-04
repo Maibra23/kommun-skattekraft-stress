@@ -24,7 +24,10 @@
       "Bash(/usr/local/bin/python3 *)",
       "Read(//usr/local/bin/**)",
       "Bash(/usr/local/bin/python3.11 -c \"import linearmodels; print\\('ok'\\)\")",
-      "Bash(/usr/local/bin/python3.11 *)"
+      "Bash(/usr/local/bin/python3.11 *)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_snapshot",
+      "mcp__plugin_playwright_playwright__browser_console_messages"
     ]
   }
 }
