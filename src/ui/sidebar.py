@@ -69,7 +69,6 @@ def render_sidebar(page_key: str) -> dict:
 
         # ---- Navigation ----
         for item in _NAV_ITEMS:
-            active = "active" if item["key"] == page_key else ""
             if item["key"] == page_key:
                 # Active page — render as highlighted text (no link needed)
                 st.html(

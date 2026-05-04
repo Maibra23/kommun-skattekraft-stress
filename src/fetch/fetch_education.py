@@ -641,7 +641,7 @@ if __name__ == "__main__":
     print(f"\nFetched {len(result)} rows.")
     print(f"Years covered: {sorted(result['year'].unique())}")
     print(f"Unique kommuner: {result['kommun_kod'].nunique()}")
-    print(f"\nNational mean edu_share by year:")
+    print("\nNational mean edu_share by year:")
     print(
         result.groupby("year")["edu_share"]
         .mean()

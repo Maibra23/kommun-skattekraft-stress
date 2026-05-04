@@ -36,7 +36,6 @@ from src.ui.chart_theme import get_chart_layout  # noqa: E402
 from src.ui.components import (  # noqa: E402
     card_header,
     footer_note,
-    render_kpi_row,
 )
 from src.ui.css import COLORS, inject_css  # noqa: E402
 from src.ui.labels import SWEDISH_LABELS  # noqa: E402
@@ -306,7 +305,14 @@ with st.container(border=True):
     st.plotly_chart(fig_coefs, use_container_width=True, config={"displayModeBar": False})
 
     # Show all coefficient values in a table for clarity
-    _sig_label = lambda p: "***" if p < 0.001 else ("**" if p < 0.01 else ("*" if p < 0.05 else SWEDISH_LABELS["sig_not_significant"]))
+    def _sig_label(p: float) -> str:
+        if p < 0.001:
+            return "***"
+        if p < 0.01:
+            return "**"
+        if p < 0.05:
+            return "*"
+        return SWEDISH_LABELS["sig_not_significant"]
     _interp = {
         "unemployment_rate": SWEDISH_LABELS["interp_unemployment"],
         "dependency_ratio": SWEDISH_LABELS["interp_dependency"],

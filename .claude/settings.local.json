@@ -31,7 +31,12 @@
       "mcp__plugin_playwright_playwright__browser_take_screenshot",
       "mcp__plugin_playwright_playwright__browser_evaluate",
       "mcp__plugin_playwright_playwright__browser_resize",
-      "mcp__plugin_playwright_playwright__browser_click"
+      "mcp__plugin_playwright_playwright__browser_click",
+      "Bash(pip3 list *)",
+      "Bash(python3.11 -m pytest tests/ -v)",
+      "Bash(python3.11 -m py_compile app.py pages/01_Riksoversikt.py pages/02_Kommunjamforelse.py pipeline.py src/ui/choropleth.py src/ui/css.py src/ui/components.py src/ui/sidebar.py src/ui/labels.py src/ui/chart_theme.py src/model/estimate.py src/model/decompose.py src/model/predict.py src/fetch/pxweb_client.py src/clean/build_panel.py)",
+      "Bash(python3.11 *)",
+      "Bash(pip3.11 install *)"
     ]
   }
 }

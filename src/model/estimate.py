@@ -11,7 +11,6 @@ import logging
 import pickle
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 from linearmodels import PanelOLS
 
