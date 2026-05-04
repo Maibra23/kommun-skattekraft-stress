@@ -17,7 +17,14 @@
       "Bash(.venv/Scripts/pip install:*)",
       "Bash(timeout 15 streamlit run:*)",
       "Bash(ls:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(pip show *)",
+      "Bash(python3 *)",
+      "Bash(pip3 show *)",
+      "Bash(/usr/local/bin/python3 *)",
+      "Read(//usr/local/bin/**)",
+      "Bash(/usr/local/bin/python3.11 -c \"import linearmodels; print\\('ok'\\)\")",
+      "Bash(/usr/local/bin/python3.11 *)"
     ]
   }
 }

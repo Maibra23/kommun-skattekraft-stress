@@ -2,9 +2,9 @@
 
 En modell över skattekraftens utveckling i Sveriges 290 kommuner, med prognoser och strukturell dekomponering.
 
-## Abstract
+## Sammanfattning
 
-A two-way fixed-effects panel model of Swedish municipal tax base growth, with predictive vulnerability ranking and structural decomposition, delivered as a Streamlit dashboard. The panel covers 290 municipalities x 15 years (2010-2024) using four structural drivers: unemployment rate, dependency ratio, population growth, and tertiary education share. Predicted 2025 growth and vulnerability ranks are precomputed and served as Parquet artifacts.
+En tvåvägs fixed-effects panelmodell av skattekraftsutvecklingen i Sveriges kommuner, med prediktiv sårbarhetsrankning och strukturell dekomponering, levererad som ett Streamlit-dashboard. Panelen täcker 290 kommuner × 15 år (2010–2024) med fyra strukturella drivkrafter: arbetslöshet, försörjningskvot, befolkningstillväxt och utbildningsandel. Prognosticerad tillväxt 2025 och sårbarhetsrankning är förberäknade och serveras som Parquet-artefakter.
 
 ## Om projektet
 
