@@ -100,7 +100,7 @@ def render_choropleth(
 
     lookup = df.set_index("kommun_kod").to_dict("index")
 
-    # Build linear colormap
+    # Build linear colormap (used for coloring polygons)
     colormap = cm.LinearColormap(
         colors=DIVERGING_SCALE,
         vmin=_VMIN,
@@ -171,15 +171,122 @@ def render_choropleth(
         ),
     ).add_to(m)
 
-    colormap.add_to(m)
+    # Add responsive legend as custom HTML element
+    legend_html = _build_responsive_legend(
+        colors=DIVERGING_SCALE,
+        vmin=_VMIN,
+        vmax=_VMAX,
+        caption=SWEDISH_LABELS["map_legend_caption"],
+    )
+    m.get_root().html.add_child(folium.Element(legend_html))
 
-    # Render in Streamlit
-    st_folium(m, height=height, use_container_width=True, key=key, returned_objects=[])
+    # Hide the selection rectangle that appears on click
+    hide_selection_css = """
+    <style>
+        .leaflet-interactive:focus {
+            outline: none !important;
+        }
+        .folium-map path.leaflet-interactive:focus {
+            outline: none !important;
+        }
+    </style>
+    """
+    m.get_root().html.add_child(folium.Element(hide_selection_css))
+
+    # Render in Streamlit (feature_group_to_add=[] prevents selection rectangle)
+    st_folium(
+        m,
+        height=height,
+        use_container_width=True,
+        key=key,
+        returned_objects=[],
+        feature_group_to_add=[],
+    )
 
 
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
+
+def _build_responsive_legend(
+    colors: list[str],
+    vmin: float,
+    vmax: float,
+    caption: str,
+) -> str:
+    """Build a responsive HTML legend that scales with map container width.
+
+    Args:
+        colors: List of hex color strings for the gradient.
+        vmin: Minimum value for the scale.
+        vmax: Maximum value for the scale.
+        caption: Legend caption text.
+
+    Returns:
+        HTML string for the legend element.
+    """
+    # Build CSS gradient from colors
+    gradient_stops = ", ".join(
+        f"{c} {i * 100 / (len(colors) - 1):.1f}%"
+        for i, c in enumerate(colors)
+    )
+
+    return f"""
+    <style>
+        .kss-legend-container {{
+            position: absolute;
+            top: 10px;
+            left: 50px;
+            right: 50px;
+            z-index: 1000;
+            pointer-events: none;
+        }}
+        .kss-legend {{
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 4px;
+            padding: 6px 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+            font-family: Source Sans 3, system-ui, sans-serif;
+            font-size: 10px;
+            max-width: 100%;
+            box-sizing: border-box;
+        }}
+        .kss-legend-caption {{
+            color: #1A1A2E;
+            font-weight: 500;
+            margin-bottom: 3px;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+        .kss-legend-bar {{
+            height: 8px;
+            width: 100%;
+            background: linear-gradient(to right, {gradient_stops});
+            border-radius: 2px;
+            margin-bottom: 3px;
+        }}
+        .kss-legend-labels {{
+            display: flex;
+            justify-content: space-between;
+            color: #6B7280;
+            font-size: 9px;
+        }}
+    </style>
+    <div class="kss-legend-container">
+        <div class="kss-legend">
+            <div class="kss-legend-caption">{caption}</div>
+            <div class="kss-legend-bar"></div>
+            <div class="kss-legend-labels">
+                <span>{vmin:+.1f}</span>
+                <span>0</span>
+                <span>{vmax:+.1f}</span>
+            </div>
+        </div>
+    </div>
+    """
 
 
 @st.cache_data

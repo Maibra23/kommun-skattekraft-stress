@@ -659,8 +659,8 @@ div[data-testid="stDataFrame"] td {
     margin-top: 2px;
 }
 
-/* ---- Sidebar pills (st.pills year / risk filter) ---- */
-section[data-testid="stSidebar"] div[data-testid="stPills"] button {
+/* ---- Sidebar pills (st.pills risk filter) ---- */
+section[data-testid="stSidebar"] div[data-testid="stButtonGroup"] button {
     font-family: var(--font-mono) !important;
     font-size: 11px !important;
     font-weight: 500 !important;
@@ -672,14 +672,13 @@ section[data-testid="stSidebar"] div[data-testid="stPills"] button {
     transition: all 0.15s;
 }
 
-section[data-testid="stSidebar"] div[data-testid="stPills"] button:hover {
+section[data-testid="stSidebar"] div[data-testid="stButtonGroup"] button:hover {
     color: #FFFFFF !important;
     background: rgba(255, 255, 255, 0.06) !important;
     border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
-section[data-testid="stSidebar"] div[data-testid="stPills"] button[aria-checked="true"],
-section[data-testid="stSidebar"] div[data-testid="stPills"] button[data-selected="true"] {
+section[data-testid="stSidebar"] div[data-testid="stButtonGroup"] button[data-testid="stBaseButton-pillsActive"] {
     color: var(--color-primary) !important;
     background: var(--color-accent) !important;
     border-color: var(--color-accent) !important;
