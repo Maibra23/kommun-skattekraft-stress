@@ -101,29 +101,33 @@ section[data-testid="stSidebar"] nav {display: none !important;}
 }
 
 section[data-testid="stSidebar"] {
-    width: 260px !important;
-    min-width: 260px !important;
-    max-width: 260px !important;
     background-color: var(--color-primary) !important;
-    transform: none !important;
-    transition: none !important;
 }
 
-/* Prevent sidebar from collapsing: hide toggle buttons */
-button[data-testid="stSidebarCollapse"],
-button[data-testid="baseButton-headerNoPadding"],
-section[data-testid="stSidebar"] button[kind="headerNoPadding"],
-div[data-testid="collapsedControl"] {
-    display: none !important;
-}
+/* Desktop only: lock sidebar open and hide its toggle */
+@media (min-width: 769px) {
+    section[data-testid="stSidebar"] {
+        width: 260px !important;
+        min-width: 260px !important;
+        max-width: 260px !important;
+        transform: none !important;
+        transition: none !important;
+    }
 
-/* Keep sidebar always visible even in collapsed state */
-section[data-testid="stSidebar"][aria-expanded="false"] {
-    display: block !important;
-    width: 260px !important;
-    min-width: 260px !important;
-    margin-left: 0 !important;
-    transform: none !important;
+    button[data-testid="stSidebarCollapse"],
+    button[data-testid="baseButton-headerNoPadding"],
+    section[data-testid="stSidebar"] button[kind="headerNoPadding"],
+    div[data-testid="collapsedControl"] {
+        display: none !important;
+    }
+
+    section[data-testid="stSidebar"][aria-expanded="false"] {
+        display: block !important;
+        width: 260px !important;
+        min-width: 260px !important;
+        margin-left: 0 !important;
+        transform: none !important;
+    }
 }
 
 section[data-testid="stSidebar"] .block-container {
@@ -761,6 +765,124 @@ a[data-testid="stLinkButton"] {
     *, *::before, *::after {
         transition-duration: 0.01ms !important;
         animation-duration: 0.01ms !important;
+    }
+}
+
+/* ================================================================
+   RESPONSIVE BREAKPOINTS
+   ================================================================ */
+
+/* ---- Tablet (≤ 1024px) ---- */
+@media (max-width: 1024px) {
+    .main .block-container {
+        padding: 24px 24px !important;
+    }
+    .shai-kpi .shai-kpi-value {
+        font-size: 26px !important;
+    }
+    .shai-hero {
+        padding: 24px 28px;
+    }
+    .shai-pipeline-step {
+        min-width: 100px;
+        padding: 10px 14px;
+    }
+}
+
+/* ---- Mobile (≤ 768px) ---- */
+@media (max-width: 768px) {
+    /* Restore Streamlit native sidebar slide-in overlay */
+    section[data-testid="stSidebar"] {
+        width: 260px !important;
+        min-width: 260px !important;
+        max-width: 260px !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        height: 100vh !important;
+        z-index: 999 !important;
+        transform: translateX(-260px) !important;
+        transition: transform 0.3s ease !important;
+    }
+    section[data-testid="stSidebar"][aria-expanded="true"] {
+        transform: translateX(0) !important;
+    }
+
+    /* Collapsed: slide off-screen — overrides the global [aria-expanded=false] rule */
+    section[data-testid="stSidebar"][aria-expanded="false"] {
+        transform: translateX(-260px) !important;
+        overflow: hidden !important;
+    }
+
+    /* Show sidebar toggle button on mobile */
+    button[data-testid="stSidebarCollapse"],
+    button[data-testid="baseButton-headerNoPadding"],
+    section[data-testid="stSidebar"] button[kind="headerNoPadding"],
+    div[data-testid="collapsedControl"] {
+        display: flex !important;
+    }
+
+    /* Full-width main content */
+    .main .block-container {
+        padding: 16px 14px !important;
+        max-width: 100%% !important;
+    }
+
+    /* Stack all Streamlit columns vertically */
+    div[data-testid="stHorizontalBlock"] {
+        flex-direction: column !important;
+    }
+    div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+        width: 100%% !important;
+        flex: 0 0 100%% !important;
+        min-width: 100%% !important;
+    }
+
+    /* Compact KPI cards */
+    .shai-kpi .shai-kpi-value {
+        font-size: 22px !important;
+    }
+    .shai-kpi {
+        padding: 12px 14px;
+    }
+
+    /* Year badge: stop floating, go below subtitle */
+    .shai-page-title .shai-year {
+        float: none !important;
+        display: block !important;
+        margin-top: 4px !important;
+    }
+
+    /* Tighter hero */
+    .shai-hero {
+        padding: 18px 16px;
+    }
+
+    /* Stat strip: wrap 2×2 */
+    .shai-stat-strip {
+        flex-wrap: wrap !important;
+    }
+    .shai-stat-cell {
+        flex: 1 1 48%% !important;
+        min-width: 0 !important;
+    }
+
+    /* Pipeline: compact and wrap */
+    .shai-pipeline-step {
+        min-width: 80px !important;
+        padding: 8px 10px !important;
+    }
+
+    /* Dim overlay behind open sidebar */
+    section[data-testid="stSidebar"][aria-expanded="true"]::after {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 260px;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: -1;
     }
 }
 """ % COLORS
