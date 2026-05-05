@@ -1,26 +1,15 @@
-# Kommunal Skattekraft Stress Monitor
+## Skattekraftsprognos för svenska kommuner
 
-En modell över skattekraftens utveckling i Sveriges 290 kommuner, med prognoser och strukturell dekomponering.
+Det här projektet analyserar och rangordnar Sveriges kommuner efter förväntad skattekraftsutveckling fram till 2025.
 
-## Sammanfattning
+**Vad ingår?**
 
-En tvåvägs fixed-effects panelmodell av skattekraftsutvecklingen i Sveriges kommuner, med prediktiv sårbarhetsrankning och strukturell dekomponering, levererad som ett Streamlit-dashboard. Panelen täcker 290 kommuner × 15 år (2010–2024) med fyra strukturella drivkrafter: arbetslöshet, försörjningskvot, befolkningstillväxt och utbildningsandel. Prognosticerad tillväxt 2025 och sårbarhetsrankning är förberäknade och serveras som Parquet-artefakter.
+- 290 kommuner analyserade över 15 år (2010–2024)
+- Statistisk modell (tvåvägs fixed effects) med fyra förklaringsfaktorer: arbetslöshet, försörjningskvot, befolkningstillväxt och utbildningsandel
+- Interaktivt Streamlit-dashboard med tre vyer: översikt, nationell karta och kommundetaljer
+- Förberäknade prognoser och sårbarhetsrankning i Parquet-format
 
-## Om projektet
-
-Skattekraften (beskattningsbar förvärvsinkomst per invånare) är det centrala måttet på en kommuns skattemässiga kapacitet. Skillnaderna mellan kommuner är enorma: Danderyd rapporterade ca 481 000 kr per invånare 2024, medan flera Norrlandskommuner låg under 180 000 kr.
-
-Det här projektet bygger en panelmodell (tvåvägs fixed effects) som identifierar vilka kommuner som har den svagaste prognosticerade skattekraftstillväxten och vilka strukturella faktorer som driver variationen. Resultaten levereras som en interaktiv Streamlit-dashboard med tre sidor: en översikt, en nationell kartvy med rangordning, och en kommundetaljsida med strukturell dekomponering.
-
-**Målgrupp:** Kreditanalytiker, kommunala controllers, SKR-analytiker, regionala beslutsfattare.
-
-## Skärmdumpar
-
-> *Skärmdumpar läggs till efter driftsättning på Streamlit Cloud.*
-
-| Översikt | Riksöversikt | Kommunjämförelse |
-|:---:|:---:|:---:|
-| ![Översikt](docs/screenshots/landing.png) | ![Riksöversikt](docs/screenshots/riksoversikt.png) | ![Kommunjämförelse](docs/screenshots/kommunjamforelse.png) |
+**Varför?** Skattekraften varierar enormt mellan kommuner – från ~481 000 kr (Danderyd) till under 180 000 kr i delar av Norrland. Modellen hjälper till att förstå vad som driver dessa skillnader och vilka kommuner som är mest utsatta. vilket är baserat på följande frågeställning: Vilka kommuner riskerar att tappa skattekraft?
 
 ## Modell
 
@@ -35,19 +24,21 @@ Där *i* indexerar kommun (290), *t* indexerar år (2010-2024). Standardfel klus
 
 **Sårbarhetsindex:** Prognosticerad tillväxt 2025 standardiseras (z-poäng, teckenvänd så högt = sårbar). Nedre kvintilen (58 kommuner) klassas som "Hög risk".
 
-Se [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) för fullständig metodbeskrivning inklusive robusthetsanalyser och begränsningar.
+Se `[docs/METHODOLOGY.md](docs/METHODOLOGY.md)` för fullständig metodbeskrivning inklusive robusthetsanalyser och begränsningar.
 
 ## Datakällor
 
-| Källa | Tabell-ID | Variabel | Period |
-|---|---|---|---|
-| SCB Statistikdatabasen | OE0101 | Skattekraft per invånare | 2009-2024 |
-| SCB Statistikdatabasen | BE0101 | Folkmängd (ålder, kön) | 2009-2024 |
-| SCB Statistikdatabasen | AA0003 | Öppen arbetslöshet (STATIV) | 2010-2024 |
-| SCB Statistikdatabasen | UF0506 | Utbildningsnivå | 2010-2024 |
-| okfse/sweden-geojson | . | Kommungränser (GeoJSON) | 2024 |
 
-Se [`docs/KRI_Dataset_Identification.md`](docs/KRI_Dataset_Identification.md) för detaljerad datarevision med API-endpoints, query-parametrar och validering.
+| Källa                  | Tabell-ID | Variabel                    | Period    |
+| ---------------------- | --------- | --------------------------- | --------- |
+| SCB Statistikdatabasen | OE0101    | Skattekraft per invånare    | 2009-2024 |
+| SCB Statistikdatabasen | BE0101    | Folkmängd (ålder, kön)      | 2009-2024 |
+| SCB Statistikdatabasen | AA0003    | Öppen arbetslöshet (STATIV) | 2010-2024 |
+| SCB Statistikdatabasen | UF0506    | Utbildningsnivå             | 2010-2024 |
+| okfse/sweden-geojson   | .         | Kommungränser (GeoJSON)     | 2024      |
+
+
+Se `[docs/KRI_Dataset_Identification.md](docs/KRI_Dataset_Identification.md)` för detaljerad datarevision med API-endpoints, query-parametrar och validering.
 
 ## Köra lokalt
 
@@ -141,7 +132,7 @@ kommun-skattekraft-stress/
 
 ## Begränsningar
 
-Modellen har flera kända begränsningar, dokumenterade i [`docs/METHODOLOGY.md` avsnitt 7](docs/METHODOLOGY.md#7-known-limitations-volunteer-in-interviews):
+Modellen har flera kända begränsningar, dokumenterade i `[docs/METHODOLOGY.md` avsnitt 7](docs/METHODOLOGY.md#7-known-limitations-volunteer-in-interviews):
 
 - Låg R2(within) (~0,8 %) är förväntat efter tvåvägs demeaning; år-fixed effects absorberar >95 % av variationen
 - Befolkningstillväxtens negativa koefficient reflekterar within-entity-dynamik (tillfällig per-capita-utspädning), inte tvärsnittssamband
