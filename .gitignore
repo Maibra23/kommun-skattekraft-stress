@@ -7,3 +7,4 @@ data/raw/*.json
 data/raw/pipeline.log
 .ipynb_checkpoints/
 .DS_Store
+.claude/
