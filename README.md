@@ -6,10 +6,10 @@ Det här projektet analyserar och rangordnar Sveriges kommuner efter förväntad
 
 - 290 kommuner analyserade över 15 år (2010–2024)
 - Statistisk modell (tvåvägs fixed effects) med fyra förklaringsfaktorer: arbetslöshet, försörjningskvot, befolkningstillväxt och utbildningsandel
-- Interaktivt Streamlit-dashboard med tre vyer: översikt, nationell karta och kommundetaljer
+- Interaktivt Streamlit dashboard med tre vyer: översikt, nationell karta och kommundetaljer
 - Förberäknade prognoser och sårbarhetsrankning i Parquet-format
 
-**Varför?** Skattekraften varierar enormt mellan kommuner – från ~481 000 kr (Danderyd) till under 180 000 kr i delar av Norrland. Modellen hjälper till att förstå vad som driver dessa skillnader och vilka kommuner som är mest utsatta. vilket är baserat på följande frågeställning: Vilka kommuner riskerar att tappa skattekraft?
+**Varför?** Skattekraften varierar enormt mellan kommuner, från ~481 000 kr (Danderyd) till under 180 000 kr i delar av Norrland. Modellen hjälper till att förstå vad som driver dessa skillnader och vilka kommuner som är mest utsatta. vilket är baserat på följande frågeställning: Vilka kommuner riskerar att tappa skattekraft?
 
 ## Modell
 
