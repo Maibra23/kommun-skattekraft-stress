@@ -7,6 +7,7 @@ using data/geo/kommuner.geojson (from okfse/sweden-geojson).  Colors are drawn
 from DIVERGING_SCALE: green = low vulnerability, red = high vulnerability.
 Map height is 480 px.  Tooltips show municipality name and key metrics.
 The map is embedded in Streamlit via streamlit_folium.st_folium().
+Basemap tiles come from Esri's light grey canvas, which needs no API key.
 
 Legend caption comes from SWEDISH_LABELS['map_legend_caption'].
 """
@@ -25,6 +26,21 @@ from src.ui.labels import SWEDISH_LABELS, format_pct, format_sek
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _GEOJSON_PATH = _PROJECT_ROOT / "data" / "geo" / "kommuner.geojson"
+
+# Basemap tiles.  CARTO now stamps an "API KEY REQUIRED" watermark onto tiles
+# served from basemaps.cartocdn.com without credentials -- the request still
+# returns HTTP 200, so the map defaces itself silently.  Esri's light grey
+# canvas is served without credentials and matches the muted palette.
+_TILE_URL = (
+    "https://server.arcgisonline.com/ArcGIS/rest/services/"
+    "Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+)
+_TILE_ATTRIBUTION = "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ"
+_TILE_MAX_ZOOM = 16
+
+# Map viewport centred on Sweden
+_MAP_CENTER = (63.0, 16.5)
+_MAP_ZOOM_START = 5
 
 # Z-score range for the color scale (vulnerability_score)
 _VMIN = -2.5
@@ -109,12 +125,7 @@ def render_choropleth(
     )
 
     # Create base map centered on Sweden
-    m = folium.Map(
-        location=[63.0, 16.5],
-        zoom_start=5,
-        tiles="cartodbpositron",
-        control_scale=False,
-    )
+    m = build_base_map()
 
     # Style function
     def style_function(feature):
@@ -207,6 +218,26 @@ def render_choropleth(
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
+
+def build_base_map() -> folium.Map:
+    """Create the empty Sweden-centred base map used by the choropleth.
+
+    The tile layer is configured from an explicit URL template rather than a
+    named folium provider so that the map cannot silently switch to a service
+    that requires an API key.
+
+    Returns:
+        A folium.Map with the keyless basemap already attached.
+    """
+    return folium.Map(
+        location=list(_MAP_CENTER),
+        zoom_start=_MAP_ZOOM_START,
+        tiles=_TILE_URL,
+        attr=_TILE_ATTRIBUTION,
+        max_zoom=_TILE_MAX_ZOOM,
+        control_scale=False,
+    )
 
 
 def _build_responsive_legend(
