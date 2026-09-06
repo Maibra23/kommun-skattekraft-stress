@@ -1,9 +1,20 @@
-"""Fetch municipal tax base (skattekraft) per capita from SCB table OE0101.
+"""Fetch municipal tax base (skattekraft) from SCB table OE0101.
 
-Downloads beskattningsbar förvärvsinkomst per invånare for all 290 kommuner
-for the years 2010–2024 using the generic pxweb_client and caches the raw
-response to data/raw/skattekraft.json.  Returns a tidy DataFrame with columns
-[kommun_kod, year, tax_base_per_capita].
+Downloads two metrics for all 290 kommuner in a single query and caches the
+result to data/raw/skattekraft.json.  Returns a tidy DataFrame with columns
+[kommun_kod, year, tax_base_per_capita, tax_base_index_riket]:
+
+  * ``tax_base_per_capita`` (OE0101A0) — beskattningsbar förvärvsinkomst per
+    invånare, SEK, current prices.
+  * ``tax_base_index_riket`` (OE0101B0) — andel av riksmedelvärdet, percent.
+    SCB's own published index with riket = 100; the figure Regionfakta and
+    other secondary sources republish.
+
+The index is **population-weighted** (riksmedelvärde ~271 000 kr for 2026),
+whereas this project's own cross-municipality mean is unweighted (~231 000 kr
+for 2024).  The two denominators must never be mixed in one chart; see
+METHODOLOGY 7.13.  The index is fetched as a soft dependency: if SCB withdraws
+it the column is left null rather than failing the pipeline.
 
 Cache policy: data/raw/skattekraft.json is reused if younger than 7 days.
 Pass force_refresh=True to bypass the cache and re-fetch from the API.
@@ -41,7 +52,10 @@ _CACHE_FILE: Path = _PROJECT_ROOT / "data" / "raw" / "skattekraft.json"
 
 _CACHE_MAX_AGE_DAYS: int = 7
 _EXPECTED_COMMUNES: int = 290
-_DEFAULT_YEARS: list[int] = list(range(2010, 2025))
+# Coverage runs through the latest year SCB publishes.  Skattekraft for a
+# budget year is released the preceding December, so 2026 has been available
+# since December 2025.  See REMEDIATION_PLAN.md finding F2.
+_DEFAULT_YEARS: list[int] = list(range(2010, 2027))
 
 # Known ContentsCode for "skattekraft per invånare"; verified at runtime via
 # metadata call.  Updated from legacy '000001LB' to 'OE0101A0' (current SCB API).
@@ -55,10 +69,27 @@ _SKATTEKRAFT_PER_CAPITA_KEYWORDS: tuple[str, ...] = (
     "skattekraft per inv",
 )
 
+# ContentsCode for "andel av riksmedelvärdet, procent" — SCB's published
+# index, riket = 100.  Soft dependency: absence degrades to a null column.
+_KNOWN_INDEX_CONTENTS_CODE: str = "OE0101B0"
+
+_INDEX_KEYWORDS: tuple[str, ...] = (
+    "andel av riksmedelvärdet",
+    "andel av riksmedel",
+)
+
+# Plausible bounds for the index, in percent of the national mean.  The
+# observed 2026 range is roughly 73 (Högsby) to 191 (Danderyd); the wider
+# bounds here catch a scale error (fraction instead of percent) without
+# tripping on legitimate outliers.
+_INDEX_MIN: float = 40.0
+_INDEX_MAX: float = 400.0
+
 _CACHE_DTYPES: dict[str, str] = {
     "kommun_kod": "str_zfill4",
     "year": "int",
     "tax_base_per_capita": "float",
+    "tax_base_index_riket": "float",
 }
 
 
@@ -80,13 +111,13 @@ def fetch_skattekraft(
     actually needs to be fetched from the API, not when loading from cache.
 
     Args:
-        years: List of integer years to include.  Defaults to 2010–2024.
+        years: List of integer years to include.  Defaults to 2010–2026.
         force_refresh: If True, ignore the cache and re-fetch from the API.
 
     Returns:
-        DataFrame with columns [kommun_kod, year, tax_base_per_capita] and
-        exactly 290 × len(years) rows.  kommun_kod is a zero-padded 4-digit
-        string; year is int; tax_base_per_capita is float (SEK).
+        DataFrame with columns [kommun_kod, year, tax_base_per_capita,
+        tax_base_index_riket] and exactly 290 × len(years) rows.  kommun_kod
+        is a zero-padded 4-digit string; year is int; both metrics are float.
 
     Raises:
         ValueError: If the API call fails after retries, or if the returned
@@ -96,15 +127,29 @@ def fetch_skattekraft(
         years = _DEFAULT_YEARS
 
     # --- Steps 1–5: Fetch or load from cache ---
+    cached = None
     if not force_refresh and is_cache_fresh(_CACHE_FILE, _CACHE_MAX_AGE_DAYS):
         logger.info("Loading skattekraft from cache: %s", _CACHE_FILE)
-        df = load_df_cache(_CACHE_FILE, _CACHE_DTYPES)
+        candidate = load_df_cache(_CACHE_FILE, _CACHE_DTYPES)
+        stale_reason = _cache_shortfall(candidate, years)
+        if stale_reason is None:
+            cached = candidate
+        else:
+            logger.info("Ignoring cache: %s. Re-fetching from SCB.", stale_reason)
+
+    if cached is not None:
+        df = cached
     else:
         # Step 1: Confirm ContentsCode via metadata (only when fetching)
         logger.info("Fetching OE0101 metadata from %s", _TABLE_URL)
         metadata = fetch_metadata(_TABLE_URL)
         contents_code = _discover_contents_code(metadata)
-        logger.info("Using ContentsCode: %s", contents_code)
+        index_code = _discover_index_code(metadata) or _KNOWN_INDEX_CONTENTS_CODE
+        logger.info(
+            "Using ContentsCodes: %s (per capita), %s (index)",
+            contents_code,
+            index_code,
+        )
         region_codes = _discover_region_codes(metadata)
         logger.info("Using %d explicit region codes.", len(region_codes))
 
@@ -114,13 +159,15 @@ def fetch_skattekraft(
             max(years),
         )
         # Step 2: Build query per KRI §2
-        query_body = _build_query(contents_code, years, region_codes)
+        query_body = _build_query(
+            [contents_code, index_code], years, region_codes
+        )
 
         # Step 3: Call generic client
         df_raw = query_pxweb(_TABLE_URL, query_body)
 
         # Step 4: Rename and cast columns
-        df = _clean_response(df_raw)
+        df = _clean_response(df_raw, contents_code, index_code)
 
         # Step 5: Persist cache
         save_df_cache(df, _CACHE_FILE)
@@ -144,6 +191,33 @@ def fetch_skattekraft(
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
+
+def _cache_shortfall(df: pd.DataFrame, years: list[int]) -> str | None:
+    """Return why a cached frame is unusable, or None if it is usable.
+
+    A cache written before REMEDIATION_PLAN.md T0.1 predates the
+    tax_base_index_riket column and stops at 2024.  Age alone cannot detect
+    that, so the schema and the requested year coverage are checked too —
+    otherwise a fresh-but-obsolete cache silently yields a null index column.
+
+    Args:
+        df: Frame loaded from the JSON cache.
+        years: Years the caller requested.
+
+    Returns:
+        A human-readable reason string, or None when the cache is usable.
+    """
+    missing = [col for col in _CACHE_DTYPES if col not in df.columns]
+    if missing:
+        return f"cached frame is missing column(s) {missing}"
+
+    cached_years = set(df["year"].unique())
+    absent = sorted(set(years) - cached_years)
+    if absent:
+        return f"cached frame does not cover year(s) {absent}"
+
+    return None
 
 
 def _discover_contents_code(metadata: dict) -> str:
@@ -203,6 +277,46 @@ def _discover_contents_code(metadata: dict) -> str:
     )
 
 
+def _discover_index_code(metadata: dict) -> str | None:
+    """Find the ContentsCode for andel av riksmedelvärdet, if published.
+
+    Unlike the per-capita metric this is a soft dependency: a missing index
+    degrades the panel by one column rather than breaking the pipeline, so
+    this returns None instead of raising.
+
+    Args:
+        metadata: Table metadata dict returned by fetch_metadata.
+
+    Returns:
+        The ContentsCode string for the index, or None if not found.
+    """
+    for variable in metadata.get("variables", []):
+        if variable.get("code") != "ContentsCode":
+            continue
+        codes: list[str] = variable.get("values", [])
+        texts: list[str] = variable.get("valueTexts", [])
+
+        if _KNOWN_INDEX_CONTENTS_CODE in codes:
+            return _KNOWN_INDEX_CONTENTS_CODE
+
+        for code, text in zip(codes, texts):
+            if any(kw in text.lower() for kw in _INDEX_KEYWORDS):
+                logger.info(
+                    "Known index code absent; matched '%s' (%s) by keyword.",
+                    code,
+                    text,
+                )
+                return code
+
+    logger.warning(
+        "OE0101 does not publish an index metric matching %s or %s. "
+        "tax_base_index_riket will be null.",
+        _KNOWN_INDEX_CONTENTS_CODE,
+        _INDEX_KEYWORDS,
+    )
+    return None
+
+
 def _discover_region_codes(metadata: dict) -> list[str]:
     """Extract 4-digit municipality codes from OE0101 table metadata.
 
@@ -246,7 +360,9 @@ def _discover_region_codes(metadata: dict) -> list[str]:
     return muni_codes
 
 
-def _build_query(contents_code: str, years: list[int], region_codes: list[str]) -> dict:
+def _build_query(
+    contents_codes: list[str], years: list[int], region_codes: list[str]
+) -> dict:
     """Build the PxWeb POST query body for OE0101/SkatteKraft.
 
     Uses explicit municipality codes (filter=item) instead of a value-set
@@ -255,7 +371,7 @@ def _build_query(contents_code: str, years: list[int], region_codes: list[str]) 
     runtime from the table metadata by _discover_region_codes.
 
     Args:
-        contents_code: The ContentsCode value for skattekraft per invånare.
+        contents_codes: ContentsCode values to request, in column order.
         years: List of integer years to request.
         region_codes: List of 4-digit municipality code strings from metadata.
 
@@ -275,7 +391,7 @@ def _build_query(contents_code: str, years: list[int], region_codes: list[str]) 
                 "code": "ContentsCode",
                 "selection": {
                     "filter": "item",
-                    "values": [contents_code],
+                    "values": list(contents_codes),
                 },
             },
             {
@@ -290,42 +406,67 @@ def _build_query(contents_code: str, years: list[int], region_codes: list[str]) 
     }
 
 
-def _clean_response(df_raw: pd.DataFrame) -> pd.DataFrame:
+def _clean_response(
+    df_raw: pd.DataFrame, per_capita_code: str, index_code: str
+) -> pd.DataFrame:
     """Rename and cast columns from a raw PxWeb response DataFrame.
 
-    Detects the Region, Tid, and value columns by name (case-insensitive)
-    and drops the ContentsCode column if present.
+    Value columns are located by their ContentsCode rather than by position.
+    With two metrics requested, positional detection would silently swap
+    skattekraft for the index if SCB reordered the response.
 
     Args:
         df_raw: DataFrame returned by query_pxweb (all string columns).
+        per_capita_code: ContentsCode of skattekraft per invånare (required).
+        index_code: ContentsCode of andel av riksmedelvärdet (optional — a
+            null column is produced if absent from the response).
 
     Returns:
-        DataFrame with columns [kommun_kod, year, tax_base_per_capita].
+        DataFrame with columns [kommun_kod, year, tax_base_per_capita,
+        tax_base_index_riket].
+
+    Raises:
+        ValueError: If the Region, Tid or per-capita column is missing.
     """
-    rename: dict[str, str] = {}
-    drop_cols: list[str] = []
+    lookup = {col.lower(): col for col in df_raw.columns}
 
-    for col in df_raw.columns:
-        col_lower = col.lower()
-        if col_lower == "region":
-            rename[col] = "kommun_kod"
-        elif col_lower == "tid":
-            rename[col] = "year"
-        elif col_lower == "contentscode":
-            drop_cols.append(col)
-        else:
-            # The remaining column is the content metric (skattekraft value).
-            rename[col] = "tax_base_per_capita"
+    region_col = lookup.get("region")
+    year_col = lookup.get("tid")
+    if region_col is None or year_col is None:
+        raise ValueError(
+            f"Response missing Region or Tid column. Got: {list(df_raw.columns)}."
+        )
 
-    df = df_raw.rename(columns=rename).drop(columns=drop_cols, errors="ignore")
+    if per_capita_code not in df_raw.columns:
+        raise ValueError(
+            f"Response missing the skattekraft per invånare column "
+            f"'{per_capita_code}'. Got: {list(df_raw.columns)}. "
+            "Refusing to guess which column holds the metric."
+        )
 
-    df["kommun_kod"] = df["kommun_kod"].str.zfill(4)
-    df["year"] = df["year"].astype(int)
-    df["tax_base_per_capita"] = pd.to_numeric(
-        df["tax_base_per_capita"], errors="coerce"
+    df = pd.DataFrame(
+        {
+            "kommun_kod": df_raw[region_col].astype(str).str.zfill(4),
+            "year": df_raw[year_col].astype(int),
+            "tax_base_per_capita": pd.to_numeric(
+                df_raw[per_capita_code], errors="coerce"
+            ).astype("float64"),
+        }
     )
 
-    return df[["kommun_kod", "year", "tax_base_per_capita"]]
+    if index_code in df_raw.columns:
+        df["tax_base_index_riket"] = pd.to_numeric(
+            df_raw[index_code], errors="coerce"
+        ).astype("float64")
+    else:
+        logger.warning(
+            "Index metric '%s' absent from response; "
+            "tax_base_index_riket will be null.",
+            index_code,
+        )
+        df["tax_base_index_riket"] = float("nan")
+
+    return df
 
 
 def _verify(df: pd.DataFrame, years: list[int]) -> None:
@@ -335,6 +476,8 @@ def _verify(df: pd.DataFrame, years: list[int]) -> None:
         1. Exactly 290 unique kommun_kod values per year.
         2. For 2024: raises ValueError if Danderyd (0162) is not the highest.
         3. National mean for 2024 is within 200 000–350 000 SEK range.
+        4. If present, the riksmedelvärde index lies within plausible percent
+           bounds — this catches a fraction-vs-percent scale error.
 
     Both the Danderyd check and the national mean check raise ValueError
     for consistent severity — any failure indicates a data integrity problem.
@@ -384,6 +527,45 @@ def _verify(df: pd.DataFrame, years: list[int]) -> None:
             f"2024 national mean skattekraft is {national_mean:.0f} SEK, "
             "outside the expected range 200 000–350 000 SEK. "
             "Possible wrong ContentsCode or unexpected data scale."
+        )
+
+    _verify_index(df_2024)
+
+
+def _verify_index(df_2024: pd.DataFrame) -> None:
+    """Check the riksmedelvärde index for scale and range errors.
+
+    Skipped silently when the column is absent or entirely null, because the
+    index is a soft dependency (see module docstring).
+
+    Args:
+        df_2024: Cleaned 2024 slice of the skattekraft frame.
+
+    Raises:
+        ValueError: If index values fall outside plausible percent bounds.
+    """
+    if "tax_base_index_riket" not in df_2024.columns:
+        logger.info("No index column present; skipping index checks.")
+        return
+
+    index = df_2024["tax_base_index_riket"].dropna()
+    if index.empty:
+        logger.warning("Index column is entirely null for 2024; skipping checks.")
+        return
+
+    logger.info(
+        "2024 riksmedelvärde index: range [%.0f, %.0f], median %.0f",
+        index.min(),
+        index.max(),
+        index.median(),
+    )
+
+    if index.min() < _INDEX_MIN or index.max() > _INDEX_MAX:
+        raise ValueError(
+            f"2024 riksmedelvärde index spans [{index.min():.2f}, "
+            f"{index.max():.2f}], outside plausible percent bounds "
+            f"[{_INDEX_MIN}, {_INDEX_MAX}]. SCB publishes this as a percent "
+            "of the national mean; a fraction indicates a scale error."
         )
 
 

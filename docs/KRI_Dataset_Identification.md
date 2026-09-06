@@ -38,10 +38,33 @@ The `{topic}` segment of the URL must match the table family (e.g. OE for offent
 ### Definition (Swedish, from SCB)
 "Skattekraften beräknas som skatteunderlag i kronor per invånare vid taxeringsårets ingång."
 
+### Available ContentsCodes (all three, verified against live metadata 2026-09-06)
+
+| Code | SCB label | Used? | Panel column |
+|---|---|---|---|
+| `OE0101A5` | Skatteunderlag, kronor | No | — (total SEK, not per capita) |
+| `OE0101A0` | Skattekraft, kronor per invånare | **Yes** | `tax_base_per_capita` |
+| `OE0101B0` | Andel av riksmedelvärdet, procent | **Yes** (added T0.1) | `tax_base_index_riket` |
+
+`OE0101B0` is SCB's own published index with riket = 100 — the figure Regionfakta
+and other secondary sources republish. It went unused until the 2026-09-04 audit
+(finding F1); see `REMEDIATION_PLAN.md` T0.1.
+
+**Weighting caution.** SCB's riksmedelvärde is **population-weighted** (≈271 000 kr
+for 2026). This project's own cross-municipality mean is **unweighted** (≈230 660 kr
+for 2024). The index and the pipeline's national mean therefore rest on different
+denominators and must never be combined in one chart. See `METHODOLOGY.md` §7.13.
+
+The index is a **soft dependency**: `_discover_index_code` returns `None` rather than
+raising if SCB withdraws the metric, leaving the column null. The per-capita metric
+is a hard dependency and raises.
+
 ### Coverage
-* **Time:** 1995 to 2025 (annual)
+* **Time:** 1995 to 2026 (annual). Skattekraft for a budget year is published the
+  preceding December, so 2026 has been available since December 2025. The pipeline
+  fetches 2009–2026 (2009 as the growth baseline).
 * **Geography:** All 290 kommuner + national total
-* **Unit:** SEK per inhabitant, current prices
+* **Unit:** SEK per inhabitant (current prices); percent of national mean for the index
 
 ### Query parameters
 ```python

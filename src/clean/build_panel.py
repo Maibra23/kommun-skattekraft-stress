@@ -39,7 +39,11 @@ _OUTPUT_PATH: Path = _PROJECT_ROOT / "data" / "processed" / "panel.parquet"
 
 _EXPECTED_ROWS: int = 290 * 15  # 4 350
 _PANEL_YEARS: list[int] = list(range(2010, 2025))
-_FETCH_YEARS_SKATTEKRAFT: list[int] = list(range(2009, 2025))  # 2009 for growth calc
+# Skattekraft is published two years ahead of the other sources (2026 was
+# released in December 2025).  Fetching the full range keeps the raw cache
+# current; the panel itself is bounded by _PANEL_YEARS until T0.2 extends
+# the remaining fetchers.  See REMEDIATION_PLAN.md T0.1.
+_FETCH_YEARS_SKATTEKRAFT: list[int] = list(range(2009, 2027))  # 2009 for growth calc
 _FETCH_YEARS_POPULATION: list[int] = list(range(2009, 2025))  # 2009 for growth calc
 
 _FINAL_COLUMNS: list[str] = [
@@ -125,6 +129,13 @@ def build_panel(force_refresh: bool = False) -> pd.DataFrame:
         .merge(df_dep_ratio, on=["kommun_kod", "year"], how="inner")
         .merge(df_pop_growth, on=["kommun_kod", "year"], how="inner")
         .merge(df_edu[["kommun_kod", "year", "edu_share"]], on=["kommun_kod", "year"], how="inner")
+        # SCB's own published index (riket = 100).  Left join: a missing index
+        # must not silently drop municipality-years from the panel.
+        .merge(
+            df_skatt[["kommun_kod", "year", "tax_base_index_riket"]],
+            on=["kommun_kod", "year"],
+            how="left",
+        )
         .merge(name_cols, on="kommun_kod", how="left")
     )
 

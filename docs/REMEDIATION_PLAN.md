@@ -3,7 +3,7 @@
 **Project:** Kommunal Skattekraft Stress Monitor
 **Created:** 2026-09-05
 **Last updated:** 2026-09-06
-**Status:** In progress — Phase 0 (step 1 of 10 complete)
+**Status:** In progress — Phase 0. **Blocked at step 2** pending a data-provenance decision (see 13, 2026-09-06 T0.2a).
 **Trigger:** Skattekraft Model Audit, 2026-09-04
 **Audit report:** https://claude.ai/code/artifact/b3dfec90-7359-45fa-91d8-ea137080eb42
 
@@ -157,6 +157,30 @@ Two hard rules for delegation:
 - Riket check: skattekraft 251 437 (2024), 262 711 (2025), 270 969 (2026).
 - Spot check: Danderyd index 191 (2026), Filipstad 76, Högsby 73.
 - `KRI_Dataset_Identification.md` §2 lists all three ContentsCodes and states which are used.
+
+---
+
+### T0.2a — SCB withdrew the AA0003X archive · DECISION REQUIRED
+**Phase:** 0 · **Time:** 2–4 h once decided · **`[SOLO]`** · **Status:** blocked on user decision
+**Files:** `src/fetch/fetch_unemployment.py`, `data/lookup/` (option A), `docs/METHODOLOGY.md` 8
+**Blocks:** T0.2, and therefore the T0.1 panel rebuild
+
+**What happened.** `https://.../AA/AA0003/AA0003X` now returns HTTP 400 — the whole archive group, not just one table. `IntGr1KomKonUtb`, `IntGr1KomKon` and `IntGr1Kom` are all gone. `AA0003B/IntGr1KomUtbBAS` still exists but its `Tid` dimension is exactly `['2022','2023','2024']`. No replacement municipality-level open-unemployment series with history exists anywhere under AA0003 (checked AA0003B, AA0003E, AA0003H — the long series there are demography and education, not labour market).
+
+**Consequence.** Open unemployment for **2010–2021 can no longer be fetched from SCB at all**. Those 3 480 observations survive only in the committed `data/processed/panel.parquet`, fetched in May 2026. `METHODOLOGY.md` 8 claims the pipeline is reproducible from source; for this variable that is now false.
+
+**Severity is lower than it looks, because of this plan.** The loss falls on the long historical panel, which is what the two-way FE model consumes — the model this plan demotes in T2.4. The cross-sectional specification that Phase 2 makes primary needs the *latest* year, which is available (2022–2024). Phase 1's position and drift work uses skattekraft alone and is unaffected. Had this happened before the audit it would have been critical; under the remediation it degrades a component already being reduced in importance.
+
+**Options.**
+
+| | Approach | Cost | Consequence |
+|---|---|---|---|
+| **A** *(recommended)* | Snapshot 2010–2021 from the committed panel into `data/lookup/` with provenance; fetcher reads the snapshot below 2022 and the API above | 2–3 h | Panel preserved. Reproducibility becomes "from repo" not "from SCB" — honest if documented. Validate by checking 2022–2024 snapshot rows still match the live API. |
+| **B** | Truncate the panel to 2022+ | 1 h | Three years. Destroys the panel model. Not viable. |
+| **C** | Re-source from Arbetsförmedlingen, the upstream origin of the STATIV series | 6–10 h | Restores true reproducibility, but a different vintage and possibly a different definition — a series break mid-panel, which is worse than a documented snapshot. |
+| **D** | Drop unemployment entirely | 2 h | Loses the second-strongest variable (β × within-SD = −0.111). Not advisable. |
+
+**Recommendation: A**, with the overlap check as the validation that the snapshot is the same series SCB still publishes. Log it in `DEVIATIONS.md` and correct `METHODOLOGY.md` 8 in the same change — the reproducibility claim must not outlive its truth.
 
 ---
 
@@ -451,7 +475,8 @@ Markers: `[ ]` not started · `[~]` in progress · `[x]` done · `[-]` skipped.
 ```
 STEP  TASK                                            PHASE  DELEGATION
  [x] 1   T0.3  Freeze audit baseline fixture             0    [SOLO]  done 2026-09-06
- [ ] 2   T0.1  Fetch OE0101B0 + skattekraft to 2026      0    [SOLO]
+ [~] 2   T0.1  Fetch OE0101B0 + skattekraft to 2026      0    [SOLO]  code done; panel rebuild BLOCKED
+ [!] 2b  T0.2a AA0003X archive withdrawn — DECISION      0    [SOLO]  blocks T0.2, see status log
  [ ] 3   T0.2  Extend full panel, handle ragged years    0    [SOLO]
  ---     GATE  Re-run 2025 backtest on real data
  [ ] 4   T1.1  Position and drift module                 1    [SUBAGENT]
@@ -529,6 +554,22 @@ Append one entry per completed task, in the same commit as the code. Record what
 - `test_entity_effects_do_not_dominate` deliberately encodes the audit's contradiction of `METHODOLOGY.md` 7.10. **It is expected to be deleted by T4.1**, when the claim it contradicts is corrected. Do not "fix" it before then.
 - `scripts/freeze_audit_baseline.py` bootstraps `sys.path`; the package is not installed editable in every environment here. Tests do not need this — pytest inserts the rootdir.
 - On this machine `linearmodels` lives only in `/usr/local/bin/python3.11`; the default `python3` is 3.9.6 without it. Run pytest and the script with the 3.11 interpreter.
+
+---
+
+### 2026-09-06 — T0.1 code complete · panel rebuild blocked by a fourth SCB restructure
+
+**Done and green.** `fetch_skattekraft` now requests `OE0101A0` and `OE0101B0` in one query and covers 2010–2026. `tests/test_fetch_skattekraft.py` adds 15 tests; suite is 119 passed. `KRI_Dataset_Identification.md` 2 documents all three ContentsCodes, which two are used, and the weighted-vs-unweighted denominator trap.
+
+Live fetch verified every DoD spot check: 4 930 rows (290 x 17), zero nulls in the index, Danderyd 191, Filipstad 76, Högsby 73 for 2026.
+
+**Two decisions beyond the written task.**
+- *Value columns are mapped by ContentsCode, not position.* The previous `_clean_response` took "whatever is not Region or Tid" as the metric. Safe with one metric; with two it would silently swap skattekraft for the index if SCB reordered the response.
+- *Added `_cache_shortfall`.* The task said "delete the stale cache", which works once, on one machine. A cache written before today is *fresh* by the 7-day rule but predates both the new column and 2026, so it would silently yield a null index. The guard checks schema and year coverage, not just age.
+
+**Blocked.** `build_panel` cannot complete: SCB has withdrawn the AA0003X archive path entirely. See T0.2a above for the diagnosis and the four options. `panel.parquet` is untouched — the failed run wrote nothing — so `tax_base_index_riket` is **not yet in the panel** and T0.1's DoD is only partly met. Step 2 is marked `[~]`, not `[x]`.
+
+**Do not run `pipeline.py` until T0.2a is resolved.** The four `data/raw` caches other than skattekraft are absent, so any run will refetch, hit the same wall, and — worse — a partial success could overwrite `panel.parquet` with a truncated series. The 2010–2021 unemployment data exists in exactly one place: the committed parquet.
 
 ---
 
