@@ -2,7 +2,8 @@
 
 **Project:** Kommunal Skattekraft Stress Monitor
 **Created:** 2026-09-05
-**Status:** Not started
+**Last updated:** 2026-09-06
+**Status:** In progress — Phase 0 (step 1 of 10 complete)
 **Trigger:** Skattekraft Model Audit, 2026-09-04
 **Audit report:** https://claude.ai/code/artifact/b3dfec90-7359-45fa-91d8-ea137080eb42
 
@@ -75,6 +76,33 @@ Each task carries:
 * **Depends on:** blocking task IDs
 * **What / Why / How:** the change, the audit finding it closes, the technical approach
 * **Definition of done:** objective acceptance criteria
+
+### Execution order — read this before picking a task
+
+**The phase numbers are not the execution order.** Phases group tasks by *purpose*; the sequence below orders them by *dependency and risk*. Two deliberate departures from the phase numbering:
+
+* **T0.3 runs first.** It is cheap and independent, and the fixture should exist before the artifacts start churning.
+* **Phase 1 is split.** T1.1 (the position/drift module) is pulled *forward* because T2.1 consumes it. T1.2 and T1.3 (the dashboard work) are pushed *back* behind Phase 2, because the UI renders whatever the model emits — building it before the artifact contract settles means building it twice, and Phase 2 carries the only real intellectual risk in the plan. Learn whether the premise holds before investing in presentation.
+
+| Step | Task | Time | Rationale for this position |
+|---|---|---|---|
+| 1 | T0.3 baseline fixture | 1 h | Independent; makes the before/after comparison automatic |
+| 2 | T0.1 `OE0101B0` + skattekraft → 2026 | 1–2 h | Additive, one ContentsCode; standalone value even if work stops here |
+| 3 | T0.2 rest of panel → latest | 2–4 h | **Risk node** — SCB has restructured tables three times already |
+| — | **GATE** — re-run the 2025 backtest on real data | — | Confirms or overturns the audit before spending on the fix |
+| 4 | T1.1 position/drift module | 3–4 h | Pulled forward: T2.1 depends on it |
+| 5 | T2.1 cross-sectional estimator | 4–6 h | **The fix**, and the gate that tests the plan's premise |
+| 6 | T2.2 + T2.3 | 5 h | Parallelisable (group B) |
+| 7 | T2.4 demote FE to inference panel | 2–3 h | |
+| 8 | T1.2, T1.3 dashboard work | 5–8 h | Deferred until the artifact contract is stable |
+| 9 | Phase 3 (optional) | 6–8 h | Only if a forward-looking number is genuinely wanted |
+| 10 | Phase 4 documentation | 5–6 h | Last, when the code is settled |
+
+**Defensible stopping points.** After step 3: current with SCB, official index in the panel, nothing half-finished. After step 7 plus T4.1: the model is fixed and the docs no longer contradict the artifacts — this is the milestone worth aiming for, the point at which the project stops telling users something untrue. Phase 3 is genuinely optional.
+
+### Keeping this document current
+
+**Every completed task updates this file in the same commit as the code.** Tick §10, and append an entry to the status log in §13 recording what was done, what was found, and anything that surprised you. A plan that drifts from the repository is worse than no plan, because it is trusted.
 
 ### Rules that carry over from the existing project
 
@@ -156,11 +184,11 @@ Two hard rules for delegation:
 ### T0.3 — Freeze the audit baseline as a regression fixture
 **Phase:** 0 · **Time:** 1 h · **`[SUBAGENT]`**
 **Files:** `tests/fixtures/audit_baseline_2026-09-04.json` (new), `tests/test_audit_baseline.py` (new)
-**Depends on:** —  *(can run before or during T0.1/T0.2 — reads only committed artifacts)*
+**Depends on:** — · **Runs first** (see §2 execution order). Reads only committed artifacts; must complete before T0.2 regenerates them.
 
 **What:** Capture the audit's headline numbers from the **current** committed artifacts as a locked JSON fixture, with a test that asserts them.
 
-**Why:** Phases 1–3 replace the model layer. Without a frozen baseline there is no way to demonstrate that the new specification is better rather than merely different, and the audit's numbers exist only in a chat transcript and a published artifact.
+**Why:** Phases 1–3 replace the model layer, and the first pipeline run after T0.2 regenerates all five artifacts. Those artifacts are tracked in git, so the audit's evidence is preserved at commit `3dcaab7` and recoverable with a checkout — this fixture is not about preventing loss. It is about making the before/after comparison **automatic and continuously asserted**, so that "the new specification is better, not merely different" is a claim the test suite checks rather than one a future reader has to re-derive by hand from a chat transcript.
 
 **How:** Record at minimum: the four main-spec coefficients and p-values; R²(within) = 0.0083; the variance decomposition (dependency 59.1 %, education 25.1 %, unemployment 15.1 %, entity FE 8.8 %, population −8.2 %); β × within-SD for each variable; the 2025 backtest (r = 0.016, Spearman 0.033, RMSE 1.512 vs naive 0.974); and the three risk-class means. Test asserts to 3 decimal places against the committed artifacts and is marked `@pytest.mark.baseline` so it can be excluded once the old model is retired.
 
@@ -170,7 +198,9 @@ Two hard rules for delegation:
 
 ## 5. PHASE 1 — The Descriptive Spine
 
-*Rank stability is 0.992 year-over-year. The most useful, most defensible thing this project can show requires no model at all. Build that first, and let the model become the "why" rather than the "what".*
+*Rank stability is 0.992 year-over-year. The most useful, most defensible thing this project can show requires no model at all — let the model become the "why" rather than the "what".*
+
+> **Sequencing note.** This phase is split across the execution order (§2). **T1.1 runs at step 4**, before Phase 2, because T2.1 consumes its output. **T1.2 and T1.3 run at step 8**, after Phase 2, because the dashboard renders whatever the model emits.
 
 ### T1.1 — Relative position and drift module
 **Phase:** 1 · **Time:** 3–4 h · **`[SUBAGENT]`**
@@ -415,35 +445,33 @@ Everything else is sequential. When in doubt, run sequentially — this plan's w
 
 ## 10. Progress Tracker
 
+Ordered by execution sequence (§2), not by phase number.
+Markers: `[ ]` not started · `[~]` in progress · `[x]` done · `[-]` skipped.
+
 ```
-PHASE 0 — Data foundation
-  [ ] T0.1  Fetch OE0101B0 + extend to 2026          [SOLO]
-  [ ] T0.2  Extend full panel, handle ragged years    [SOLO]
-  [ ] T0.3  Freeze audit baseline fixture             [SUBAGENT]
-
-PHASE 1 — Descriptive spine
-  [ ] T1.1  Position and drift module                 [SUBAGENT]
-  [ ] T1.2  Dashboard leads with position/drift       [SOLO]
-  [ ] T1.3  Show SCB index alongside                  [PARALLEL-A]
-
-PHASE 2 — Re-point at the cross-section
-  [ ] T2.1  Cross-sectional estimator                 [SOLO]
-  [ ] T2.2  Level decomposition                       [SUBAGENT]
-  [ ] T2.3  Collinearity diagnostics                  [PARALLEL-B]
-  [ ] T2.4  Demote FE to inference panel              [SOLO]
-
-PHASE 3 — Forecasting (optional)
-  [ ] T3.1  Rolling-origin backtest harness           [SUBAGENT]
-  [ ] T3.2  5-year drift forecaster                   [SOLO]
-  [ ] T3.3  Publish backtest in UI                    [PARALLEL-C]
-
-PHASE 4 — Documentation
-  [ ] T4.1  Rewrite METHODOLOGY.md                    [SOLO]
-  [ ] T4.2  Reframe user-facing language              [PARALLEL-D]
-  [ ] T4.3  Log deviation                             [PARALLEL-D]
+STEP  TASK                                            PHASE  DELEGATION
+ [x] 1   T0.3  Freeze audit baseline fixture             0    [SOLO]  done 2026-09-06
+ [ ] 2   T0.1  Fetch OE0101B0 + skattekraft to 2026      0    [SOLO]
+ [ ] 3   T0.2  Extend full panel, handle ragged years    0    [SOLO]
+ ---     GATE  Re-run 2025 backtest on real data
+ [ ] 4   T1.1  Position and drift module                 1    [SUBAGENT]
+ [ ] 5   T2.1  Cross-sectional estimator                 2    [SOLO]
+ ---     GATE  Cross-sectional R2 > 0.60
+ [ ] 6a  T2.2  Level decomposition                       2    [SUBAGENT]
+ [ ] 6b  T2.3  Collinearity diagnostics                  2    [PARALLEL-B]
+ [ ] 7   T2.4  Demote FE to inference panel              2    [SOLO]
+ [ ] 8a  T1.2  Dashboard leads with position/drift       1    [SOLO]
+ [ ] 8b  T1.3  Show SCB index alongside                  1    [PARALLEL-A]
+ [ ] 9a  T3.1  Rolling-origin backtest harness           3    [SUBAGENT]   optional
+ [ ] 9b  T3.2  5-year drift forecaster                   3    [SOLO]       optional
+ [ ] 9c  T3.3  Publish backtest in UI                    3    [PARALLEL-C] optional
+ ---     GATE  Out-of-sample Spearman > 0.25, else do not ship forecast
+ [ ] 10a T4.1  Rewrite METHODOLOGY.md                    4    [SOLO]
+ [ ] 10b T4.2  Reframe user-facing language              4    [PARALLEL-D]
+ [ ] 10c T4.3  Log deviation                             4    [PARALLEL-D]
 ```
 
-**Estimated total:** 35–48 hours. Phases 0–2 alone (23–32 h) deliver a coherent, defensible product; Phase 3 is genuinely optional.
+**Estimated total:** 35–48 hours. Steps 1–7 (23–32 h) deliver a coherent, defensible product; Phase 3 is genuinely optional.
 
 ---
 
@@ -471,6 +499,36 @@ Every figure in §1 was computed from the repository at commit `66ee2a3` plus li
 * **Lag structure** — within-kommun correlation of `tax_base_growth_pct` with `X` shifted 0–3 years.
 
 Note `linearmodels` is required to unpickle `model_results.pkl`; on this machine the interpreter carrying it is `/usr/local/bin/python3.11`, not the default `python3` (3.9.6, no linearmodels).
+
+---
+
+## 13. Status Log
+
+Append one entry per completed task, in the same commit as the code. Record what changed, what was found, and anything that contradicted this plan — the plan is only useful while it matches the repository.
+
+---
+
+### 2026-09-06 — Plan resequenced
+
+**Change:** Added the execution order to §2. Phase numbers group tasks by purpose; the execution order sequences them by dependency and risk. T0.3 moved to first; Phase 1 split, with T1.1 pulled ahead of Phase 2 and T1.2/T1.3 deferred behind it.
+
+**Correction to T0.3's stated rationale:** the original text claimed that without the fixture "there is no way to demonstrate that the new specification is better." That overstated the risk. `artifacts/` and `data/processed/panel.parquet` are tracked in git, so the audit's evidence survives at `3dcaab7` regardless. The fixture's real value is making the comparison automatic rather than manual.
+
+---
+
+### 2026-09-06 — T0.3 complete · baseline fixture frozen
+
+**Done.** `scripts/freeze_audit_baseline.py` recomputes every headline audit number from the committed artifacts plus one live SCB query, and writes `tests/fixtures/audit_baseline_2026-09-04.json`. `tests/test_audit_baseline.py` adds 13 tests asserting those findings still hold. Full suite: 104 passed, no regressions.
+
+**Independent confirmation.** The audit's figures were originally computed with ad-hoc scripts using `urllib`. The fixture regenerates them through the project's own `src/fetch/pxweb_client`, a different code path, and reproduces them exactly: R2(within) = 0.0083, backtest r = 0.016, RMSE 1.512 vs naive 0.974, realised 2025 growth mean 4.60 % (sd 0.98). The audit's conclusions are not an artefact of how they were measured.
+
+**Design decision.** The realised 2025 growth vector (290 values) is stored *inside* the fixture so the backtest recomputes offline. No test in the suite touches the network; the generator script is the only place that does.
+
+**Notes for whoever runs this next.**
+- The suite is marked `baseline`, registered in `pyproject.toml`. Exclude it once the pre-remediation model retires: `pytest -m "not baseline"`.
+- `test_entity_effects_do_not_dominate` deliberately encodes the audit's contradiction of `METHODOLOGY.md` 7.10. **It is expected to be deleted by T4.1**, when the claim it contradicts is corrected. Do not "fix" it before then.
+- `scripts/freeze_audit_baseline.py` bootstraps `sys.path`; the package is not installed editable in every environment here. Tests do not need this — pytest inserts the rootdir.
+- On this machine `linearmodels` lives only in `/usr/local/bin/python3.11`; the default `python3` is 3.9.6 without it. Run pytest and the script with the 3.11 interpreter.
 
 ---
 

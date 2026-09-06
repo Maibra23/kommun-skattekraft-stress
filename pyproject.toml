@@ -30,3 +30,6 @@ include = ["src*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "baseline: locks the 2026-09-04 pre-remediation audit findings (see docs/REMEDIATION_PLAN.md T0.3)",
+]
