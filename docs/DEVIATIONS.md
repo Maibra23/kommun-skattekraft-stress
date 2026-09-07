@@ -122,6 +122,20 @@ Option A was chosen partly because it is the only option that preserves the T0.3
 
 **Reference:** REMEDIATION_PLAN.md T0.2a; METHODOLOGY 8.1 and 12.6.
 
+### 6.2 The panel is no longer balanced
+
+**Original plan (PRD 4, METHODOLOGY 2.3):** A balanced panel of 290 kommuner x 15 years = 4 350 observations, every variable populated in every cell.
+
+**Deviation:** The four SCB sources no longer share an end year. Skattekraft reaches 2026, population and education 2025, unemployment 2024. Holding the panel balanced would mean truncating every source to 2024 and discarding the newest skattekraft — the opposite of the intent behind extending coverage.
+
+**Resolution:** The panel is anchored on skattekraft and left ragged: 290 x 17 = **4 930 rows**, 2010-2026, with shorter sources null in the years they do not reach. All 290 kommuner appear in every year; the raggedness is across variables only. `artifacts/data_provenance.json` records each source's coverage and the `complete_case_max_year` (2024), and any consumer needing all four structural variables must read it rather than assume `max(panel.year)`.
+
+The estimation sample is unchanged. `PanelOLS` drops incomplete cases, so the model is still fit on 2010-2024 and the T0.3 audit baseline still passes with the same coefficients.
+
+**Also corrected here:** `tax_base_index_riket` was merged into the panel but omitted from `_FINAL_COLUMNS`, so it was dropped before writing. T0.1's definition of done would have failed silently after the rebuild. The column is now written and non-null for every kommun-year.
+
+**Reference:** REMEDIATION_PLAN.md T0.2; METHODOLOGY 2.3.1 and 12.7.
+
 ---
 
 **End of DEVIATIONS.md**

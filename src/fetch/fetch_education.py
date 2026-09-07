@@ -61,7 +61,7 @@ _CACHE_FILE: Path = _PROJECT_ROOT / "data" / "raw" / "education.json"
 
 _CACHE_MAX_AGE_DAYS: int = 7
 _EXPECTED_COMMUNES: int = 290
-_DEFAULT_YEARS: list[int] = list(range(2010, 2025))
+_DEFAULT_YEARS: list[int] = list(range(2010, 2026))
 
 _CACHE_DTYPES: dict[str, str] = {
     "kommun_kod": "str_zfill4",

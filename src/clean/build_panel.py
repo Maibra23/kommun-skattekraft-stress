@@ -1,22 +1,35 @@
-"""Merge all cleaned data sources into the balanced 290 × 15 panel DataFrame.
+"""Merge all cleaned data sources into the ragged kommun-year panel DataFrame.
 
 Calls all four fetchers, applies harmonize_kommunkod to each, computes derived
 variables (tax_base_growth_pct, dependency_ratio, population_growth_pct), merges
 on (kommun_kod, year), drops the 2009 rows (used only for computing 2010 growth),
-validates the final shape, runs the METHODOLOGY §6.1 and §6.3 sanity checks, and
-writes data/processed/panel.parquet.
+validates the result, runs the METHODOLOGY §6.1 and §6.3 sanity checks, and
+writes data/processed/panel.parquet plus artifacts/data_provenance.json.
 
-Expected final shape: 290 municipalities × 15 years (2010–2024) = 4 350 rows.
+**The panel is deliberately unbalanced at the top end.** The four SCB sources
+refresh on different cadences and no longer share an end year: skattekraft runs
+to 2026, population and education to 2025, unemployment to 2024. Truncating
+every source to the shortest would throw away the newest skattekraft, which is
+the whole point of extending coverage. Instead the panel is anchored on
+skattekraft and the shorter sources are left null in the years they do not
+reach. `PanelOLS` tolerates unbalanced panels and estimation `.dropna()`
+handles the rest.
+
+Any consumer that needs all four structural variables must read
+`complete_case_max_year` from the provenance artifact rather than assuming the
+panel's own maximum year. See REMEDIATION_PLAN.md T0.2 and METHODOLOGY §2.3.1.
 
 Final panel columns:
     kommun_kod, kommun_name, lan_kod, lan_name, year,
-    tax_base_per_capita, tax_base_growth_pct,
+    tax_base_per_capita, tax_base_growth_pct, tax_base_index_riket,
     unemployment_rate,
     dependency_ratio, population, population_growth_pct,
     edu_share
 """
 
+import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -37,14 +50,29 @@ logger = logging.getLogger(__name__)
 _PROJECT_ROOT = Path(__file__).parents[2]
 _OUTPUT_PATH: Path = _PROJECT_ROOT / "data" / "processed" / "panel.parquet"
 
-_EXPECTED_ROWS: int = 290 * 15  # 4 350
-_PANEL_YEARS: list[int] = list(range(2010, 2025))
-# Skattekraft is published two years ahead of the other sources (2026 was
-# released in December 2025).  Fetching the full range keeps the raw cache
-# current; the panel itself is bounded by _PANEL_YEARS until T0.2 extends
-# the remaining fetchers.  See REMEDIATION_PLAN.md T0.1.
-_FETCH_YEARS_SKATTEKRAFT: list[int] = list(range(2009, 2027))  # 2009 for growth calc
-_FETCH_YEARS_POPULATION: list[int] = list(range(2009, 2025))  # 2009 for growth calc
+_PROVENANCE_PATH: Path = _PROJECT_ROOT / "artifacts" / "data_provenance.json"
+
+_EXPECTED_COMMUNES: int = 290
+_PANEL_START_YEAR: int = 2010
+# Each source is fetched to its own maximum; the panel has no fixed end year.
+# 2009 is fetched for skattekraft and population only to seed the 2010 growth
+# rates, then dropped.  See REMEDIATION_PLAN.md T0.2.
+_FETCH_YEARS_SKATTEKRAFT: list[int] = list(range(2009, 2027))  # to 2026
+_FETCH_YEARS_POPULATION: list[int] = list(range(2009, 2026))  # to 2025
+_FETCH_YEARS_UNEMPLOYMENT: list[int] = list(range(2010, 2025))  # to 2024
+_FETCH_YEARS_EDUCATION: list[int] = list(range(2010, 2026))  # to 2025
+
+# The variable that defines whether a kommun-year row exists at all.
+_SPINE_COLUMN: str = "tax_base_growth_pct"
+
+# Variables required by the cross-sectional model; their common coverage sets
+# complete_case_max_year in the provenance artifact.
+_STRUCTURAL_COLUMNS: list[str] = [
+    "unemployment_rate",
+    "dependency_ratio",
+    "population_growth_pct",
+    "edu_share",
+]
 
 _FINAL_COLUMNS: list[str] = [
     "kommun_kod",
@@ -54,6 +82,7 @@ _FINAL_COLUMNS: list[str] = [
     "year",
     "tax_base_per_capita",
     "tax_base_growth_pct",
+    "tax_base_index_riket",
     "unemployment_rate",
     "dependency_ratio",
     "population",
@@ -91,10 +120,10 @@ def build_panel(force_refresh: bool = False) -> pd.DataFrame:
     df_pop = fetch_population(years=_FETCH_YEARS_POPULATION, force_refresh=force_refresh)
 
     logger.info("Step 3/7: Fetching unemployment (AA0003) …")
-    df_unemp = fetch_unemployment(years=_PANEL_YEARS, force_refresh=force_refresh)
+    df_unemp = fetch_unemployment(years=_FETCH_YEARS_UNEMPLOYMENT, force_refresh=force_refresh)
 
     logger.info("Step 4/7: Fetching education (UF0506) …")
-    df_edu = fetch_education(years=_PANEL_YEARS, force_refresh=force_refresh)
+    df_edu = fetch_education(years=_FETCH_YEARS_EDUCATION, force_refresh=force_refresh)
 
     # --- Step 5: Harmonize codes ---
     logger.info("Step 5/7: Harmonizing municipality codes …")
@@ -113,99 +142,216 @@ def build_panel(force_refresh: bool = False) -> pd.DataFrame:
     df_pop_growth = compute_population_growth(df_pop)
     df_skatt_growth = compute_tax_base_growth(df_skatt[["kommun_kod", "year", "tax_base_per_capita"]])
 
-    # Drop 2009 from all derived tables (needed only for 2010 growth calc)
-    df_dep_ratio = df_dep_ratio[df_dep_ratio["year"].isin(_PANEL_YEARS)]
-    df_pop_growth = df_pop_growth[df_pop_growth["year"].isin(_PANEL_YEARS)]
-    df_skatt_growth = df_skatt_growth[df_skatt_growth["year"].isin(_PANEL_YEARS)]
+    # Drop the 2009 seed rows (needed only for the 2010 growth calc)
+    df_dep_ratio = df_dep_ratio[df_dep_ratio["year"] >= _PANEL_START_YEAR]
+    df_pop_growth = df_pop_growth[df_pop_growth["year"] >= _PANEL_START_YEAR]
+    df_skatt_growth = df_skatt_growth[df_skatt_growth["year"] >= _PANEL_START_YEAR]
 
     # --- Step 4: Extract name columns from harmonized skattekraft ---
     name_cols = df_skatt[["kommun_kod", "kommun_name", "lan_kod", "lan_name"]].drop_duplicates()
 
     # --- Step 7a: Merge all on (kommun_kod, year) ---
     logger.info("Step 7/7: Merging, validating, and writing panel …")
-    panel = (
-        df_skatt_growth
-        .merge(df_unemp[["kommun_kod", "year", "unemployment_rate"]], on=["kommun_kod", "year"], how="inner")
-        .merge(df_dep_ratio, on=["kommun_kod", "year"], how="inner")
-        .merge(df_pop_growth, on=["kommun_kod", "year"], how="inner")
-        .merge(df_edu[["kommun_kod", "year", "edu_share"]], on=["kommun_kod", "year"], how="inner")
-        # SCB's own published index (riket = 100).  Left join: a missing index
-        # must not silently drop municipality-years from the panel.
-        .merge(
+    sources = {
+        "skattekraft": df_skatt_growth.merge(
             df_skatt[["kommun_kod", "year", "tax_base_index_riket"]],
             on=["kommun_kod", "year"],
             how="left",
-        )
-        .merge(name_cols, on="kommun_kod", how="left")
-    )
+        ),
+        "population": df_dep_ratio.merge(
+            df_pop_growth, on=["kommun_kod", "year"], how="outer"
+        ),
+        "education": df_edu[["kommun_kod", "year", "edu_share"]],
+        "unemployment": df_unemp[["kommun_kod", "year", "unemployment_rate"]],
+    }
 
-    # Filter to the analysis window (2010–2024) and drop rows with NaN growth
-    panel = panel[panel["year"].isin(_PANEL_YEARS)].reset_index(drop=True)
-    panel = panel.dropna(subset=["tax_base_growth_pct", "population_growth_pct"])
-
-    # Reorder columns to the canonical order
-    panel = panel[_FINAL_COLUMNS]
-    panel = panel.sort_values(["kommun_kod", "year"]).reset_index(drop=True)
+    panel = _merge_panel(sources, name_cols)
+    provenance = _build_provenance(sources)
 
     # --- Validate and write ---
     logger.info("Validating and writing panel …")
-    _validate_panel(panel)
+    _validate_panel(panel, provenance)
 
     _OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     panel.to_parquet(_OUTPUT_PATH, index=False, engine="pyarrow")
+    _write_provenance(provenance, len(panel))
     logger.info(
-        "Panel written to %s  (%d rows × %d columns)",
+        "Panel written to %s  (%d rows × %d columns, years %d–%d, "
+        "complete through %d)",
         _OUTPUT_PATH,
         len(panel),
         len(panel.columns),
+        panel["year"].min(),
+        panel["year"].max(),
+        provenance["complete_case_max_year"],
     )
     return panel
 
 
 # ---------------------------------------------------------------------------
-# Private helpers
+# Private helpers — merge and provenance
 # ---------------------------------------------------------------------------
 
 
-def _validate_panel(panel: pd.DataFrame) -> None:
+def _merge_panel(
+    sources: dict[str, pd.DataFrame], name_cols: pd.DataFrame
+) -> pd.DataFrame:
+    """Merge the four sources into one ragged panel, anchored on skattekraft.
+
+    Every join is a left join onto skattekraft, so a source that stops early
+    yields nulls rather than removing kommun-years.  An inner join here would
+    silently truncate the panel to the shortest source — the specific failure
+    this function exists to prevent.
+
+    Args:
+        sources: Frames keyed by source name; 'skattekraft' is the anchor and
+            must carry the spine column.
+        name_cols: One row per kommun with the name and län columns.
+
+    Returns:
+        Panel in canonical column order, sorted by (kommun_kod, year), with
+        rows lacking the spine variable dropped.
+    """
+    panel = sources["skattekraft"]
+    for name, frame in sources.items():
+        if name == "skattekraft":
+            continue
+        panel = panel.merge(frame, on=["kommun_kod", "year"], how="left")
+
+    panel = panel.merge(name_cols, on="kommun_kod", how="left")
+    panel = panel[panel["year"] >= _PANEL_START_YEAR]
+    panel = panel.dropna(subset=[_SPINE_COLUMN])
+
+    for column in _FINAL_COLUMNS:
+        if column not in panel.columns:
+            panel[column] = pd.NA
+
+    return (
+        panel[_FINAL_COLUMNS]
+        .sort_values(["kommun_kod", "year"])
+        .reset_index(drop=True)
+    )
+
+
+def _build_provenance(sources: dict[str, pd.DataFrame]) -> dict:
+    """Record each source's year coverage so consumers can state what they used.
+
+    The four SCB series refresh on different cadences, so the panel's own
+    maximum year is not the year at which every variable exists. Anything that
+    needs all four structural variables — the cross-sectional estimator above
+    all — must read `complete_case_max_year` rather than `max(panel.year)`.
+
+    Args:
+        sources: The same frames passed to _merge_panel.
+
+    Returns:
+        A JSON-serialisable provenance dict.
+    """
+    per_source = {
+        name: {
+            "min_year": int(frame["year"].min()),
+            "max_year": int(frame["year"].max()),
+            "n_kommuner": int(frame["kommun_kod"].nunique()),
+        }
+        for name, frame in sources.items()
+    }
+
+    complete_case_max = min(s["max_year"] for s in per_source.values())
+    panel_max = max(s["max_year"] for s in per_source.values())
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "sources": per_source,
+        "panel_max_year": panel_max,
+        "complete_case_max_year": complete_case_max,
+        "balanced": complete_case_max == panel_max,
+        "note": (
+            "The panel is ragged at the top end: sources end in different "
+            "years. Use complete_case_max_year for any analysis needing all "
+            "four structural variables. See REMEDIATION_PLAN.md T0.2."
+        ),
+    }
+
+
+def _write_provenance(provenance: dict, n_rows: int) -> None:
+    """Write the provenance dict to artifacts/data_provenance.json."""
+    payload = {**provenance, "panel_rows": n_rows}
+    _PROVENANCE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _PROVENANCE_PATH.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    logger.info("Provenance written to %s", _PROVENANCE_PATH)
+
+
+# ---------------------------------------------------------------------------
+# Private helpers — validation
+# ---------------------------------------------------------------------------
+
+
+def _validate_panel(panel: pd.DataFrame, provenance: dict) -> None:
     """Run shape, completeness, and sanity checks on the final panel.
 
     Implements METHODOLOGY §6.1 (skattekraft level checks) and §6.3 (growth
-    rate sanity) in-line.  Also validates the balanced-panel shape constraint.
+    rate sanity) in-line.
+
+    The panel is expected to be ragged at the top end, so this does not assert
+    a fixed row count.  Instead it asserts the shape invariants that must hold
+    regardless of how far each source reaches: every year carries all 290
+    kommuner, and no variable has gaps *inside* the window it does cover.  A
+    null unemployment rate in 2026 is expected; one in 2015 is a merge failure.
 
     Args:
         panel: The merged panel DataFrame.
+        provenance: Output of _build_provenance, giving each source's coverage.
 
     Raises:
         ValueError: If any check fails.
     """
-    # Shape check
-    if len(panel) != _EXPECTED_ROWS:
-        raise ValueError(
-            f"Panel has {len(panel)} rows; expected {_EXPECTED_ROWS} "
-            f"(290 municipalities × 15 years). "
-            "Check for missing data or failed merges."
-        )
-
     n_municipalities = panel["kommun_kod"].nunique()
-    if n_municipalities != 290:
+    if n_municipalities != _EXPECTED_COMMUNES:
         raise ValueError(
-            f"Panel has {n_municipalities} unique municipalities; expected 290."
+            f"Panel has {n_municipalities} unique municipalities; "
+            f"expected {_EXPECTED_COMMUNES}."
         )
 
-    n_years = panel["year"].nunique()
-    if n_years != 15:
+    # Every year must carry every kommun — raggedness is across variables,
+    # never across municipalities within a year.
+    per_year = panel.groupby("year")["kommun_kod"].nunique()
+    short_years = per_year[per_year != _EXPECTED_COMMUNES]
+    if not short_years.empty:
         raise ValueError(
-            f"Panel has {n_years} unique years; expected 15 (2010–2024)."
+            "These years do not carry all "
+            f"{_EXPECTED_COMMUNES} municipalities:\n{short_years.to_string()}"
         )
 
-    # No missing values in any column
-    missing = panel[_FINAL_COLUMNS].isnull().sum()
-    missing = missing[missing > 0]
-    if not missing.empty:
+    if panel["year"].min() != _PANEL_START_YEAR:
         raise ValueError(
-            f"Missing values detected in panel:\n{missing.to_string()}\n"
-            "Resolve data gaps before modeling."
+            f"Panel starts at {panel['year'].min()}; expected {_PANEL_START_YEAR}."
+        )
+
+    # No gaps inside each variable's own coverage window.
+    for column, source in [
+        ("unemployment_rate", "unemployment"),
+        ("edu_share", "education"),
+        ("dependency_ratio", "population"),
+        ("population_growth_pct", "population"),
+    ]:
+        covered = panel[panel["year"] <= provenance["sources"][source]["max_year"]]
+        n_missing = int(covered[column].isnull().sum())
+        if n_missing:
+            raise ValueError(
+                f"{column} has {n_missing} missing values inside its coverage "
+                f"window (through {provenance['sources'][source]['max_year']}). "
+                "This is a merge failure, not a ragged tail."
+            )
+
+    if not provenance["balanced"]:
+        logger.info(
+            "Panel is ragged by design: complete through %d, extends to %d. "
+            "Consumers needing all four structural variables must use the "
+            "complete-case year.",
+            provenance["complete_case_max_year"],
+            provenance["panel_max_year"],
         )
 
     # §6.1 — Skattekraft level checks

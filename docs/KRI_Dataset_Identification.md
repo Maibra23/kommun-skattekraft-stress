@@ -122,7 +122,7 @@ query_body = {
 ```
 
 ### Expected row count
-290 kommuner x 16 years (2009-2024) = **4 640 rows** from API; after dropping 2009 growth-baseline rows, the final panel contains 290 x 15 = **4 350 rows**.
+290 kommuner x 18 years (2009-2026) = **5 220 rows** from API; after dropping the 2009 growth-baseline rows, skattekraft contributes 290 x 17 = **4 930 rows**, which sets the panel's size because the panel is anchored on this source. See METHODOLOGY 2.3.1 — the panel is ragged, so 4 930 rows does not mean every variable is populated in every row.
 
 ### Known issues
 1. **Reference year vs income year:** Skattekraft for year t is based on income from year t-2. The 2025 published number reflects 2023 income. Document this explicitly in tooltips.
@@ -203,7 +203,7 @@ query_body = {
 **Total-code optimization:** Using `Kön='1+2'`, `UtbNiv='000'`, `BakgrVar='TOT'` selects the pre-aggregated SCB total directly. This reduces each POST to 290 x 1 x 1 x 1 x n_years cells (well within the ~150 000 cell limit) and avoids any need for client-side averaging.
 
 ### Expected row count
-290 x 15 = **4 350 rows** (concatenated from both tables)
+290 x 15 = **4 350 rows**, 2010-2024 (3 480 from the snapshot, 870 from the live table). This is the shortest of the four sources and therefore sets `complete_case_max_year` = 2024 for the whole panel.
 
 ### Known issues
 1. **Definition change in 2018:** SCB updated the methodology - "från och med uppdatering år 2018 av nya uppgifter från 1997 och framåt justerades även innehållet i Andel öppet arbetslösa." Pre-2018 values may differ slightly from post-2018 series. The table notes this; we accept it and document.
@@ -238,7 +238,7 @@ Annual, published mid-year for previous reference year.
 Folkmängd by kommun, single-year age, sex. We aggregate to age groups for our derived variables.
 
 ### Coverage
-* **Time:** 1968 onwards (we use 2009-2024 to compute population_growth_pct for 2010-2024)
+* **Time:** 1968 onwards (we use 2009-2025 to compute population_growth_pct for 2010-2025). **Two tables:** `BefolkningNy` is frozen at 2024 and `BefolkningCKM` carries 2025, with different ContentsCodes, age codes and elimination behaviour. Years are routed by each table's declared `Tid`. See METHODOLOGY 12.7.
 * **Geography:** All 290 kommuner + aggregations
 * **Unit:** Number of persons
 
@@ -349,7 +349,7 @@ for year in years:
 **Education share formula:** `edu_share = sum(population with SUN 6+7) / sum(population with any SUN code)`, computed per (kommun, year) after aggregating across all age codes in the 25-64 range and both sexes.
 
 ### Expected row count
-290 x 15 = **4 350 rows** (after aggregation to edu_share per kommun-year)
+290 x 16 = **4 640 rows**, 2010-2025 (after aggregation to edu_share per kommun-year)
 
 ### Known issues
 1. **Slow-moving:** Education stocks change slowly within a kommun. Within-kommun variation across 15 years is modest. beta_4 may have wide confidence interval. Document in METHODOLOGY 7.7.

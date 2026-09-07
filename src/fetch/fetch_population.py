@@ -20,13 +20,13 @@ files (data/raw/population_{year}.json) enable incremental re-fetching of
 individual years without re-downloading the full 16-year series.
 """
 
-import copy
 import logging
 from pathlib import Path
 
 import pandas as pd
 
 from src.fetch.pxweb_client import (
+    extract_tid_years,
     fetch_metadata,
     get_dimension_codes,
     is_cache_fresh,
@@ -41,23 +41,37 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
+# SCB froze BefolkningNy at 2024 and published 2025 in a new parallel table,
+# BefolkningCKM, with the same dimensions but different codes.  Years are routed
+# to whichever table's Tid actually carries them; nothing about the split is
+# hardcoded to a year.  See METHODOLOGY §12.7.
 _PRIMARY_TABLE_URL = (
     "https://api.scb.se/OV0104/v1/doris/sv/ssd/START/BE/BE0101/BE0101A/BefolkningNy"
+)
+_RECENT_TABLE_URL = (
+    "https://api.scb.se/OV0104/v1/doris/sv/ssd/START/BE/BE0101/BE0101A/BefolkningCKM"
 )
 _FALLBACK_TABLE_URL = (
     "https://api.scb.se/OV0104/v1/doris/sv/ssd/START/BE/BE0101/BE0101A/FolkmangdNov"
 )
+_TABLE_CANDIDATES: list[str] = [
+    _PRIMARY_TABLE_URL,
+    _RECENT_TABLE_URL,
+    _FALLBACK_TABLE_URL,
+]
 
 _PROJECT_ROOT = Path(__file__).parents[2]
 _CACHE_DIR: Path = _PROJECT_ROOT / "data" / "raw"
 
 _CACHE_MAX_AGE_DAYS: int = 7
 _EXPECTED_COMMUNES: int = 290
-_DEFAULT_YEARS: list[int] = list(range(2009, 2025))
-_CONTENTS_CODE = "BE0101N1"
+_DEFAULT_YEARS: list[int] = list(range(2009, 2026))
 
-# Single-year age codes as returned by the SCB API
-_AGE_CODES: list[str] = [str(a) for a in range(0, 100)] + ["100+"]
+# Single-year age codes.  The open-ended top code is spelled '100+' in
+# BefolkningNy and '100+1' in BefolkningCKM (the suffix marks the one-year
+# grouping); _age_codes picks whichever the table offers.
+_SINGLE_YEAR_AGES: list[str] = [str(a) for a in range(0, 100)]
+_OPEN_ENDED_AGE_CODES: tuple[str, ...] = ("100+", "100+1")
 
 
 # ---------------------------------------------------------------------------
@@ -92,12 +106,7 @@ def fetch_population(
     if years is None:
         years = _DEFAULT_YEARS
 
-    table_url, table_meta = _resolve_table_url()
-    region_codes = sorted(
-        c for c in get_dimension_codes(table_meta, "Region")
-        if len(c) == 4 and c.isdigit()
-    )
-    base_query = _build_base_query(region_codes)
+    routing = _resolve_tables(years)
 
     frames: list[pd.DataFrame] = []
     for year in years:
@@ -106,12 +115,13 @@ def fetch_population(
             logger.info("Loading population year %d from cache: %s", year, cache_path)
             df_raw = load_df_cache(cache_path)
         else:
-            year_query = copy.deepcopy(base_query)
-            for dim in year_query["query"]:
-                if dim["code"] == "Tid":
-                    dim["selection"]["values"] = [str(year)]
-                    break
-            logger.info("Fetching population year %d from SCB API.", year)
+            table_url, table_meta = routing[year]
+            region_codes = sorted(
+                c for c in get_dimension_codes(table_meta, "Region")
+                if len(c) == 4 and c.isdigit()
+            )
+            year_query = _build_year_query(table_meta, region_codes, year)
+            logger.info("Fetching population year %d from %s.", year, table_url)
             df_raw = query_pxweb(table_url, year_query)
             save_df_cache(df_raw, cache_path)
 
@@ -138,34 +148,139 @@ def fetch_population(
 # ---------------------------------------------------------------------------
 
 
-def _resolve_table_url() -> tuple[str, dict]:
-    """Return the first accessible BE0101A subtable URL and its metadata.
+def _resolve_tables(years: list[int]) -> dict[int, tuple[str, dict]]:
+    """Map each requested year to the BE0101A subtable that carries it.
 
-    Tries BefolkningNy first; falls back to FolkmangdNov if the primary
-    metadata call fails.  Returns the metadata alongside the URL so callers
-    can reuse it (e.g. to extract region codes) without a second network call.
+    Probes the candidate tables once each and routes by their declared Tid
+    dimension, so a future SCB split needs a new candidate URL rather than new
+    year logic.  Earlier candidates win when several tables offer the same year.
+
+    Args:
+        years: Integer years the caller needs.
 
     Returns:
-        Tuple of (table_url, metadata).
+        Dict mapping each requested year to (table_url, metadata).
 
     Raises:
-        ValueError: If neither subtable is accessible.
+        ValueError: If no candidate table is reachable, or if some requested
+            year is carried by none of them.
     """
-    for url in [_PRIMARY_TABLE_URL, _FALLBACK_TABLE_URL]:
+    routing: dict[int, tuple[str, dict]] = {}
+    reachable = 0
+
+    for url in _TABLE_CANDIDATES:
         try:
             meta = fetch_metadata(url)
-            if "variables" in meta:
-                logger.info("Using BE0101 subtable: %s", url)
-                return url, meta
         except ValueError as exc:
-            logger.warning(
-                "Metadata unavailable for %s (%s); trying fallback.", url, exc
+            logger.warning("Metadata unavailable for %s (%s); trying next.", url, exc)
+            continue
+        if "variables" not in meta:
+            continue
+
+        reachable += 1
+        available = set(extract_tid_years(meta))
+        claimed = sorted(y for y in years if y in available and y not in routing)
+        for year in claimed:
+            routing[year] = (url, meta)
+        if claimed:
+            logger.info(
+                "BE0101 subtable %s serves years %d–%d.", url, min(claimed), max(claimed)
             )
 
+    if reachable == 0:
+        raise ValueError(
+            "No BE0101A subtable is accessible "
+            f"(tried {', '.join(_TABLE_CANDIDATES)}). "
+            "Verify SCB API availability and subtable names."
+        )
+
+    missing = sorted(set(years) - routing.keys())
+    if missing:
+        raise ValueError(
+            f"No BE0101A subtable carries population for years {missing}. "
+            "SCB may have published them in a new table — add its URL to "
+            "_TABLE_CANDIDATES. See METHODOLOGY §12.7."
+        )
+
+    return routing
+
+
+def _contents_code(meta: dict) -> str:
+    """Return the ContentsCode for Folkmängd (population count) in this table.
+
+    Resolved from metadata rather than hardcoded: BefolkningNy calls it
+    BE0101N1 and BefolkningCKM calls it 000007ME.  The sibling code in both
+    tables is Folkökning (population *change*), which would be silently wrong.
+
+    Args:
+        meta: Table metadata dict.
+
+    Returns:
+        The ContentsCode string for the population count.
+
+    Raises:
+        ValueError: If no Folkmängd code is present.
+    """
+    for var in meta.get("variables", []):
+        if var.get("code") != "ContentsCode":
+            continue
+        for code, text in zip(var.get("values", []), var.get("valueTexts", [])):
+            if text.strip().lower().startswith("folkmängd"):
+                return code
+
     raise ValueError(
-        "Neither BE0101A/BefolkningNy nor BE0101A/FolkmangdNov is accessible. "
-        "Verify SCB API availability and subtable names."
+        "No 'Folkmängd' ContentsCode found in the BE0101 table metadata. "
+        f"Available: {_dimension_pairs(meta, 'ContentsCode')}"
     )
+
+
+def _age_codes(meta: dict) -> list[str]:
+    """Return this table's 101 single-year age codes, 0 through 100+.
+
+    Aggregate bands (TOT1, 5-9, …) are excluded: requesting them alongside
+    single years would double-count the population.
+
+    Args:
+        meta: Table metadata dict.
+
+    Returns:
+        List of age codes present in the table.
+
+    Raises:
+        ValueError: If the open-ended top code cannot be identified.
+    """
+    available = set(_dimension_values(meta, "Alder"))
+    open_ended = next((c for c in _OPEN_ENDED_AGE_CODES if c in available), None)
+    if open_ended is None:
+        raise ValueError(
+            "No open-ended age code (tried "
+            f"{', '.join(_OPEN_ENDED_AGE_CODES)}) in the BE0101 Alder dimension."
+        )
+    return [a for a in _SINGLE_YEAR_AGES if a in available] + [open_ended]
+
+
+def _dimension_values(meta: dict, code: str) -> list[str]:
+    """Return the declared values of one dimension, or [] if it is absent."""
+    for var in meta.get("variables", []):
+        if var.get("code") == code:
+            return var.get("values", [])
+    return []
+
+
+def _dimension_pairs(meta: dict, code: str) -> list[tuple[str, str]]:
+    """Return (value, valueText) pairs for one dimension, for error messages."""
+    for var in meta.get("variables", []):
+        if var.get("code") == code:
+            return list(zip(var.get("values", []), var.get("valueTexts", [])))
+    return []
+
+
+def _eliminates(meta: dict, code: str) -> bool:
+    """Whether a dimension is summed automatically when left out of the query."""
+    for var in meta.get("variables", []):
+        if var.get("code") == code:
+            return bool(var.get("elimination"))
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -173,63 +288,55 @@ def _resolve_table_url() -> tuple[str, dict]:
 # ---------------------------------------------------------------------------
 
 
-def _build_base_query(region_codes: list[str]) -> dict:
-    """Build the base PxWeb query for one year of BE0101 population data.
+def _build_year_query(meta: dict, region_codes: list[str], year: int) -> dict:
+    """Build the PxWeb query for one year, using that table's own codes.
 
     Uses explicit municipality codes (filter=item) instead of a value-set
     filter (vs:RegionKommun07EjAggr) because the SCB API no longer accepts
     the value-set syntax (returns HTTP 400).
 
-    The Tid dimension value is a placeholder ('2024') that the per-year loop
-    overrides before each POST.
+    Civilstand is selected explicitly only when the table does not eliminate
+    it.  BefolkningNy eliminates it (so leaving it out sums civil statuses);
+    BefolkningCKM does not, and omitting it there would return one row per
+    civil status and quadruple the counts.
 
     Args:
-        region_codes: Sorted list of 4-digit municipality code strings from
-            the table metadata.
+        meta: Metadata for the table this year will be fetched from.
+        region_codes: 4-digit municipality codes to request.
+        year: The single year to request.
 
     Returns:
-        A PxWeb query dict ready for deep-copying and year substitution.
+        A PxWeb query dict ready to POST.
     """
-    return {
-        "query": [
-            {
-                "code": "Region",
-                "selection": {
-                    "filter": "item",
-                    "values": region_codes,
-                },
-            },
-            {
-                "code": "Alder",
-                "selection": {
-                    "filter": "item",
-                    "values": _AGE_CODES,
-                },
-            },
-            {
-                "code": "Kon",
-                "selection": {
-                    "filter": "item",
-                    "values": ["1", "2"],  # 1=men, 2=women
-                },
-            },
-            {
-                "code": "ContentsCode",
-                "selection": {
-                    "filter": "item",
-                    "values": [_CONTENTS_CODE],
-                },
-            },
-            {
-                "code": "Tid",
-                "selection": {
-                    "filter": "item",
-                    "values": ["2024"],  # overridden per year in the loop
-                },
-            },
-        ],
-        "response": {"format": "json"},
-    }
+    dims: list[dict] = [
+        {"code": "Region", "selection": {"filter": "item", "values": region_codes}},
+        {"code": "Alder", "selection": {"filter": "item", "values": _age_codes(meta)}},
+        {"code": "Kon", "selection": {"filter": "item", "values": ["1", "2"]}},
+    ]
+
+    if not _eliminates(meta, "Civilstand"):
+        civil_values = _dimension_values(meta, "Civilstand")
+        total = next((c for c in ("SC", "TOT") if c in civil_values), None)
+        if total is None:
+            raise ValueError(
+                "Civilstand does not eliminate and offers no total code; "
+                f"available: {_dimension_pairs(meta, 'Civilstand')}"
+            )
+        dims.append(
+            {"code": "Civilstand", "selection": {"filter": "item", "values": [total]}}
+        )
+
+    dims.append(
+        {
+            "code": "ContentsCode",
+            "selection": {"filter": "item", "values": [_contents_code(meta)]},
+        }
+    )
+    dims.append(
+        {"code": "Tid", "selection": {"filter": "item", "values": [str(year)]}}
+    )
+
+    return {"query": dims, "response": {"format": "json"}}
 
 
 # ---------------------------------------------------------------------------
@@ -242,11 +349,12 @@ def _age_code_to_group(age_code: str) -> str:
 
     Args:
         age_code: Raw age code from the SCB API (e.g. '0', '19', '65', '100+').
+            BefolkningCKM spells the open-ended code '100+1'.
 
     Returns:
         One of '0-19', '20-64', or '65+'.
     """
-    if age_code == "100+":
+    if age_code.startswith("100+"):
         return "65+"
     age = int(age_code)
     if age <= 19:
@@ -272,6 +380,11 @@ def _aggregate_to_age_groups(df_raw: pd.DataFrame) -> pd.DataFrame:
     Raises:
         ValueError: If expected dimension columns are missing.
     """
+    # Dimension columns that must never be read as the value column.  Civilstand
+    # appears only in BefolkningCKM, which does not eliminate it; without this
+    # it would be renamed to population_raw alongside the real value column.
+    _DROP_DIMENSIONS = {"contentscode", "civilstand"}
+
     rename: dict[str, str] = {}
     value_col_raw: str | None = None
 
@@ -285,7 +398,7 @@ def _aggregate_to_age_groups(df_raw: pd.DataFrame) -> pd.DataFrame:
             rename[col] = "sex"
         elif lower == "tid":
             rename[col] = "year"
-        elif lower == "contentscode":
+        elif lower in _DROP_DIMENSIONS:
             pass  # drop
         else:
             value_col_raw = col
@@ -298,7 +411,7 @@ def _aggregate_to_age_groups(df_raw: pd.DataFrame) -> pd.DataFrame:
         )
 
     df = df_raw.rename(columns=rename).drop(
-        columns=[c for c in df_raw.columns if c.lower() == "contentscode"],
+        columns=[c for c in df_raw.columns if c.lower() in _DROP_DIMENSIONS],
         errors="ignore",
     )
 

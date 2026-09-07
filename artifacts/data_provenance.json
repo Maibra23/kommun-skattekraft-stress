@@ -1,0 +1,30 @@
+{
+  "generated_at": "2026-09-07T06:31:50+00:00",
+  "sources": {
+    "skattekraft": {
+      "min_year": 2010,
+      "max_year": 2026,
+      "n_kommuner": 290
+    },
+    "population": {
+      "min_year": 2010,
+      "max_year": 2025,
+      "n_kommuner": 290
+    },
+    "education": {
+      "min_year": 2010,
+      "max_year": 2025,
+      "n_kommuner": 290
+    },
+    "unemployment": {
+      "min_year": 2010,
+      "max_year": 2024,
+      "n_kommuner": 290
+    }
+  },
+  "panel_max_year": 2026,
+  "complete_case_max_year": 2024,
+  "balanced": false,
+  "note": "The panel is ragged at the top end: sources end in different years. Use complete_case_max_year for any analysis needing all four structural variables. See REMEDIATION_PLAN.md T0.2.",
+  "panel_rows": 4930
+}

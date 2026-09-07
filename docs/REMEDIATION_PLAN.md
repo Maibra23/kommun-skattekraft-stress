@@ -3,7 +3,7 @@
 **Project:** Kommunal Skattekraft Stress Monitor
 **Created:** 2026-09-05
 **Last updated:** 2026-09-06
-**Status:** In progress — Phase 0, **step 3 (T0.2) is next**. T0.2a resolved 2026-09-07 via option A; nothing is blocked (see 13).
+**Status:** In progress — **Phase 0 complete** (steps 1, 2, 2b, 3 done 2026-09-06/07). Next: the post-Phase-0 GATE, then step 4 (T1.1).
 **Trigger:** Skattekraft Model Audit, 2026-09-04
 **Audit report:** https://claude.ai/code/artifact/b3dfec90-7359-45fa-91d8-ea137080eb42
 
@@ -475,10 +475,10 @@ Markers: `[ ]` not started · `[~]` in progress · `[x]` done · `[-]` skipped.
 ```
 STEP  TASK                                            PHASE  DELEGATION
  [x] 1   T0.3  Freeze audit baseline fixture             0    [SOLO]  done 2026-09-06
- [~] 2   T0.1  Fetch OE0101B0 + skattekraft to 2026      0    [SOLO]  code done; panel rebuild now unblocked
+ [x] 2   T0.1  Fetch OE0101B0 + skattekraft to 2026      0    [SOLO]  done 2026-09-07 (DoD met at rebuild)
  [x] 2b  T0.2a AA0003X withdrawn — option A snapshot     0    [SOLO]  done 2026-09-07
- [ ] 3   T0.2  Extend full panel, handle ragged years    0    [SOLO]  NEXT — rebuild completes T0.1 too
- ---     GATE  Re-run 2025 backtest on real data
+ [x] 3   T0.2  Extend full panel, handle ragged years    0    [SOLO]  done 2026-09-07
+ ---     GATE  Re-run 2025 backtest on real data              <- NEXT
  [ ] 4   T1.1  Position and drift module                 1    [SUBAGENT]
  [ ] 5   T2.1  Cross-sectional estimator                 2    [SOLO]
  ---     GATE  Cross-sectional R2 > 0.60
@@ -596,6 +596,47 @@ Live fetch verified every DoD spot check: 4 930 rows (290 x 17), zero nulls in t
 - Unemployment now maxes out at **2024** (`AA0003B` `Tid` = 2022–2024; SCB has not published 2025). Skattekraft reaches 2026. The ragged-panel handling in T0.2 is therefore mandatory, not hypothetical — the panel cannot be balanced at the top end.
 - `_verify` logs a pre-existing warning that the mean rate (11.63 %) sits outside its historical 3–8 % band. This predates the change and is unrelated to it — it reflects the STATIV denominator question in 7.9, not the snapshot. Worth resolving on its own terms, not folded into a data-source fix.
 - The snapshot is a source of record. `scripts/freeze_unemployment_snapshot.py` exists to document how it was made and to re-run the overlap validation; it must never be used to "refresh" the file from a fetch, because the fetch it would need no longer exists.
+
+---
+
+### 2026-09-07 — T0.2 and T0.1 complete · Phase 0 closed · panel is 290 × 17
+
+**Done.** `python pipeline.py --force-refresh` runs end to end from a cold cache in 270 s. The panel is **4 930 rows (290 × 17, 2010–2026)**, ragged by design, with `artifacts/data_provenance.json` recording each source's coverage. Suite is **157 passed** — including all 13 T0.3 baseline tests, unchanged.
+
+**T0.1's DoD is now met, and one part of it would have silently failed.** `tax_base_index_riket` was being merged into the panel and then dropped again, because `_FINAL_COLUMNS` did not list it. The rebuild alone would have produced a panel with no index column and no error. Fixed; all spot checks now pass against the written parquet: Danderyd 191, Filipstad 76, Högsby 73 for 2026, zero nulls in the index.
+
+**A fifth SCB restructure, and the first that fails silently.** T0.2 assumed the remaining fetchers just needed wider year ranges. Population did not: SCB froze `BE0101A/BefolkningNy` at 2024 and published 2025 in a new parallel table, `BefolkningCKM`. Metadata for the old table still resolves, so nothing errors — the fetcher would simply have returned a series one year short while looking complete. The two tables disagree in three ways, each silent: a different ContentsCode for Folkmängd (whose sibling is Folkökning, population *change*), `Civilstand` no longer eliminating (omitting it multiplies every count by the number of civil statuses), and the open-ended age code spelled `100+1` rather than `100+`. `fetch_population` now routes years by each table's declared `Tid` and resolves every code from that table's own metadata rather than hardcoding. METHODOLOGY 12.7 documents it.
+
+**Actual source coverage** — the plan guessed the sources would differ; they differ more than expected:
+
+| Source | Max year | Notes |
+|---|---|---|
+| skattekraft | **2026** | already fetched by T0.1 |
+| population | **2025** | needed the new table |
+| education | **2025** | year range widened only |
+| unemployment | **2024** | live table caps here; SCB has not published 2025 |
+
+**The binding constraint is unemployment, and that shapes Phase 2.** `complete_case_max_year` is **2024**. T2.1's cross-section must be estimated on 2024 — not on the panel's maximum year, which is 2026 where three of four structural variables are null. The provenance artifact exists so that consumer does not have to guess; METHODOLOGY 2.3.1 states the rule.
+
+**Verified the rebuild changed nothing historical.** All 4 350 pre-existing rows compare identically against the previous panel except `edu_share`, which differs by at most **5e-11** (relative 5.5e-12) — float summation order from fetching one more year, not a data change. The main spec's estimation sample is still the 2010–2024 complete cases (N=4 350), which is why the audit baseline still passes: the main coefficients are the audit's coefficients, and `predictions.parquet` and `decomposition.parquet` are unchanged to within 6e-11.
+
+**One artifact did change materially, and it is the one Phase 2 cares about.** Of the 19 rows in `coefficients.parquet`, the four **lagged**-spec rows moved; the other 15 are identical. The cause is not noise: the lagged spec regresses growth on one-year-lagged regressors, so 2025's realised skattekraft growth can now be paired with 2024's regressors. Its sample grew from **N=4 060 (2011–2024) to N=4 350 (2011–2025)** — a full extra year.
+
+| lagged spec | before | after |
+|---|---|---|
+| `unemployment_rate` | −0.0989 (t = −6.08) | **−0.1063 (t = −7.32)** |
+| `dependency_ratio` | −4.335 (t = −5.14) | −3.805 (t = −4.88) |
+| `edu_share` | +0.0061 (t = +0.20) | −0.0071 (t = −0.29) |
+
+This is a strengthening of the finding T2.4 rests on, not a contradiction of it — but **T2.4's written figures are now stale**: it says "unemployment strengthens from −0.059 to −0.099, t from −3.8 to −6.1". The current numbers are −0.106 and t = −7.3. Whoever executes T2.4 should quote the artifact, not the plan text. `edu_share` also flipped sign in this spec while remaining thoroughly insignificant either way (|t| < 0.3), which is worth a sentence in T4.1 rather than any change of substance.
+
+**Notes for whoever runs this next.**
+- `pipeline.py` logging crashes on Windows consoles when it prints `β` (cp1252). Cosmetic — the pipeline itself completes and exits 0 — but run it as `PYTHONIOENCODING=utf-8 python pipeline.py` to keep the log readable.
+- `_verify` in `fetch_unemployment` still warns that the mean rate (11.63 %) is outside its 3–8 % band. Pre-existing and unrelated to these changes: the STATIV measure is a *flow* (anyone registered at any point in the year, over population 20-64), so it is legitimately higher than an AKU-style stock. The warning band is wrong, not the data — worth correcting on its own.
+- `labels.py` now states the ragged coverage in the Metod tab. It previously said "290 kommuner, 15 år, 4 350 observationer", which the rebuild made false.
+- `PRD.md` and `REVIEW_2026-04-24.md` still quote the old 4 350 / 15-year figures. Left as written: both are historical records of what was planned and reviewed at the time, and DEVIATIONS is where departures belong.
+
+**One latent trap left deliberately in place.** Every downstream consumer hardcodes `year == 2024` rather than deriving it — `estimate.py:120`, `predict.py:92`, `decompose.py:74`, `01_Riksoversikt.py:100`, `02_Kommunjamforelse.py:175` and `:407`. That is *currently correct*, because 2024 is `complete_case_max_year`, and it is why the ragged panel broke nothing. It stops being correct the moment SCB publishes 2025 unemployment: the complete-case year moves to 2025 and every one of those call sites silently keeps reporting 2024. They were not refactored here because T2.1 and T2.2 rewrite the model-layer three, and rewriting the UI two before the artifact contract settles means doing it twice (the same reasoning that defers T1.2/T1.3). **Whoever does T2.1 should read `complete_case_max_year` from `artifacts/data_provenance.json` rather than adding a sixth hardcoded 2024.**
 
 ---
 

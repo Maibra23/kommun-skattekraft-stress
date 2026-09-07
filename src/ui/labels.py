@@ -111,8 +111,12 @@ SWEDISH_LABELS = {
 
     # Methodology callouts
     "method_model_name": "Tvåvägs fixed effects panelmodell",
-    "method_period": "Period: 2010 till 2024",
-    "method_units": "290 kommuner, 15 år, 4 350 observationer",
+    "method_period": "Period: 2010 till 2026 (modellen skattas på 2010–2024)",
+    "method_units": (
+        "290 kommuner, 17 år, 4 930 observationer. Skattekraft finns till och "
+        "med 2026, befolkning och utbildning till 2025 och arbetslöshet till "
+        "2024 — modellen använder de år där alla variabler finns."
+    ),
 
     # Landing page
     "landing_lead": (

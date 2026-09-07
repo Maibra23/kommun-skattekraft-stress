@@ -71,9 +71,27 @@ Where:
 ### 2.3 Sample
 
 * **Cross-sectional units:** 290 kommuner (all Swedish municipalities, 2024 boundaries)
-* **Time period:** 2010 to 2024 (15 years, annual)
-* **Total observations:** 4 350 (balanced panel)
+* **Time period:** 2010 to 2026 (17 years, annual)
+* **Total observations:** 4 930 (**unbalanced** — see 2.3.1)
+* **Estimation sample:** 2010 to 2024, where all four structural variables exist
 * **Lag for growth variables:** 2010 growth requires 2009 levels for skattekraft and population; ensure fetch covers 2009 even though 2009 is dropped from the regression sample.
+
+#### 2.3.1 The panel is ragged at the top end
+
+The four SCB sources refresh on different cadences and no longer share an end year:
+
+| Source | Variables | Coverage |
+|---|---|---|
+| OE0101 skattekraft | `tax_base_per_capita`, `tax_base_growth_pct`, `tax_base_index_riket` | 2010–**2026** |
+| BE0101 befolkning | `dependency_ratio`, `population`, `population_growth_pct` | 2010–**2025** |
+| UF0506 utbildning | `edu_share` | 2010–**2025** |
+| AA0003 arbetslöshet | `unemployment_rate` | 2010–**2024** |
+
+Truncating every source to the shortest would discard the newest skattekraft, which is the point of maintaining current coverage. The panel is therefore anchored on skattekraft: every kommun-year with a skattekraft growth rate is a row, and shorter sources are null in the years they do not reach. All 290 kommuner are present in every year — the raggedness is across *variables*, never across municipalities.
+
+`PanelOLS` tolerates unbalanced panels and the estimation `.dropna()` reduces the sample to complete cases, so the model is fit on 2010–2024 exactly as before.
+
+**Any analysis needing all four structural variables must read `complete_case_max_year` from `artifacts/data_provenance.json` rather than assuming `max(panel.year)`.** That file records each source's coverage and is regenerated on every pipeline run. Assuming the panel's own maximum year would silently use 2026, where three of the four variables are null.
 
 ### 2.4 Estimation
 
@@ -429,7 +447,7 @@ This section documents the SCB PxWeb API changes encountered and adapted to duri
 | 2010-2021 | `AA0003X/IntGr1KomKonUtb` | 1997-2021 (archived, still accessible) |
 | 2022-2024 | `AA0003B/IntGr1KomUtbBAS` | 2022-present |
 
-Results from both tables are concatenated to form the complete 2010-2024 series. Constants `_OLD_TABLE_LAST_YEAR = 2021` and `_NEW_TABLE_FIRST_YEAR = 2022` control the split. If SCB updates the new table to cover earlier years in the future, adjusting these constants is sufficient to change the routing.
+Results from both sources are concatenated to form the complete series. Constants `_SNAPSHOT_LAST_YEAR = 2021` and `_LIVE_TABLE_FIRST_YEAR = 2022` control the split. The archived table referenced here was subsequently withdrawn altogether; see 12.6 for what replaced it.
 
 **Total-code optimization:** Both tables provide total-aggregate codes (`BakgrVar='TOT'`, `Kön='1+2'`, `UtbNiv='000'`). The pipeline selects these codes directly, reducing each POST to 290 x 1 x 1 x 1 x n_years cells (well within SCB's ~150 000-cell limit). This also avoids the unweighted-mean approximation described previously in 7.9.
 
@@ -453,7 +471,7 @@ Results from both tables are concatenated to form the complete 2010-2024 series.
 
 **Background:** The `tax_base_growth_pct` variable for year *t* is computed as `(skattekraft_t / skattekraft_{t-1} - 1) x 100`. The first year in the analysis window is 2010, so 2009 values are needed as the lag baseline.
 
-**Fix applied:** `build_panel.py` fetches skattekraft for years 2009-2024 (constant `_FETCH_YEARS_SKATTEKRAFT`). After computing growth rates, the 2009 rows are dropped (`df_skatt_growth = df_skatt_growth[df_skatt_growth["year"].isin(_PANEL_YEARS)]`). The skattekraft cache file (`data/raw/skattekraft.json`) therefore covers 2009-2024, while the final panel covers only 2010-2024. The same logic applies to population: `_FETCH_YEARS_POPULATION` includes 2009 for the population growth computation.
+**Fix applied:** `build_panel.py` fetches skattekraft from 2009 (constant `_FETCH_YEARS_SKATTEKRAFT`). After computing growth rates, the 2009 rows are dropped (`df >= _PANEL_START_YEAR`). The skattekraft cache therefore begins in 2009 while the panel begins in 2010. The same logic applies to population: `_FETCH_YEARS_POPULATION` includes 2009 for the population growth computation.
 
 ### 12.6 SCB withdrew the AA0003X archive group entirely
 
@@ -465,7 +483,27 @@ Results from both tables are concatenated to form the complete 2010-2024 series.
 
 **Fix applied:** Option A of REMEDIATION_PLAN.md T0.2a. `fetch_unemployment` now reads 2010–2021 from the committed snapshot `data/lookup/unemployment_2010_2021.csv` and 2022 onwards from the live `AA0003B/IntGr1KomUtbBAS`. The dead `_PRIMARY_TABLE_URL` constant was removed so no code path can request the withdrawn archive. See 8.1 for the reproducibility consequence and DEVIATIONS.md 6.1 for the decision record.
 
-**Considered and rejected:** re-sourcing the full history from Kolada or Arbetsförmedlingen. Both are live and carry a 2010-onwards municipal series, and both rank kommuner almost identically to the SCB series (Spearman +0.926 and +0.952 against our 2024 values), but neither matches its *level*: Kolada `N03937` runs 3.65x below our series, `N01720` 0.72x above. The gap is definitional, not an error in either series — ours is a **flow** measure (registered as openly unemployed at any point during the year, over population 20-64; see KRI §3), while `N03937` is a stock-like annual average over population 18-65, itself carrying an 18-64 → 18-65 age-band change at 2023. Splicing either onto 2010–2021 would put a step change at the 2021/2022 seam, inside the within-kommun time variation the FE model reads as signal — a series break disguised as continuity, which is worse than a documented snapshot. High rank agreement means these remain viable *fallbacks* if SCB withdraws more; it does not make them drop-in replacements.
+**Considered and rejected (unemployment):** re-sourcing the full history from Kolada or Arbetsförmedlingen. Both are live and carry a 2010-onwards municipal series, and both rank kommuner almost identically to the SCB series (Spearman +0.926 and +0.952 against our 2024 values), but neither matches its *level*: Kolada `N03937` runs 3.65x below our series, `N01720` 0.72x above. The gap is definitional, not an error in either series — ours is a **flow** measure (registered as openly unemployed at any point during the year, over population 20-64; see KRI §3), while `N03937` is a stock-like annual average over population 18-65, itself carrying an 18-64 → 18-65 age-band change at 2023. Splicing either onto 2010–2021 would put a step change at the 2021/2022 seam, inside the within-kommun time variation the FE model reads as signal — a series break disguised as continuity, which is worse than a documented snapshot. High rank agreement means these remain viable *fallbacks* if SCB withdraws more; it does not make them drop-in replacements.
+
+### 12.7 SCB split the population table at 2024/2025
+
+**Symptom:** `BE0101A/BefolkningNy` metadata still resolves, but its `Tid` dimension stops at 2024 (last updated 2025-02-21) even though SCB published 2025 population in February 2026. Nothing errors — the fetcher would simply have returned a series one year shorter than available and the panel would have looked complete.
+
+**Root cause:** SCB froze the long historical table and published 2025 in a *new parallel table*, `BE0101A/BefolkningCKM` ("Folkmängden efter region, civilstånd, ålder och kön. År 2025"). The same pattern appears across BE0101A: `FolkmangdDecCKM`, `BefolkManadCKM`, `BefolkningR1860NCKM`. This is the fifth structural change this project has absorbed, and the first that fails *silently* rather than with an HTTP error.
+
+**Three incompatibilities between the two tables**, each of which would corrupt the panel quietly rather than loudly:
+
+| | BefolkningNy (≤2024) | BefolkningCKM (2025) |
+|---|---|---|
+| ContentsCode for Folkmängd | `BE0101N1` | `000007ME` |
+| `Civilstand` | eliminates (auto-summed) | does **not** eliminate |
+| Open-ended age code | `100+` | `100+1` |
+
+The sibling ContentsCode in both tables is Folkökning (population *change*, not level), so a positional or first-code guess would have silently substituted the wrong metric. Because `Civilstand` no longer eliminates, omitting it returns one row per civil status — inflating every count — and the extra response column would otherwise have been read as the value column.
+
+**Fix applied:** `fetch_population` now probes candidate tables and routes each requested year to whichever table's `Tid` declares it, so a future split needs a new candidate URL rather than new year logic. Every table-specific detail is resolved from that table's own metadata: `_contents_code` matches on the valueText "Folkmängd", `_age_codes` picks whichever open-ended code exists, and `_build_year_query` pins `Civilstand` to its total only when the dimension does not eliminate. `_aggregate_to_age_groups` drops `Civilstand` explicitly.
+
+**Validated:** the 2025 fetch returns 290 kommuner and a national population of 10 605 366, against 10 587 710 for 2024 — a plausible +0.17 %. Age-group totals and per-kommun year-over-year changes are all in range.
 
 ---
 
