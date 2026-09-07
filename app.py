@@ -290,45 +290,92 @@ plot_df = cross_df.copy()
 plot_df["label"] = plot_df["variable"].map(_VAR_LABEL_MAP)
 plot_df = plot_df.sort_values("beta_sd")
 
+# A dot-and-whisker, not a bar chart.  A bar encodes accumulation from zero and
+# fills the space the interval needs: for education the CI runs +6.4 to +13.7,
+# so a 0-to-10 bar hid its entire lower half behind the fill.  A point with a
+# whisker shows the estimate and the whole interval, and makes "crosses zero"
+# — the thing that decides whether a variable is identified — readable at a
+# glance.  See docs/screenshots/ for the version this replaced.
+_IDENTIFIED_COLOR = {True: None, False: COLORS["text_secondary"]}
+
+
+def _mark_color(value: float, identified: bool) -> str:
+    """Colour by sign when the effect is real, de-emphasis grey when it is not."""
+    if not identified:
+        return COLORS["text_secondary"]
+    return COLORS["positive"] if value >= 0 else COLORS["negative"]
+
+
+plot_df = plot_df.reset_index(drop=True)
 fig_coefs = go.Figure()
+
+for _, row in plot_df.iterrows():
+    colour = _mark_color(row["beta_sd"], bool(row["identified"]))
+    fig_coefs.add_trace(
+        go.Scatter(
+            x=[row["beta_sd"]],
+            y=[row["label"]],
+            mode="markers",
+            marker={
+                "size": 13,
+                "color": colour,
+                # A 2px surface ring keeps the marker legible where it overlaps
+                # its own whisker.
+                "line": {"width": 2, "color": COLORS["card_bg"]},
+            },
+            error_x={
+                "type": "data",
+                "symmetric": False,
+                "array": [row["upper_ci_sd"] - row["beta_sd"]],
+                "arrayminus": [row["beta_sd"] - row["lower_ci_sd"]],
+                "color": colour,
+                "thickness": 2,
+                "width": 7,
+            },
+            hovertemplate=(
+                f"<b>{row['label']}</b><br>"
+                + f"{row['beta_sd']:+.2f} ".replace(".", ",")
+                + SWEDISH_LABELS["unit_index_points"]
+                + f"<br>95 % KI [{row['lower_ci_sd']:+.2f}, {row['upper_ci_sd']:+.2f}]".replace(".", ",")
+                + "<extra></extra>"
+            ),
+            showlegend=False,
+        )
+    )
+
+# Values sit in a fixed column at the right, in text ink rather than the mark
+# colour.  Following each whisker's own end put the unemployment label on top
+# of the zero line; a column also reads like the table beneath it.
+_span = float(plot_df["upper_ci_sd"].max() - plot_df["lower_ci_sd"].min())
+_label_x = float(plot_df["upper_ci_sd"].max()) + _span * 0.05
 fig_coefs.add_trace(
-    go.Bar(
-        x=plot_df["beta_sd"],
+    go.Scatter(
+        x=[_label_x] * len(plot_df),
         y=plot_df["label"],
-        orientation="h",
-        marker_color=[
-            (COLORS["positive"] if v >= 0 else COLORS["negative"])
-            if ident
-            else COLORS["text_tertiary"]
-            for v, ident in zip(plot_df["beta_sd"], plot_df["identified"])
-        ],
-        marker_line_width=0,
-        error_x=dict(
-            type="data",
-            symmetric=False,
-            array=(plot_df["upper_ci_sd"] - plot_df["beta_sd"]).tolist(),
-            arrayminus=(plot_df["beta_sd"] - plot_df["lower_ci_sd"]).tolist(),
-            color=COLORS["text_secondary"],
-            thickness=1.2,
-            width=6,
-        ),
-        # Labels sit inside the bar: with error bars drawn, an outside label
-        # lands on top of the whisker.  Verified by screenshot 2026-09-07.
+        mode="text",
         text=[f"{v:+.1f}".replace(".", ",") for v in plot_df["beta_sd"]],
-        textposition="inside",
-        insidetextanchor="middle",
-        textfont={"family": "IBM Plex Mono", "size": 12, "color": "#FFFFFF"},
-        hovertemplate=(
-            "<b>%{y}</b><br>%{x:+.2f} "
-            + SWEDISH_LABELS["unit_index_points"]
-            + "<extra></extra>"
-        ),
+        textposition="middle right",
+        textfont={
+            "family": "IBM Plex Mono",
+            "size": 12,
+            "color": COLORS["text_primary"],
+        },
+        hoverinfo="skip",
+        showlegend=False,
     )
 )
-fig_coefs.add_vline(x=0, line_width=1, line_color=COLORS["border"])
+
+# Zero is the reference the whole chart is read against: if the whisker touches
+# it, the effect cannot be told from nothing.
+fig_coefs.add_vline(
+    x=0,
+    line_width=1.5,
+    line_dash="dash",
+    line_color=COLORS["text_tertiary"],
+)
 
 layout = get_chart_layout(
-    height=300,
+    height=320,
     xaxis_title=SWEDISH_LABELS["axis_beta_sd"],
     showlegend=False,
 )
@@ -337,9 +384,16 @@ layout["yaxis"]["tickfont"] = {
     "size": 13,
     "color": COLORS["text_primary"],
 }
+layout["yaxis"]["showgrid"] = False
+layout["xaxis"]["zeroline"] = False
+layout["xaxis"]["dtick"] = 2
 layout["margin"]["l"] = 240
 layout["margin"]["r"] = 90
-layout["bargap"] = 0.35
+# Breathing room so the outermost whisker and its label are never clipped.
+layout["xaxis"]["range"] = [
+    float(plot_df["lower_ci_sd"].min()) - _span * 0.08,
+    float(plot_df["upper_ci_sd"].max()) + _span * 0.16,
+]
 fig_coefs.update_layout(**layout)
 
 with st.container(border=True):

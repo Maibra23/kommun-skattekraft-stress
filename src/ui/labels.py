@@ -173,10 +173,11 @@ SWEDISH_LABELS = {
     ),
     "landing_model_expander": "Hur läser jag diagrammet?",
     "landing_vars_explanation": (
-        "Staplarna visar hur mycket kommunens indexläge skiljer sig när en "
-        "variabel ändras med en standardavvikelse. Strecken är 95-procentiga "
-        "konfidensintervall: omsluter strecket noll går effekten inte att "
-        "skilja från slumpen, och variabeln redovisas som kontroll."
+        "Varje punkt är effekten av en variabel, mätt i indexenheter per "
+        "standardavvikelse. Strecket genom punkten är ett 95-procentigt "
+        "konfidensintervall. Rör strecket den streckade nollinjen går "
+        "effekten inte att skilja från slumpen, och variabeln redovisas som "
+        "kontroll snarare än som drivkraft."
     ),
     "landing_vars_example": (
         "Exempel: utbildningsnivån ligger på +10,0 indexenheter. En kommun vars "
@@ -552,21 +553,23 @@ SWEDISH_LABELS = {
     # Graph explanations (collapsible, standardized)
     "explain_coef_chart_expander": "Hur läser jag detta diagram?",
     "explain_coef_chart_text": (
-        "Staplarna visar effekten per standardavvikelse, i indexenheter. Det "
-        "är nödvändigt för att staplarna ska gå att jämföra: variablerna mäts "
-        "i olika enheter, så råa koefficienter säger ingenting om vilken som "
-        "betyder mest."
+        "Diagrammet visar effekten per standardavvikelse, i indexenheter. "
+        "Måttet behövs för att variablerna ska gå att jämföra med varandra: "
+        "de mäts i olika enheter, så råa koefficienter säger ingenting om "
+        "vilken som betyder mest."
         "\n\n"
-        "Strecket genom varje stapel är ett 95-procentigt konfidensintervall. "
-        "Omsluter det noll går effekten inte att skilja från slumpen, och "
-        "stapeln ritas grå — variabeln ingår i modellen som kontroll men "
-        "skiljer inte kommuner åt."
+        "Punkten är skattningen och strecket är dess 95-procentiga "
+        "konfidensintervall. Nollinjen är det som avgör: rör strecket den, "
+        "går effekten inte att skilja från noll, och punkten ritas grå. En "
+        "stapel från noll skulle dölja halva intervallet bakom sin egen "
+        "fyllning — därför punkt och streck i stället."
         "\n\n"
         "Exempel: utbildningsandelen ligger på +10,0 indexenheter per "
-        "standardavvikelse med intervallet [+6,4, +13,7]; försörjningskvoten "
-        "på −0,6 med intervallet [−2,4, +1,2]. Räknat i råa koefficienter ser "
-        "försörjningskvoten störst ut. Räknat i verklig effekt är den näst "
-        "minst, och går inte att skilja från noll."
+        "standardavvikelse med intervallet [+6,4, +13,7] — hela strecket "
+        "ligger klart över noll. Försörjningskvoten ligger på −0,6 med "
+        "intervallet [−2,4, +1,2], som omsluter noll. Räknat i råa "
+        "koefficienter ser försörjningskvoten störst ut av alla fyra; räknat "
+        "i verklig effekt går den inte att skilja från ingenting."
     ),
     "explain_choropleth_expander": "Hur läser jag kartan?",
     "explain_choropleth_text": (
