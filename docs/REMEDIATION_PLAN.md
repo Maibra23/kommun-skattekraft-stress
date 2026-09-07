@@ -3,7 +3,7 @@
 **Project:** Kommunal Skattekraft Stress Monitor
 **Created:** 2026-09-05
 **Last updated:** 2026-09-06
-**Status:** In progress — Phase 0. **Blocked at step 2** pending a data-provenance decision (see 13, 2026-09-06 T0.2a).
+**Status:** In progress — Phase 0, **step 3 (T0.2) is next**. T0.2a resolved 2026-09-07 via option A; nothing is blocked (see 13).
 **Trigger:** Skattekraft Model Audit, 2026-09-04
 **Audit report:** https://claude.ai/code/artifact/b3dfec90-7359-45fa-91d8-ea137080eb42
 
@@ -160,10 +160,10 @@ Two hard rules for delegation:
 
 ---
 
-### T0.2a — SCB withdrew the AA0003X archive · DECISION REQUIRED
-**Phase:** 0 · **Time:** 2–4 h once decided · **`[SOLO]`** · **Status:** blocked on user decision
-**Files:** `src/fetch/fetch_unemployment.py`, `data/lookup/` (option A), `docs/METHODOLOGY.md` 8
-**Blocks:** T0.2, and therefore the T0.1 panel rebuild
+### T0.2a — SCB withdrew the AA0003X archive · RESOLVED (option A, 2026-09-07)
+**Phase:** 0 · **Time:** 2–4 h once decided · **`[SOLO]`** · **Status:** done — see the status log entry for 2026-09-07
+**Files:** `src/fetch/fetch_unemployment.py`, `data/lookup/unemployment_2010_2021.csv`, `scripts/freeze_unemployment_snapshot.py`, `tests/test_fetch_unemployment.py`, `docs/METHODOLOGY.md` 8.1 + 12.6, `docs/DEVIATIONS.md` 6.1
+**Blocked:** T0.2, and therefore the T0.1 panel rebuild — **both now unblocked**
 
 **What happened.** `https://.../AA/AA0003/AA0003X` now returns HTTP 400 — the whole archive group, not just one table. `IntGr1KomKonUtb`, `IntGr1KomKon` and `IntGr1Kom` are all gone. `AA0003B/IntGr1KomUtbBAS` still exists but its `Tid` dimension is exactly `['2022','2023','2024']`. No replacement municipality-level open-unemployment series with history exists anywhere under AA0003 (checked AA0003B, AA0003E, AA0003H — the long series there are demography and education, not labour market).
 
@@ -475,9 +475,9 @@ Markers: `[ ]` not started · `[~]` in progress · `[x]` done · `[-]` skipped.
 ```
 STEP  TASK                                            PHASE  DELEGATION
  [x] 1   T0.3  Freeze audit baseline fixture             0    [SOLO]  done 2026-09-06
- [~] 2   T0.1  Fetch OE0101B0 + skattekraft to 2026      0    [SOLO]  code done; panel rebuild BLOCKED
- [!] 2b  T0.2a AA0003X archive withdrawn — DECISION      0    [SOLO]  blocks T0.2, see status log
- [ ] 3   T0.2  Extend full panel, handle ragged years    0    [SOLO]
+ [~] 2   T0.1  Fetch OE0101B0 + skattekraft to 2026      0    [SOLO]  code done; panel rebuild now unblocked
+ [x] 2b  T0.2a AA0003X withdrawn — option A snapshot     0    [SOLO]  done 2026-09-07
+ [ ] 3   T0.2  Extend full panel, handle ragged years    0    [SOLO]  NEXT — rebuild completes T0.1 too
  ---     GATE  Re-run 2025 backtest on real data
  [ ] 4   T1.1  Position and drift module                 1    [SUBAGENT]
  [ ] 5   T2.1  Cross-sectional estimator                 2    [SOLO]
@@ -570,6 +570,32 @@ Live fetch verified every DoD spot check: 4 930 rows (290 x 17), zero nulls in t
 **Blocked.** `build_panel` cannot complete: SCB has withdrawn the AA0003X archive path entirely. See T0.2a above for the diagnosis and the four options. `panel.parquet` is untouched — the failed run wrote nothing — so `tax_base_index_riket` is **not yet in the panel** and T0.1's DoD is only partly met. Step 2 is marked `[~]`, not `[x]`.
 
 **Do not run `pipeline.py` until T0.2a is resolved.** The four `data/raw` caches other than skattekraft are absent, so any run will refetch, hit the same wall, and — worse — a partial success could overwrite `panel.parquet` with a truncated series. The 2010–2021 unemployment data exists in exactly one place: the committed parquet.
+
+*(Superseded 2026-09-07 — T0.2a is resolved and `pipeline.py` is safe to run. The cache claim was also wrong on at least one machine; see the entry below.)*
+
+---
+
+### 2026-09-07 — T0.2a resolved · option A · 2010–2021 frozen as a snapshot
+
+**Decision.** Option A, as recommended. `data/lookup/unemployment_2010_2021.csv` now holds the 3 480 withdrawn observations with a provenance header; `fetch_unemployment` reads it below 2022 and queries the live `AA0003B` table above. `_PRIMARY_TABLE_URL` is deleted, so no code path can request the dead archive. `tests/test_fetch_unemployment.py` adds 9 tests; suite is **128 passed**, no regressions, and the T0.3 baseline fixture still passes untouched.
+
+**The options were tested before choosing, not just argued.**
+- *A:* the overlap years 2022–2024 were re-fetched live and compared to the committed panel across all 870 kommun-years — **max abs diff 0.000000 pp**. A cold `fetch_unemployment(force_refresh=True)` then reproduced all 4 350 rows with zero changed values. The snapshot is the same series SCB still publishes.
+- *B:* measured, not estimated — truncating to 2022+ costs **80 % of observations**, leaves 3 years, and leaves **zero** 5-year drift windows. It would make T1.1 and T3.2 impossible, which is worse than the plan's own "destroys the panel model" wording implies.
+- *C/E:* Kolada carries a 2010–2025 municipal series (`N03937`), so the "no long series exists anywhere" framing was too strong — but it is not the same construct. Against our 2024 values: Spearman **+0.926** yet a **3.65x** level gap; the STATIV-sourced `N01720` is **+0.952** but **0.72x** and starts only in 2017. High rank agreement, wrong levels. Splicing either at the 2021/2022 seam injects a step change into exactly the within-kommun variation the FE model reads as signal.
+
+**A reason for A that the plan did not record.** Option A is the only option that preserves the T0.3 baseline fixture. C or E would have changed every historical unemployment value while the model specification was also changing — two moving parts in the before/after comparison the whole remediation rests on. That, more than the cost estimate, is what settles it.
+
+**Two corrections to the previous entry.**
+- *The `data/raw` caches are not absent.* On the Windows working copy all five are present, and `unemployment.json` holds a complete, correct 2010–2024 series identical to the panel. The previous entry was written in a different environment (note its `/usr/local/bin/python3.11` path). The claim was environment-specific and read as universal.
+- *That copy is untracked.* `git ls-files data/raw/` returns only `.gitkeep`, so the second copy is one `git clean -fdx` from gone and does not exist in any clone. It was never the safety net it appeared to be — an argument for freezing the snapshot sooner, not later.
+
+**Deliberately not done in this change.** The panel rebuild. T0.2a and the rebuild have different blast radii: this change is provable offline without regenerating a single artifact, while the rebuild regenerates all five and will trip the row-count checks in 6.1–6.3 that hardcode 4 350. Bundling them would make a rebuild failure indistinguishable from a snapshot-logic failure. Step 3 is next and completes T0.1's DoD in the same run.
+
+**Notes for whoever runs this next.**
+- Unemployment now maxes out at **2024** (`AA0003B` `Tid` = 2022–2024; SCB has not published 2025). Skattekraft reaches 2026. The ragged-panel handling in T0.2 is therefore mandatory, not hypothetical — the panel cannot be balanced at the top end.
+- `_verify` logs a pre-existing warning that the mean rate (11.63 %) sits outside its historical 3–8 % band. This predates the change and is unrelated to it — it reflects the STATIV denominator question in 7.9, not the snapshot. Worth resolving on its own terms, not folded into a data-source fix.
+- The snapshot is a source of record. `scripts/freeze_unemployment_snapshot.py` exists to document how it was made and to re-run the overlap validation; it must never be used to "refresh" the file from a fetch, because the fetch it would need no longer exists.
 
 ---
 

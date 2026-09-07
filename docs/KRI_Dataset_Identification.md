@@ -150,10 +150,10 @@ After fetching, verify:
 ### Identification
 * **Authority:** SCB STATIV (data originally from Arbetsförmedlingen)
 * **Statistic name:** Integration och arbetsmarknad - andel öppet arbetslösa
-* **Table ID:** AA0003 (two subtables - see coverage below)
+* **Table ID:** AA0003 (one live subtable plus a committed snapshot - see coverage below)
 * **API endpoints:**
-  * **2010-2021:** `https://api.scb.se/OV0104/v1/doris/sv/ssd/START/AA/AA0003/AA0003X/IntGr1KomKonUtb` (archived table, 1997-2021)
-  * **2022-2024:** `https://api.scb.se/OV0104/v1/doris/sv/ssd/START/AA/AA0003/AA0003B/IntGr1KomUtbBAS` (current table, 2022-present)
+  * **2010-2021:** none. `AA0003X/IntGr1KomKonUtb` served these years until SCB withdrew the entire AA0003X group in 2026; served from `data/lookup/unemployment_2010_2021.csv` instead. See METHODOLOGY 12.6.
+  * **2022-:** `https://api.scb.se/OV0104/v1/doris/sv/ssd/START/AA/AA0003/AA0003B/IntGr1KomUtbBAS` (current table, 2022-2024 as of 2026-09-07)
 
 ### Definition
 "Andelen personer som någon gång under året registrerats som öppet arbetslösa i sökandekategori för öppen arbetslöshet, dividerat med befolkningen 20-64 år."
@@ -161,19 +161,21 @@ After fetching, verify:
 This is a **flow measure** (registered at any point during the year), not a point-in-time stock. Values are therefore higher than AKU survey-based unemployment.
 
 ### Coverage
-* **Time:** 2010-2024 via two-table strategy. SCB reorganized the STATIV tables around 2023-2024: the old subtable `AA0003B/IntGr1KomKonUtb` was moved to the archive path `AA0003X` and a new subtable `AA0003B/IntGr1KomUtbBAS` was introduced covering 2022 onwards. See METHODOLOGY 12.2.
+* **Time:** 2010-2024. SCB reorganized the STATIV tables around 2023-2024 (old subtable moved to the `AA0003X` archive path, new `AA0003B/IntGr1KomUtbBAS` covering 2022+, see METHODOLOGY 12.2), then in 2026 withdrew the `AA0003X` group altogether (METHODOLOGY 12.6). 2022 onwards is live; 2010-2021 is no longer fetchable from SCB.
 * **Geography:** All 290 kommuner
 * **Unit:** Percent (share of population 20-64)
 
-### Two-table strategy (implemented)
+### Snapshot + live strategy (implemented)
 The pipeline splits the requested year range at the 2021/2022 boundary:
 
-| Year range | Table URL | Coverage |
+| Year range | Source | Coverage |
 |---|---|---|
-| 2010-2021 | `AA0003X/IntGr1KomKonUtb` | 1997-2021 (archived, still accessible) |
-| 2022-2024 | `AA0003B/IntGr1KomUtbBAS` | 2022-present |
+| 2010-2021 | `data/lookup/unemployment_2010_2021.csv` | committed snapshot; **withdrawn from SCB, cannot be re-fetched** |
+| 2022- | `AA0003B/IntGr1KomUtbBAS` | 2022-2024 as of 2026-09-07 |
 
-Results from both tables are concatenated. Constants `_OLD_TABLE_LAST_YEAR = 2021` and `_NEW_TABLE_FIRST_YEAR = 2022` in `fetch_unemployment.py` control the split.
+Both frames are concatenated. Constants `_SNAPSHOT_LAST_YEAR = 2021` and `_LIVE_TABLE_FIRST_YEAR = 2022` in `fetch_unemployment.py` control the split.
+
+The snapshot is a **source of record**: it holds 3 480 kommun-year observations that exist nowhere else. It can be copied forward but never regenerated. `scripts/freeze_unemployment_snapshot.py` documents its provenance and re-runs the 2022-2024 overlap validation that shows it is the same series SCB still publishes (max abs diff 0.000000 pp at the 2026-09-07 freeze). See DEVIATIONS 6.1 for why this was chosen over re-sourcing from Kolada or Arbetsförmedlingen.
 
 ### Query parameters (per table)
 ```python
@@ -205,7 +207,7 @@ query_body = {
 
 ### Known issues
 1. **Definition change in 2018:** SCB updated the methodology - "från och med uppdatering år 2018 av nya uppgifter från 1997 och framåt justerades även innehållet i Andel öppet arbetslösa." Pre-2018 values may differ slightly from post-2018 series. The table notes this; we accept it and document.
-2. **STATIV table restructure (2023-2024):** The old `AA0003B/IntGr1KomKonUtb` subtable (and its siblings `IntGr1KomKon`, `IntGr1Kom`) was moved to archive path `AA0003X`. The new `AA0003B/IntGr1KomUtbBAS` only covers 2022+. The pipeline uses both tables. See METHODOLOGY 12.2.
+2. **STATIV table restructure (2023-2024), then withdrawal (2026):** The old `AA0003B/IntGr1KomKonUtb` subtable (and its siblings `IntGr1KomKon`, `IntGr1Kom`) was moved to archive path `AA0003X`; the new `AA0003B/IntGr1KomUtbBAS` covers only 2022+. In 2026 SCB withdrew `AA0003X` entirely — every path into the group returns HTTP 400 — so 2010-2021 now comes from a committed snapshot. See METHODOLOGY 12.2 and 12.6.
 3. **Not the same as AKU:** AKU (Arbetskraftsundersökningarna) is the official survey-based unemployment rate but is unavailable at kommun level for small kommuner. The STATIV register-based measure is a flow measure (higher values than AKU). Volunteer this limitation in interviews (METHODOLOGY 7).
 4. **Value-set filter deprecated:** `vs:RegionKommun07EjAggr` returns HTTP 400. Pipeline uses explicit codes from metadata. See METHODOLOGY 12.1.
 

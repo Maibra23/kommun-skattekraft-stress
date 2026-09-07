@@ -93,4 +93,35 @@
 **Current state:** Removed. The dashboard shows all years in historical views and uses 2024/2025 as the reference year for predictions. A year selector added confusion because predictions are always for 2025 and decomposition is always for 2024 data.
 **Rationale:** Simplification. The year context is implicit and clear from the data displayed.
 
+## 6. Data Source Withdrawals
+
+### 6.1 Unemployment 2010-2021 served from a committed snapshot, not from SCB
+
+**Original plan (METHODOLOGY 8):** Every variable is fetched from the SCB API on each pipeline run; the panel is reproducible from source by anyone who clones the repository.
+
+**Deviation:** SCB withdrew the AA0003X archive group. `AA0003X/IntGr1KomKonUtb`, which served open unemployment for 1997-2021, returns HTTP 400 — as does the group URL itself and the sibling tables `IntGr1KomKon` and `IntGr1Kom`. The group is still listed in the `AA0003` directory response but no path into it resolves. The live successor `AA0003B/IntGr1KomUtbBAS` carries only 2022-2024.
+
+No replacement exists. `AA0003E` (demography), `AA0003H` (education), `AM0207` (RAMS, municipal series end 2018/2021) and `AM0210D` (BAS, 2020-2024, different definition) were each checked and ruled out. Open unemployment for 2010-2021 — 3 480 kommun-year observations — is no longer obtainable from SCB by any route.
+
+**Options considered:**
+
+| | Approach | Consequence |
+|---|---|---|
+| **A** *(chosen)* | Snapshot 2010-2021 from the committed panel; fetch 2022+ live | Panel preserved intact; reproducibility becomes "from repo" for one variable |
+| B | Truncate the panel to 2022+ | Tested: 80 % of observations lost, 3 years remain, zero 5-year drift windows. Would make REMEDIATION_PLAN T1.1 and T3.2 impossible |
+| C/E | Re-source from Arbetsförmedlingen or Kolada | Tested: ranks agree (Spearman +0.93/+0.95) but levels differ by 3.65x and 0.72x. Creates a step change at the 2021/2022 seam |
+| D | Drop unemployment entirely | Loses the second-strongest variable (beta x within-SD = -0.111) |
+
+**Resolution:** Option A. `data/lookup/unemployment_2010_2021.csv` holds the 3 480 historical observations with a provenance header; `fetch_unemployment` reads it below 2022 and queries SCB above. The dead archive URL was removed from the fetcher so no code path can request it.
+
+Option A was chosen partly because it is the only option that preserves the T0.3 audit baseline fixture. The remediation's whole premise is a before/after comparison against the 2026-09-04 audit; C or E would have changed every historical unemployment value at the same time as the model specification changed, making the comparison uninterpretable.
+
+**Validation:** the overlap years 2022-2024 exist in both the snapshot-era fetch and the live table. Re-fetched live on 2026-09-07 and compared across all 870 overlapping kommun-years: **max abs diff 0.000000 pp**. A cold `fetch_unemployment(force_refresh=True)` through the new snapshot/live split reproduces all 4 350 committed rows with zero changed values. `scripts/freeze_unemployment_snapshot.py` refuses to write the snapshot if the overlap diverges by more than 0.05 pp.
+
+**Consequence to keep in view:** the snapshot can be copied forward but never regenerated from source. METHODOLOGY 8.1 states this rather than leaving the old reproducibility claim standing, and `tests/test_fetch_unemployment.py` asserts the snapshot still matches the committed panel row for row, so a silent change fails the suite.
+
+**Reference:** REMEDIATION_PLAN.md T0.2a; METHODOLOGY 8.1 and 12.6.
+
+---
+
 **End of DEVIATIONS.md**

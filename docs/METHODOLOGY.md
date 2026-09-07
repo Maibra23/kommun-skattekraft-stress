@@ -325,6 +325,17 @@ If artifacts differ, document the cause (typically: SCB has refreshed underlying
 
 The repository commits both the input parquet (`data/processed/panel.parquet`) and the output artifacts so that a reviewer can verify the model independently of SCB API availability.
 
+### 8.1 One variable is no longer reproducible from SCB
+
+**Unemployment for 2010–2021 is reproducible from this repository, not from SCB.** SCB withdrew the AA0003X archive group in 2026 (see 12.6); the table that served those years returns HTTP 400, as does every other path into the group, and no replacement municipality-level open-unemployment series with pre-2022 history exists anywhere in the SCB API. Those 3 480 observations are served from `data/lookup/unemployment_2010_2021.csv`, a committed snapshot of the values fetched on 2026-04-24 while the archive was still live. 2022 onwards is still fetched from SCB on every run.
+
+This is a real reduction in the reproducibility guarantee and is stated here rather than left implicit. What can still be verified independently:
+
+* **The snapshot is the series SCB publishes, not a divergent vintage.** The overlap years 2022–2024 exist in both the snapshot-era fetch and the live table. `scripts/freeze_unemployment_snapshot.py` re-fetches them and refuses to write the snapshot if they disagree by more than 0.05 pp. At the freeze on 2026-09-07 the maximum absolute difference across all 870 overlapping kommun-years was 0.000000 pp.
+* **The snapshot is a copy, not a re-derivation.** `tests/test_fetch_unemployment.py::TestSnapshotFile::test_matches_the_committed_panel_exactly` asserts the snapshot equals the committed panel row for row, so a silent change to the historical series fails the suite.
+
+The snapshot can only be copied forward, never regenerated from source. Treat it as a source of record with the same care as the committed artifacts.
+
 ---
 
 ## 9. Interpretation Guide for Non-Econometricians
@@ -443,6 +454,18 @@ Results from both tables are concatenated to form the complete 2010-2024 series.
 **Background:** The `tax_base_growth_pct` variable for year *t* is computed as `(skattekraft_t / skattekraft_{t-1} - 1) x 100`. The first year in the analysis window is 2010, so 2009 values are needed as the lag baseline.
 
 **Fix applied:** `build_panel.py` fetches skattekraft for years 2009-2024 (constant `_FETCH_YEARS_SKATTEKRAFT`). After computing growth rates, the 2009 rows are dropped (`df_skatt_growth = df_skatt_growth[df_skatt_growth["year"].isin(_PANEL_YEARS)]`). The skattekraft cache file (`data/raw/skattekraft.json`) therefore covers 2009-2024, while the final panel covers only 2010-2024. The same logic applies to population: `_FETCH_YEARS_POPULATION` includes 2009 for the population growth computation.
+
+### 12.6 SCB withdrew the AA0003X archive group entirely
+
+**Symptom:** `GET .../AA/AA0003/AA0003X/IntGr1KomKonUtb` returns HTTP 400. So does the group URL `.../AA/AA0003/AA0003X` itself, and so do the sibling tables `IntGr1KomKon` and `IntGr1Kom`. The group is still *listed* in the `AA0003` directory response as "Äldre tabeller som inte uppdateras", but every path into it is unreachable.
+
+**Root cause:** SCB retired the archive rather than the single table. Unlike 12.2, 12.3 and 12.4 — which were renames and reorganisations, recoverable by pointing the fetcher at the new URL — this is a withdrawal. Verified on 2026-09-06 and re-verified 2026-09-07.
+
+**Impact:** Open unemployment for 2010–2021 (3 480 kommun-year observations) cannot be fetched from SCB by any route. Searched and ruled out: `AA0003B` (labour market, `Tid` = 2022–2024 only), `AA0003E` (demography), `AA0003H` (education), `AM0207` RAMS (municipal series end 2018/2021), and `AM0210D` BAS (kommun-level but 2020–2024 only, and a different unemployment definition).
+
+**Fix applied:** Option A of REMEDIATION_PLAN.md T0.2a. `fetch_unemployment` now reads 2010–2021 from the committed snapshot `data/lookup/unemployment_2010_2021.csv` and 2022 onwards from the live `AA0003B/IntGr1KomUtbBAS`. The dead `_PRIMARY_TABLE_URL` constant was removed so no code path can request the withdrawn archive. See 8.1 for the reproducibility consequence and DEVIATIONS.md 6.1 for the decision record.
+
+**Considered and rejected:** re-sourcing the full history from Kolada or Arbetsförmedlingen. Both are live and carry a 2010-onwards municipal series, and both rank kommuner almost identically to the SCB series (Spearman +0.926 and +0.952 against our 2024 values), but neither matches its *level*: Kolada `N03937` runs 3.65x below our series, `N01720` 0.72x above. The gap is definitional, not an error in either series — ours is a **flow** measure (registered as openly unemployed at any point during the year, over population 20-64; see KRI §3), while `N03937` is a stock-like annual average over population 18-65, itself carrying an 18-64 → 18-65 age-band change at 2023. Splicing either onto 2010–2021 would put a step change at the 2021/2022 seam, inside the within-kommun time variation the FE model reads as signal — a series break disguised as continuity, which is worse than a documented snapshot. High rank agreement means these remain viable *fallbacks* if SCB withdraws more; it does not make them drop-in replacements.
 
 ---
 

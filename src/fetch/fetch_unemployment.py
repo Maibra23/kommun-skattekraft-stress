@@ -1,13 +1,18 @@
-"""Fetch municipal open unemployment rates from SCB STATIV table AA0003.
+"""Fetch municipal open unemployment rates for all 290 kommuner.
 
-Downloads "Andel öppet arbetslösa" (share of open unemployment, percent) for
-all 290 kommuner for the years 2010–2024 using the generic pxweb_client.
+Returns "Andel öppet arbetslösa" (share of open unemployment, percent) for
+2010 onwards, from two sources:
 
-Two-table strategy (SCB restructured AA0003 in 2022):
-  - 2010–2021: AA0003X/IntGr1KomKonUtb (archived table, 1997–2021)
-  - 2022–2024: AA0003B/IntGr1KomUtbBAS (current table, 2022–present)
+  - 2010–2021: data/lookup/unemployment_2010_2021.csv (committed snapshot)
+  - 2022–:     AA0003B/IntGr1KomUtbBAS via the generic pxweb_client
 
-The query uses SCB's total-aggregate codes (BakgrVar='TOT', Kön='1+2',
+The split is not a performance choice.  SCB withdrew the AA0003X archive that
+served 1997–2021 — the whole group returns HTTP 400, not just one table — so
+those years are no longer obtainable from SCB at any URL.  The snapshot is
+their only remaining source; see METHODOLOGY §8.1 and §12.6, DEVIATIONS §6.1,
+and REMEDIATION_PLAN.md T0.2a.
+
+The live query uses SCB's total-aggregate codes (BakgrVar='TOT', Kön='1+2',
 UtbNiv='000') to select the pre-aggregated unemployment rate directly.
 No client-side averaging across sub-categories is performed.  See
 METHODOLOGY §7.9 for details.
@@ -37,26 +42,23 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-# SCB STATIV restructured AA0003 in 2022.  The old municipality-level table
-# (IntGr1KomKonUtb) was archived in AA0003X and covers 1997–2021.  The new
-# equivalent (IntGr1KomUtbBAS) lives in AA0003B and covers 2022 onwards.
-# To fetch 2010–2024, both tables are needed.
-_PRIMARY_TABLE_URL = (
-    "https://api.scb.se/OV0104/v1/doris/sv/ssd/START/AA/AA0003/AA0003X"
-    "/IntGr1KomKonUtb"
-)
+# The only live municipality-level table.  Its predecessor for 1997–2021,
+# AA0003X/IntGr1KomKonUtb, was withdrawn by SCB along with the entire AA0003X
+# group; those years come from _SNAPSHOT_FILE instead.
 _CONTINUATION_TABLE_URL = (
     "https://api.scb.se/OV0104/v1/doris/sv/ssd/START/AA/AA0003/AA0003B"
     "/IntGr1KomUtbBAS"
 )
-# Year boundary between the two tables.
-_OLD_TABLE_LAST_YEAR: int = 2021
-_NEW_TABLE_FIRST_YEAR: int = 2022
-# Legacy: kept for backward compatibility in _discover_table signature.
+# Year boundary between the snapshot and the live table.
+_SNAPSHOT_LAST_YEAR: int = 2021
+_LIVE_TABLE_FIRST_YEAR: int = 2022
 _ALTERNATIVE_URLS: list[str] = []
 
 _PROJECT_ROOT = Path(__file__).parents[2]
 _CACHE_FILE: Path = _PROJECT_ROOT / "data" / "raw" / "unemployment.json"
+_SNAPSHOT_FILE: Path = (
+    _PROJECT_ROOT / "data" / "lookup" / "unemployment_2010_2021.csv"
+)
 
 _CACHE_MAX_AGE_DAYS: int = 7
 _EXPECTED_COMMUNES: int = 290
@@ -109,32 +111,26 @@ def fetch_unemployment(
         logger.info("Loading unemployment from cache: %s", _CACHE_FILE)
         df = load_df_cache(_CACHE_FILE, _CACHE_DTYPES)
     else:
-        # SCB split the municipality unemployment table into two: the old table
-        # (IntGr1KomKonUtb in AA0003X) covers 1997–2021, and the new table
-        # (IntGr1KomUtbBAS in AA0003B) covers 2022 onwards.  Fetch from each
-        # as needed and concatenate.
         frames: list[pd.DataFrame] = []
 
-        old_years = [y for y in years if y <= _OLD_TABLE_LAST_YEAR]
-        new_years = [y for y in years if y >= _NEW_TABLE_FIRST_YEAR]
+        snapshot_years = [y for y in years if y <= _SNAPSHOT_LAST_YEAR]
+        live_years = [y for y in years if y >= _LIVE_TABLE_FIRST_YEAR]
 
-        for table_url_candidate, subset_years in [
-            (_PRIMARY_TABLE_URL, old_years),
-            (_CONTINUATION_TABLE_URL, new_years),
-        ]:
-            if not subset_years:
-                continue
+        if snapshot_years:
+            frames.append(_load_snapshot(snapshot_years))
+
+        if live_years:
             table_url, contents_code, available_years, table_meta = _discover_table(
-                subset_years, [table_url_candidate]
+                live_years, [_CONTINUATION_TABLE_URL]
             )
-            missing = [y for y in subset_years if y not in available_years]
+            missing = [y for y in live_years if y not in available_years]
             if missing:
                 raise NotImplementedError(
-                    f"AA0003 subtable {table_url_candidate} does not cover years "
+                    f"AA0003 subtable {_CONTINUATION_TABLE_URL} does not cover years "
                     f"{missing}. SCB may have restructured the table. "
                     "Consult KRI_Dataset_Identification.md §3 for fallback strategies."
                 )
-            query_body = _build_query(contents_code, subset_years, table_meta)
+            query_body = _build_query(contents_code, live_years, table_meta)
             df_raw = query_pxweb(table_url, query_body)
             frames.append(_clean_response(df_raw))
 
@@ -152,6 +148,51 @@ def fetch_unemployment(
         df["kommun_kod"].nunique(),
     )
     return df
+
+
+# ---------------------------------------------------------------------------
+# Private helpers — snapshot
+# ---------------------------------------------------------------------------
+
+
+def _load_snapshot(years: list[int]) -> pd.DataFrame:
+    """Read pre-2022 unemployment from the committed snapshot.
+
+    Args:
+        years: Integer years to return, all ≤ _SNAPSHOT_LAST_YEAR.
+
+    Returns:
+        DataFrame with columns [kommun_kod, year, unemployment_rate],
+        typed identically to the live-API path.
+
+    Raises:
+        ValueError: If the snapshot file is missing, or does not carry every
+            requested year.  Returning a short frame would surface downstream
+            as a silently unbalanced panel.
+    """
+    if not _SNAPSHOT_FILE.exists():
+        raise ValueError(
+            f"Unemployment snapshot missing: {_SNAPSHOT_FILE}. "
+            "2010–2021 cannot be re-fetched from SCB (AA0003X withdrawn); "
+            "restore it from git or regenerate with "
+            "scripts/freeze_unemployment_snapshot.py."
+        )
+
+    df = pd.read_csv(
+        _SNAPSHOT_FILE,
+        comment="#",
+        dtype={"kommun_kod": str, "year": int, "unemployment_rate": float},
+    )
+    df["kommun_kod"] = df["kommun_kod"].str.zfill(4)
+
+    missing = sorted(set(years) - set(df["year"].unique()))
+    if missing:
+        raise ValueError(
+            f"Snapshot {_SNAPSHOT_FILE.name} does not cover years {missing}; "
+            f"it holds {df['year'].min()}–{df['year'].max()}."
+        )
+
+    return df[df["year"].isin(years)].reset_index(drop=True)
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +226,7 @@ def _discover_table(
         NotImplementedError: If no candidate covers the requested years.
     """
     if candidates is None:
-        candidates = [_PRIMARY_TABLE_URL] + _ALTERNATIVE_URLS
+        candidates = [_CONTINUATION_TABLE_URL] + _ALTERNATIVE_URLS
 
     for url in candidates:
         try:
