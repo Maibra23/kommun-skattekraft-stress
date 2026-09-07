@@ -32,6 +32,7 @@ st.set_page_config(
     menu_items={"Get Help": None, "Report a bug": None},
 )
 
+from src.provenance import analysis_year, panel_max_year  # noqa: E402
 from src.ui.chart_theme import get_chart_layout  # noqa: E402
 from src.ui.components import (  # noqa: E402
     card_header,
@@ -55,19 +56,43 @@ sidebar_state = render_sidebar("landing")
 _PROJECT_ROOT = Path(__file__).resolve().parent
 _ARTIFACTS_DIR = _PROJECT_ROOT / "artifacts"
 
+# Never hardcoded: 2024 today, and it moves when SCB publishes 2025
+# unemployment.  See src/provenance.py.
+_ANALYSIS_YEAR = analysis_year()
+_PANEL_YEAR = panel_max_year()
+
 
 @st.cache_data
-def _load_coefficients() -> pd.DataFrame:
-    """Load regression coefficients from artifacts."""
-    return pd.read_parquet(_ARTIFACTS_DIR / "coefficients.parquet")
+def _load_cross_coefficients() -> pd.DataFrame:
+    """Cross-sectional coefficients for the analysis year.
+
+    This is the headline model: it explains why kommuner differ from each
+    other, which is the question the dashboard is about.
+    """
+    coefs = pd.read_parquet(_ARTIFACTS_DIR / "coefficients_cross.parquet")
+    return coefs[coefs["spec"] == f"year_{_ANALYSIS_YEAR}"].copy()
 
 
-coef_df = _load_coefficients()
+@st.cache_data
+def _load_within_primary() -> pd.DataFrame:
+    """The FE panel's primary specification, for the within-time section.
+
+    Selected by ``role``, not by spec name: T2.4 promoted the lagged spec
+    without renaming anything, because the names are a published contract.
+    """
+    coefs = pd.read_parquet(_ARTIFACTS_DIR / "coefficients.parquet")
+    if "role" in coefs.columns:
+        return coefs[coefs["role"] == "primary"].copy()
+    return coefs[coefs["spec"] == "lagged"].copy()
+
+
+cross_df = _load_cross_coefficients()
+within_df = _load_within_primary()
 
 _UPDATED_DATE = ""
-if (_ARTIFACTS_DIR / "predictions.parquet").exists():
+if (_ARTIFACTS_DIR / "position.parquet").exists():
     _UPDATED_DATE = datetime.fromtimestamp(
-        (_ARTIFACTS_DIR / "predictions.parquet").stat().st_mtime
+        (_ARTIFACTS_DIR / "position.parquet").stat().st_mtime
     ).strftime("%Y-%m-%d")
 
 # ---------------------------------------------------------------------------
@@ -101,7 +126,7 @@ st.html(f"""
         <span class="shai-stat-label">{SWEDISH_LABELS["landing_stat_kommuner"]}</span>
     </div>
     <div class="shai-stat-cell">
-        <span class="shai-stat-value">15</span>
+        <span class="shai-stat-value">17</span>
         <span class="shai-stat-label">{SWEDISH_LABELS["landing_stat_panel"]}</span>
     </div>
     <div class="shai-stat-cell">
@@ -109,8 +134,8 @@ st.html(f"""
         <span class="shai-stat-label">{SWEDISH_LABELS["landing_stat_vars"]}</span>
     </div>
     <div class="shai-stat-cell">
-        <span class="shai-stat-value">FE</span>
-        <span class="shai-stat-label">{SWEDISH_LABELS["landing_stat_fe"]}</span>
+        <span class="shai-stat-value">2</span>
+        <span class="shai-stat-label">{SWEDISH_LABELS["landing_stat_identified"]}</span>
     </div>
 </div>
 """)
@@ -125,84 +150,91 @@ st.html(f"""
         <div><h3>{SWEDISH_LABELS["landing_model_title"]}</h3></div>
         <span class="shai-tag">{SWEDISH_LABELS["method_model_name"]}</span>
     </div>
-    <svg viewBox="0 0 800 120" xmlns="http://www.w3.org/2000/svg"
+    <svg viewBox="0 0 800 170" xmlns="http://www.w3.org/2000/svg"
          style="width:100%;max-width:800px;margin:12px auto;display:block;"
          aria-hidden="true">
-        <!-- Input boxes -->
-        <rect x="10" y="10" width="130" height="36" rx="4"
-              fill="{COLORS['bg']}" stroke="{COLORS['border']}" />
-        <text x="75" y="33" text-anchor="middle"
-              font-family="Source Sans 3" font-size="11" fill="{COLORS['text_primary']}">
-            {SWEDISH_LABELS["var_unemployment"]}</text>
+        <!-- Identified drivers: solid, full weight.  These two separate
+             kommuner from each other; the model can tell them apart. -->
+        <text x="10" y="18" font-family="Source Sans 3" font-size="10"
+              font-weight="700" fill="{COLORS['text_secondary']}"
+              letter-spacing="0.5">{SWEDISH_LABELS["svg_identified_heading"]}</text>
 
-        <rect x="10" y="54" width="130" height="36" rx="4"
-              fill="{COLORS['bg']}" stroke="{COLORS['border']}" />
-        <text x="75" y="77" text-anchor="middle"
-              font-family="Source Sans 3" font-size="11" fill="{COLORS['text_primary']}">
-            {SWEDISH_LABELS["var_dependency"]}</text>
-
-        <rect x="10" y="10" width="130" height="0" rx="4" fill="none" />
-
-        <rect x="150" y="10" width="130" height="36" rx="4"
-              fill="{COLORS['bg']}" stroke="{COLORS['border']}" />
-        <text x="215" y="33" text-anchor="middle"
-              font-family="Source Sans 3" font-size="11" fill="{COLORS['text_primary']}">
-            {SWEDISH_LABELS["var_population"]}</text>
-
-        <rect x="150" y="54" width="130" height="36" rx="4"
-              fill="{COLORS['bg']}" stroke="{COLORS['border']}" />
-        <text x="215" y="77" text-anchor="middle"
+        <rect x="10" y="26" width="180" height="34" rx="4"
+              fill="{COLORS['bg']}" stroke="{COLORS['primary']}" stroke-width="1.5" />
+        <text x="100" y="48" text-anchor="middle"
               font-family="Source Sans 3" font-size="11" fill="{COLORS['text_primary']}">
             {SWEDISH_LABELS["var_education"]}</text>
 
-        <!-- Arrows to regression box -->
-        <line x1="280" y1="30" x2="320" y2="55" stroke="{COLORS['accent']}"
-              stroke-width="1.5" marker-end="url(#arrow)" />
-        <line x1="280" y1="72" x2="320" y2="58" stroke="{COLORS['accent']}"
-              stroke-width="1.5" marker-end="url(#arrow)" />
+        <rect x="10" y="66" width="180" height="34" rx="4"
+              fill="{COLORS['bg']}" stroke="{COLORS['primary']}" stroke-width="1.5" />
+        <text x="100" y="88" text-anchor="middle"
+              font-family="Source Sans 3" font-size="11" fill="{COLORS['text_primary']}">
+            {SWEDISH_LABELS["var_unemployment"]}</text>
 
-        <!-- Regression box (center) -->
-        <rect x="320" y="30" width="160" height="50" rx="4"
+        <!-- Controls: dashed and muted.  They are in the model, but between
+             kommuner their effect cannot be told from zero. -->
+        <text x="10" y="122" font-family="Source Sans 3" font-size="10"
+              font-weight="700" fill="{COLORS['text_tertiary']}"
+              letter-spacing="0.5">{SWEDISH_LABELS["svg_controls_heading"]}</text>
+
+        <rect x="10" y="130" width="88" height="28" rx="4"
+              fill="none" stroke="{COLORS['text_tertiary']}" stroke-width="1"
+              stroke-dasharray="3 3" />
+        <text x="54" y="148" text-anchor="middle"
+              font-family="Source Sans 3" font-size="9" fill="{COLORS['text_tertiary']}">
+            {SWEDISH_LABELS["var_dependency"]}</text>
+
+        <rect x="102" y="130" width="88" height="28" rx="4"
+              fill="none" stroke="{COLORS['text_tertiary']}" stroke-width="1"
+              stroke-dasharray="3 3" />
+        <text x="146" y="148" text-anchor="middle"
+              font-family="Source Sans 3" font-size="9" fill="{COLORS['text_tertiary']}">
+            {SWEDISH_LABELS["var_population"]}</text>
+
+        <!-- Arrows: solid from the drivers, dashed from the controls -->
+        <line x1="192" y1="43" x2="316" y2="62" stroke="{COLORS['accent']}"
+              stroke-width="1.8" marker-end="url(#arrow)" />
+        <line x1="192" y1="83" x2="316" y2="72" stroke="{COLORS['accent']}"
+              stroke-width="1.8" marker-end="url(#arrow)" />
+        <line x1="192" y1="144" x2="316" y2="88" stroke="{COLORS['text_tertiary']}"
+              stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arrow-muted)" />
+
+        <!-- Model -->
+        <rect x="320" y="46" width="170" height="52" rx="4"
               fill="{COLORS['primary']}" stroke="none" />
-        <text x="400" y="52" text-anchor="middle"
+        <text x="405" y="68" text-anchor="middle"
               font-family="Source Sans 3" font-size="12" font-weight="700"
               fill="#FFFFFF">{SWEDISH_LABELS["svg_regression_model"]}</text>
-        <text x="400" y="70" text-anchor="middle"
+        <text x="405" y="86" text-anchor="middle"
               font-family="IBM Plex Mono" font-size="9" fill="{COLORS['accent']}">
-            {SWEDISH_LABELS["svg_panel_ols"]}</text>
+            {SWEDISH_LABELS["svg_cross_section"]}</text>
 
-        <!-- Arrows from regression box -->
-        <line x1="480" y1="45" x2="520" y2="28" stroke="{COLORS['accent']}"
-              stroke-width="1.5" marker-end="url(#arrow)" />
-        <line x1="480" y1="55" x2="520" y2="55" stroke="{COLORS['accent']}"
-              stroke-width="1.5" marker-end="url(#arrow)" />
-        <line x1="480" y1="65" x2="520" y2="82" stroke="{COLORS['accent']}"
-              stroke-width="1.5" marker-end="url(#arrow)" />
+        <!-- Outputs: an explanation of position, not a forecast -->
+        <line x1="490" y1="62" x2="600" y2="45" stroke="{COLORS['accent']}"
+              stroke-width="1.8" marker-end="url(#arrow)" />
+        <line x1="490" y1="82" x2="600" y2="99" stroke="{COLORS['accent']}"
+              stroke-width="1.8" marker-end="url(#arrow)" />
 
-        <!-- Output boxes -->
-        <rect x="520" y="10" width="130" height="36" rx="4"
+        <rect x="604" y="28" width="186" height="34" rx="4"
               fill="{COLORS['bg']}" stroke="{COLORS['border']}" />
-        <text x="585" y="33" text-anchor="middle"
+        <text x="697" y="50" text-anchor="middle"
               font-family="Source Sans 3" font-size="11" fill="{COLORS['text_primary']}">
-            {SWEDISH_LABELS["svg_prognosis"]}</text>
+            {SWEDISH_LABELS["svg_position"]}</text>
 
-        <rect x="520" y="54" width="130" height="36" rx="4"
+        <rect x="604" y="82" width="186" height="34" rx="4"
               fill="{COLORS['bg']}" stroke="{COLORS['border']}" />
-        <text x="585" y="77" text-anchor="middle"
-              font-family="Source Sans 3" font-size="11" fill="{COLORS['text_primary']}">
-            {SWEDISH_LABELS["svg_ranking"]}</text>
-
-        <rect x="660" y="32" width="130" height="36" rx="4"
-              fill="{COLORS['bg']}" stroke="{COLORS['border']}" />
-        <text x="725" y="55" text-anchor="middle"
+        <text x="697" y="104" text-anchor="middle"
               font-family="Source Sans 3" font-size="11" fill="{COLORS['text_primary']}">
             {SWEDISH_LABELS["svg_decomposition"]}</text>
 
-        <!-- Arrow marker definition -->
         <defs>
             <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5"
                     markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                 <path d="M 0 0 L 10 5 L 0 10 z" fill="{COLORS['accent']}" />
+            </marker>
+            <marker id="arrow-muted" viewBox="0 0 10 10" refX="9" refY="5"
+                    markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="{COLORS['text_tertiary']}" />
             </marker>
         </defs>
     </svg>
@@ -220,12 +252,9 @@ with st.expander(SWEDISH_LABELS["landing_model_expander"]):
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# Section 4: Variabler & vikter (regression coefficients as bars)
+# Section 4: Variabler & koefficienter (effect per standard deviation)
 # ---------------------------------------------------------------------------
 
-main_coefs = coef_df[coef_df["spec"] == "main"].copy()
-
-# Map code names to Swedish display labels
 _VAR_LABEL_MAP = {
     "unemployment_rate": SWEDISH_LABELS["var_unemployment"],
     "dependency_ratio": SWEDISH_LABELS["var_dependency"],
@@ -233,60 +262,51 @@ _VAR_LABEL_MAP = {
     "edu_share": SWEDISH_LABELS["var_education"],
 }
 
-main_coefs["label"] = main_coefs["variable"].map(_VAR_LABEL_MAP)
-main_coefs = main_coefs.sort_values("coefficient")
+# Effects are shown per standard deviation, with intervals.  Raw coefficients
+# are not comparable across variables measured in different units: the
+# dependency ratio's raw coefficient is the largest of the four and its actual
+# effect the smallest but one, so a bar chart of raw betas inverts the ranking.
+plot_df = cross_df.copy()
+plot_df["label"] = plot_df["variable"].map(_VAR_LABEL_MAP)
+plot_df = plot_df.sort_values("beta_sd")
 
-# Significance stars
-def _sig_star(p: float) -> str:
-    if p < 0.001:
-        return " ***"
-    if p < 0.01:
-        return " **"
-    if p < 0.05:
-        return " *"
-    return ""
-
-main_coefs["star"] = main_coefs["p_value"].apply(_sig_star)
-
-# Round coefficients for display (2 decimals preserves the message)
-main_coefs["coef_rounded"] = main_coefs["coefficient"].round(2)
-
-# Build horizontal bar chart
 fig_coefs = go.Figure()
-
-bar_colors = [
-    COLORS["low_risk"] if c >= 0 else COLORS["high_risk"]
-    for c in main_coefs["coef_rounded"]
-]
-
 fig_coefs.add_trace(
     go.Bar(
-        x=main_coefs["coef_rounded"],
-        y=main_coefs["label"],
+        x=plot_df["beta_sd"],
+        y=plot_df["label"],
         orientation="h",
-        marker_color=bar_colors,
-        marker_line_width=0,
-        text=[
-            f"{c:+.2f}{s}"
-            for c, s in zip(main_coefs["coef_rounded"], main_coefs["star"])
+        marker_color=[
+            (COLORS["low_risk"] if v >= 0 else COLORS["high_risk"])
+            if ident
+            else COLORS["text_tertiary"]
+            for v, ident in zip(plot_df["beta_sd"], plot_df["identified"])
         ],
+        marker_line_width=0,
+        error_x=dict(
+            type="data",
+            symmetric=False,
+            array=(plot_df["upper_ci_sd"] - plot_df["beta_sd"]).tolist(),
+            arrayminus=(plot_df["beta_sd"] - plot_df["lower_ci_sd"]).tolist(),
+            color=COLORS["text_secondary"],
+            thickness=1.2,
+            width=6,
+        ),
+        text=[f"{v:+.1f}".replace(".", ",") for v in plot_df["beta_sd"]],
         textposition="outside",
         textfont={"family": "IBM Plex Mono", "size": 12, "color": COLORS["text_primary"]},
         hovertemplate=(
-            "<b>%{y}</b><br>"
-            "Koefficient: %{x:+.2f}<br>"
-            "<extra></extra>"
+            "<b>%{y}</b><br>%{x:+.2f} "
+            + SWEDISH_LABELS["unit_index_points"]
+            + "<extra></extra>"
         ),
     )
 )
-
-fig_coefs.add_vline(
-    x=0, line_width=1, line_color=COLORS["border"],
-)
+fig_coefs.add_vline(x=0, line_width=1, line_color=COLORS["border"])
 
 layout = get_chart_layout(
-    height=280,
-    xaxis_title=SWEDISH_LABELS["axis_coefficient"],
+    height=300,
+    xaxis_title=SWEDISH_LABELS["axis_beta_sd"],
     showlegend=False,
 )
 layout["yaxis"]["tickfont"] = {
@@ -294,17 +314,62 @@ layout["yaxis"]["tickfont"] = {
     "size": 13,
     "color": COLORS["text_primary"],
 }
-layout["margin"]["l"] = 220
-layout["margin"]["r"] = 80
+layout["margin"]["l"] = 240
+layout["margin"]["r"] = 90
 layout["bargap"] = 0.35
 fig_coefs.update_layout(**layout)
 
 with st.container(border=True):
-    st.html(card_header(SWEDISH_LABELS["landing_vars_title"], tag=SWEDISH_LABELS["method_period"]))
+    st.html(
+        card_header(
+            SWEDISH_LABELS["landing_vars_title"],
+            tag=SWEDISH_LABELS["method_period"],
+        )
+    )
     st.html(f'<div class="shai-explanation">{SWEDISH_LABELS["landing_vars_explanation"]}</div>')
     st.plotly_chart(fig_coefs, use_container_width=True, config={"displayModeBar": False})
+    st.html(f'<div class="shai-explanation">{SWEDISH_LABELS["landing_vars_scale_note"]}</div>')
 
-    # Show all coefficient values in a table for clarity
+    coef_table = pd.DataFrame(
+        {
+            SWEDISH_LABELS["vars_table_variable"]: plot_df["label"].values,
+            SWEDISH_LABELS["vars_table_effect_sd"]: [
+                f"{v:+.2f}".replace(".", ",") for v in plot_df["beta_sd"]
+            ],
+            SWEDISH_LABELS["vars_table_ci"]: [
+                f"[{lo:+.2f}, {hi:+.2f}]".replace(".", ",")
+                for lo, hi in zip(plot_df["lower_ci_sd"], plot_df["upper_ci_sd"])
+            ],
+            SWEDISH_LABELS["vars_table_identified"]: [
+                SWEDISH_LABELS["identified_yes"]
+                if ident
+                else SWEDISH_LABELS["identified_no"]
+                for ident in plot_df["identified"]
+            ],
+        }
+    )
+    st.dataframe(coef_table, use_container_width=True, hide_index=True)
+
+    with st.expander(SWEDISH_LABELS["landing_vars_expander"]):
+        st.markdown(SWEDISH_LABELS["landing_vars_example"])
+    with st.expander(SWEDISH_LABELS["explain_coef_chart_expander"]):
+        st.markdown(SWEDISH_LABELS["explain_coef_chart_text"])
+
+# ---------------------------------------------------------------------------
+# Section 4b: Samband inom kommuner över tid (the FE panel, T2.4)
+# ---------------------------------------------------------------------------
+
+# Physically separated from everything above, because it answers a different
+# question and cannot rank kommuner.
+with st.container(border=True):
+    st.html(card_header(SWEDISH_LABELS["within_section_title"]))
+    st.html(f'<div class="shai-explanation">{SWEDISH_LABELS["within_section_lead"]}</div>')
+    st.html(f'<div class="shai-explanation">{SWEDISH_LABELS["within_section_spec"]}</div>')
+
+    within_table = within_df.copy()
+    within_table["label"] = within_table["variable"].map(_VAR_LABEL_MAP)
+    within_table = within_table.sort_values("t_stat")
+
     def _sig_label(p: float) -> str:
         if p < 0.001:
             return "***"
@@ -313,38 +378,23 @@ with st.container(border=True):
         if p < 0.05:
             return "*"
         return SWEDISH_LABELS["sig_not_significant"]
-    _interp = {
-        "unemployment_rate": SWEDISH_LABELS["interp_unemployment"],
-        "dependency_ratio": SWEDISH_LABELS["interp_dependency"],
-        "population_growth_pct": SWEDISH_LABELS["interp_population"],
-        "edu_share": SWEDISH_LABELS["interp_education"],
-    }
-    coef_table_data = []
-    for _, row in main_coefs.iterrows():
-        var_name = row["variable"]
-        coef_val = row["coefficient"]
-        if var_name == "dependency_ratio":
-            effect_str = f"{coef_val / 10:+.3f}".replace(".", ",")
-        else:
-            effect_str = f"{coef_val:+.3f}".replace(".", ",")
-        interp_template = _interp.get(var_name, "")
-        interp_text = interp_template.format(v=effect_str) if interp_template else ""
-        coef_table_data.append({
-            SWEDISH_LABELS["vars_table_variable"]: row["label"],
-            SWEDISH_LABELS["vars_table_coef"]: f"{coef_val:+.4f}".replace(".", ","),
-            SWEDISH_LABELS["vars_table_sig"]: _sig_label(row["p_value"]),
-            SWEDISH_LABELS["vars_table_interpretation"]: interp_text,
-        })
+
     st.dataframe(
-        pd.DataFrame(coef_table_data),
+        pd.DataFrame(
+            {
+                SWEDISH_LABELS["vars_table_variable"]: within_table["label"].values,
+                SWEDISH_LABELS["vars_table_coef"]: [
+                    f"{v:+.4f}".replace(".", ",") for v in within_table["coefficient"]
+                ],
+                SWEDISH_LABELS["vars_table_sig"]: [
+                    _sig_label(p) for p in within_table["p_value"]
+                ],
+            }
+        ),
         use_container_width=True,
         hide_index=True,
     )
-
-    with st.expander(SWEDISH_LABELS["landing_vars_expander"]):
-        st.markdown(SWEDISH_LABELS["landing_vars_example"])
-    with st.expander(SWEDISH_LABELS["explain_coef_chart_expander"]):
-        st.markdown(SWEDISH_LABELS["explain_coef_chart_text"])
+    st.html(f'<div class="shai-explanation">{SWEDISH_LABELS["within_section_caveat"]}</div>')
 
 # ---------------------------------------------------------------------------
 # Section 5: Pipeline steps

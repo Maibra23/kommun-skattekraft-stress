@@ -47,6 +47,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from src.provenance import analysis_year
+
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -56,8 +58,10 @@ _OUTPUT_PATH: Path = _PROJECT_ROOT / "artifacts" / "decomposition_cross.parquet"
 
 Y_VAR = "tax_base_index_riket"
 
-#: Unemployment ends here, so the complete-case cross-section does too.
-LATEST_YEAR: int = 2024
+#: The complete-case year, read from the pipeline's provenance artifact rather
+#: than hardcoded: it is 2024 today and moves when SCB publishes 2025
+#: unemployment. See src/provenance.py.
+LATEST_YEAR: int = analysis_year()
 
 
 def _coefficients_for(coefs: pd.DataFrame, year: int) -> pd.DataFrame:

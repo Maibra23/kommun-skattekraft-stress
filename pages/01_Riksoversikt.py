@@ -1,20 +1,22 @@
 """Streamlit page 2 — National overview (Riksöversikt).
 
-Configures the page with st.set_page_config (title 'KSS · Riksöversikt',
-layout='wide'), injects CSS, and renders the sidebar.  Page sections:
-  1. Page title block with eyebrow and year badge
-  2. KPI row (4 cards): median prognos 2025, kommuner i hög risk,
-     största nedgång with kommun name, modellens R²
-  3. Geografisk fördelning: Folium choropleth map (3:2 split with
-     histogram on right) showing vulnerability_score per municipality
-  4. Histogram: distribution of predicted_growth_2025 across municipalities
-  5. Rangordning: sortable table of all 290 municipalities with CSV download
+Leads with relative position and drift, which is the reliable descriptive fact
+this project has, rather than with a forecast that scored r = +0.016 against
+realised 2025 growth (REMEDIATION_PLAN.md T1.2).  Page sections:
+
+  1. Page title block
+  2. KPI row: index spread, largest 10-year fall and rise, cross-sectional R²
+  3. Choropleth with a layer toggle — position / 5-year drift / vulnerability —
+     beside a histogram of the same quantity
+  4. Table of all 290 kommuner: our index, SCB's index, and both drifts
+
+The vulnerability score survives as one map layer and nowhere else.  It is not
+what sorts the table, not what filters the sidebar, and not a KPI.
 
 All data loaded from precomputed artifacts using @st.cache_data.
 All Swedish strings come from SWEDISH_LABELS in src/ui/labels.py.
 """
 
-import pickle
 from datetime import datetime
 from pathlib import Path
 
@@ -33,8 +35,9 @@ st.set_page_config(
     menu_items={"Get Help": None, "Report a bug": None},
 )
 
+from src.provenance import analysis_year, panel_max_year  # noqa: E402
 from src.ui.chart_theme import get_chart_layout  # noqa: E402
-from src.ui.choropleth import render_choropleth  # noqa: E402
+from src.ui.choropleth import MAP_LAYERS, render_choropleth, resolve_layer  # noqa: E402
 from src.ui.components import (  # noqa: E402
     card_header,
     footer_note,
@@ -44,9 +47,11 @@ from src.ui.components import (  # noqa: E402
 )
 from src.ui.css import COLORS, inject_css  # noqa: E402
 from src.ui.labels import (  # noqa: E402
+    POSITION_BANDS,
     SWEDISH_LABELS,
+    classify_position,
+    format_index_points,
     format_pct,
-    format_signed_pct,
 )
 from src.ui.sidebar import render_sidebar  # noqa: E402
 
@@ -64,54 +69,67 @@ sidebar_state = render_sidebar("national")
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _ARTIFACTS_DIR = _PROJECT_ROOT / "artifacts"
 
-
-@st.cache_data
-def _load_predictions() -> pd.DataFrame:
-    """Load 290-row prediction artifact."""
-    return pd.read_parquet(_ARTIFACTS_DIR / "predictions.parquet")
-
-
-@st.cache_data
-def _load_ranking() -> pd.DataFrame:
-    """Load ranking artifact sorted by vulnerability_rank."""
-    return pd.read_parquet(_ARTIFACTS_DIR / "ranking.parquet")
+# Position runs to the panel's own last year; the model stops at the last year
+# with every structural variable.  Neither is hardcoded — see src/provenance.py.
+_POSITION_YEAR = panel_max_year()
+_ANALYSIS_YEAR = analysis_year()
 
 
 @st.cache_data
-def _load_coefficients() -> pd.DataFrame:
-    """Load regression coefficients artifact."""
-    return pd.read_parquet(_ARTIFACTS_DIR / "coefficients.parquet")
+def _load_position() -> pd.DataFrame:
+    """Position and drift for the latest year the panel reaches."""
+    df = pd.read_parquet(_ARTIFACTS_DIR / "position.parquet")
+    return df[df["year"] == _POSITION_YEAR].copy()
 
 
 @st.cache_data
-def _load_within_r2() -> float:
-    """Extract within-R² from the pickled model results."""
-    with open(_ARTIFACTS_DIR / "model_results.pkl", "rb") as f:
-        res = pickle.load(f)
-    return float(res.rsquared_within)
+def _load_names() -> pd.DataFrame:
+    """Kommun and län names, from the panel."""
+    panel = pd.read_parquet(_PROJECT_ROOT / "data" / "processed" / "panel.parquet")
+    return panel[["kommun_kod", "kommun_name", "lan_name"]].drop_duplicates()
 
 
 @st.cache_data
-def _load_panel_2024() -> pd.DataFrame:
-    """Load 2024 panel data for choropleth supplementary columns."""
-    panel = pd.read_parquet(
-        _PROJECT_ROOT / "data" / "processed" / "panel.parquet"
-    )
-    return panel[panel["year"] == 2024][
+def _load_panel_latest() -> pd.DataFrame:
+    """Structural variables for the latest complete-case year, for tooltips."""
+    panel = pd.read_parquet(_PROJECT_ROOT / "data" / "processed" / "panel.parquet")
+    return panel[panel["year"] == _ANALYSIS_YEAR][
         ["kommun_kod", "tax_base_per_capita", "unemployment_rate", "population"]
     ].copy()
 
 
-predictions_df = _load_predictions()
-ranking_df = _load_ranking()
-coef_df = _load_coefficients()
-within_r2 = _load_within_r2()
-panel_2024 = _load_panel_2024()
+@st.cache_data
+def _load_vulnerability() -> pd.DataFrame:
+    """The deprecated score, kept only to draw its map layer."""
+    path = _ARTIFACTS_DIR / "predictions.parquet"
+    if not path.exists():
+        return pd.DataFrame(columns=["kommun_kod", "vulnerability_score"])
+    return pd.read_parquet(path)[
+        ["kommun_kod", "vulnerability_score", "vulnerability_rank", "risk_class"]
+    ]
+
+
+@st.cache_data
+def _load_cross_r2() -> float:
+    """Cross-sectional R² for the analysis year, from the coefficient table."""
+    coefs = pd.read_parquet(_ARTIFACTS_DIR / "coefficients_cross.parquet")
+    row = coefs[coefs["spec"] == f"year_{_ANALYSIS_YEAR}"]
+    return float(row["r_squared"].iloc[0])
+
+
+position_df = _load_position().merge(_load_names(), on="kommun_kod", how="left")
+panel_latest = _load_panel_latest()
+vulnerability_df = _load_vulnerability()
+cross_r2 = _load_cross_r2()
+
+map_df = position_df.merge(panel_latest, on="kommun_kod", how="left").merge(
+    vulnerability_df, on="kommun_kod", how="left"
+)
 
 _UPDATED_DATE = ""
-if (_ARTIFACTS_DIR / "predictions.parquet").exists():
+if (_ARTIFACTS_DIR / "position.parquet").exists():
     _UPDATED_DATE = datetime.fromtimestamp(
-        (_ARTIFACTS_DIR / "predictions.parquet").stat().st_mtime
+        (_ARTIFACTS_DIR / "position.parquet").stat().st_mtime
     ).strftime("%Y-%m-%d")
 
 # ---------------------------------------------------------------------------
@@ -123,78 +141,88 @@ st.html(
         eyebrow=SWEDISH_LABELS["eyebrow_national"],
         title=SWEDISH_LABELS["title_national"],
         subtitle=SWEDISH_LABELS["subtitle_national"],
-        year=2025,
+        year=_POSITION_YEAR,
     )
 )
 
 # ---------------------------------------------------------------------------
-# Section 2: KPI row
+# Section 2: KPI row — spread, movers, fit
 # ---------------------------------------------------------------------------
 
-median_predicted_growth = predictions_df["predicted_growth_2025"].median()
-count_hog_risk = int((predictions_df["risk_class"] == "hog").sum())
-worst_idx = predictions_df["predicted_growth_2025"].idxmin()
-min_predicted = predictions_df.loc[worst_idx, "predicted_growth_2025"]
-worst_kommun = predictions_df.loc[worst_idx, "kommun_name"]
+_highest = position_df.loc[position_df["relative_position"].idxmax()]
+_lowest = position_df.loc[position_df["relative_position"].idxmin()]
+
+_with_drift = position_df.dropna(subset=["drift_10y"])
+_biggest_fall = _with_drift.loc[_with_drift["drift_10y"].idxmin()]
+_biggest_rise = _with_drift.loc[_with_drift["drift_10y"].idxmax()]
 
 kpi_cards = [
     kpi_card(
-        SWEDISH_LABELS["kpi_median_prognosis"],
-        value=format_pct(median_predicted_growth),
+        SWEDISH_LABELS["kpi_index_spread"],
+        value=(
+            f"{_highest['relative_position']:.0f} / "
+            f"{_lowest['relative_position']:.0f}"
+        ),
         variant="default",
     ),
     kpi_card(
-        SWEDISH_LABELS["kpi_high_risk_count"],
-        value=str(count_hog_risk),
+        SWEDISH_LABELS["kpi_largest_fall_10y"],
+        value=(
+            f"{format_index_points(_biggest_fall['drift_10y'])}, "
+            f"{_biggest_fall['kommun_name']}"
+        ),
         variant="danger",
     ),
     kpi_card(
-        SWEDISH_LABELS["kpi_largest_decline"],
-        value=f"{format_signed_pct(min_predicted)}, {worst_kommun}",
-        variant="danger",
-    ),
-    kpi_card(
-        SWEDISH_LABELS["kpi_model_r2"],
-        value=format_pct(within_r2 * 100),
+        SWEDISH_LABELS["kpi_largest_rise_10y"],
+        value=(
+            f"{format_index_points(_biggest_rise['drift_10y'])}, "
+            f"{_biggest_rise['kommun_name']}"
+        ),
         variant="default",
-        tooltip=SWEDISH_LABELS["kpi_r2_tooltip"],
+    ),
+    kpi_card(
+        SWEDISH_LABELS["kpi_cross_r2"],
+        value=format_pct(cross_r2 * 100, decimals=0),
+        variant="default",
+        tooltip=SWEDISH_LABELS["kpi_cross_r2_tooltip"].format(year=_ANALYSIS_YEAR),
     ),
 ]
 render_kpi_row(kpi_cards)
 
-# Contextual summary
-_summary_text = SWEDISH_LABELS["national_summary_template"].format(
-    median=format_pct(median_predicted_growth),
-    count=count_hog_risk,
-    kommun=worst_kommun,
-    decline=format_signed_pct(min_predicted),
+st.html(
+    '<div class="shai-summary">'
+    + SWEDISH_LABELS["national_position_summary"].format(
+        high_name=_highest["kommun_name"],
+        high=_highest["relative_position"],
+        low_name=_lowest["kommun_name"],
+        low=_lowest["relative_position"],
+    )
+    + "</div>"
 )
-st.html(f'<div class="shai-summary">{_summary_text}</div>')
 
 # ---------------------------------------------------------------------------
-# Sidebar filter: risk class mapping
+# Sidebar filter: position bands
 # ---------------------------------------------------------------------------
 
-_RISK_LABEL_TO_CODE = {
-    SWEDISH_LABELS["risk_high"]: "hog",
-    SWEDISH_LABELS["risk_medium"]: "medel",
-    SWEDISH_LABELS["risk_low"]: "lag",
+_BAND_BY_LABEL = {band.label: band for band in POSITION_BANDS}
+_selected_bands = {
+    _BAND_BY_LABEL[label].key
+    for label in sidebar_state["selected_bands"]
+    if label in _BAND_BY_LABEL
 }
-_RISK_CODE_TO_LABEL = {v: k for k, v in _RISK_LABEL_TO_CODE.items()}
 
-selected_risk_codes = [
-    _RISK_LABEL_TO_CODE[lbl]
-    for lbl in sidebar_state["selected_risks"]
-    if lbl in _RISK_LABEL_TO_CODE
-]
 
-# Filtered data for table and histogram (NOT choropleth)
-filtered_df = predictions_df[
-    predictions_df["risk_class"].isin(selected_risk_codes)
-].copy()
+def _band_key(index: float) -> str:
+    band = classify_position(index)
+    return band.key if band else ""
+
+
+position_df["band_key"] = position_df["relative_position"].apply(_band_key)
+filtered_df = position_df[position_df["band_key"].isin(_selected_bands)].copy()
 
 # ---------------------------------------------------------------------------
-# Section 3 & 4: Two-column layout — Choropleth (left) + Histogram (right)
+# Section 3 & 4: Choropleth with layer toggle (left) + histogram (right)
 # ---------------------------------------------------------------------------
 
 col_map, col_hist = st.columns([3, 2])
@@ -207,58 +235,53 @@ with col_map:
                 subtitle=SWEDISH_LABELS["map_subtitle"],
             )
         )
-        # Merge predictions with 2024 panel data for choropleth tooltips
-        choropleth_data = predictions_df.merge(
-            panel_2024, on="kommun_kod", how="left"
+        _layer_label = st.radio(
+            SWEDISH_LABELS["map_layer_label"],
+            options=[layer.label for layer in MAP_LAYERS.values()],
+            index=0,
+            horizontal=True,
         )
-        render_choropleth(choropleth_data)
+        active_layer = resolve_layer(_layer_label)
+        render_choropleth(map_df, layer=active_layer)
         with st.expander(SWEDISH_LABELS["explain_choropleth_expander"]):
             st.markdown(SWEDISH_LABELS["explain_choropleth_text"])
 
 with col_hist:
     with st.container(border=True):
-        st.html(
-            card_header(SWEDISH_LABELS["chart_distribution"])
-        )
+        st.html(card_header(SWEDISH_LABELS["chart_distribution"]))
+
+        # The histogram follows the map: same quantity, same units, so the two
+        # cannot disagree about what is being shown.
+        hist_values = filtered_df.merge(
+            vulnerability_df, on="kommun_kod", how="left"
+        )[active_layer.column]
 
         fig_hist = go.Figure()
         fig_hist.add_trace(
             go.Histogram(
-                x=filtered_df["predicted_growth_2025"],
+                x=hist_values,
                 nbinsx=30,
                 marker_color=COLORS["secondary"],
                 hovertemplate=(
-                    SWEDISH_LABELS["axis_growth_pct"]
-                    + ": %{x:.1f}<br>"
+                    f"{active_layer.label}: %{{x:.1f}}<br>"
                     + SWEDISH_LABELS["axis_kommuner_count"]
                     + ": %{y}<extra></extra>"
                 ),
             )
         )
 
-        # Risk class boundary lines
-        _p20 = predictions_df["predicted_growth_2025"].quantile(0.2)
-        _p80 = predictions_df["predicted_growth_2025"].quantile(0.8)
+        # Reference line: the national mean for a level, zero for a signed
+        # quantity.  Drawing a zero line on an index would be meaningless.
         fig_hist.add_vline(
-            x=_p20, line_dash="dash", line_width=1,
-            line_color=COLORS["high_risk"],
-            annotation_text=SWEDISH_LABELS["risk_boundary_high_medium"],
-            annotation_position="top left",
-            annotation_font_size=10,
-            annotation_font_color=COLORS["text_secondary"],
-        )
-        fig_hist.add_vline(
-            x=_p80, line_dash="dash", line_width=1,
-            line_color=COLORS["low_risk"],
-            annotation_text=SWEDISH_LABELS["risk_boundary_medium_low"],
-            annotation_position="top right",
-            annotation_font_size=10,
-            annotation_font_color=COLORS["text_secondary"],
+            x=0 if active_layer.diverging else 100,
+            line_dash="dash",
+            line_width=1,
+            line_color=COLORS["text_secondary"],
         )
 
         hist_layout = get_chart_layout(
-            height=440,
-            xaxis_title=SWEDISH_LABELS["axis_growth_pct"],
+            height=400,
+            xaxis_title=active_layer.label,
             yaxis_title=SWEDISH_LABELS["axis_kommuner_count"],
             showlegend=False,
         )
@@ -272,7 +295,18 @@ with col_hist:
             st.markdown(SWEDISH_LABELS["explain_histogram_text"])
 
 # ---------------------------------------------------------------------------
-# Section 5: Rangordning (sortable table + CSV download)
+# Section 5: The two index measures, side by side (T1.3)
+# ---------------------------------------------------------------------------
+
+with st.container(border=True):
+    st.html(card_header(SWEDISH_LABELS["index_compare_title"]))
+    st.html(
+        f'<div class="shai-explanation">'
+        f'{SWEDISH_LABELS["index_compare_explanation"]}</div>'
+    )
+
+# ---------------------------------------------------------------------------
+# Section 6: Table of all kommuner
 # ---------------------------------------------------------------------------
 
 with st.container(border=True):
@@ -280,65 +314,48 @@ with st.container(border=True):
     with st.expander(SWEDISH_LABELS["explain_ranking_expander"]):
         st.markdown(SWEDISH_LABELS["explain_ranking_text"])
 
-    table_df = filtered_df.sort_values("vulnerability_rank")
+    table_df = filtered_df.sort_values("relative_position", ascending=False)
     display_df = pd.DataFrame(
         {
-            SWEDISH_LABELS["th_rank"]: table_df["vulnerability_rank"].astype(int).values,
             SWEDISH_LABELS["th_kommun"]: table_df["kommun_name"].values,
             SWEDISH_LABELS["th_lan"]: table_df["lan_name"].values,
-            SWEDISH_LABELS["th_prognosis"]: table_df["predicted_growth_2025"].values,
-            SWEDISH_LABELS["th_risk_class"]: table_df["risk_class"]
-            .map(_RISK_CODE_TO_LABEL)
-            .values,
+            SWEDISH_LABELS["index_compare_ours"]: table_df[
+                "relative_position"
+            ].round(1).values,
+            SWEDISH_LABELS["index_compare_scb"]: table_df[
+                "tax_base_index_riket"
+            ].values,
+            SWEDISH_LABELS["drift_5y"]: table_df["drift_5y"].round(1).values,
+            SWEDISH_LABELS["drift_10y"]: table_df["drift_10y"].round(1).values,
         }
-    )
-
-    def _color_risk(val):
-        colors = {
-            SWEDISH_LABELS["risk_high"]: (
-                f"background-color: rgba(185, 74, 72, 0.12); "
-                f"color: {COLORS['high_risk']}; font-weight: 600;"
-            ),
-            SWEDISH_LABELS["risk_medium"]: (
-                f"background-color: rgba(212, 160, 60, 0.12); "
-                f"color: {COLORS['medium_risk']}; font-weight: 600;"
-            ),
-            SWEDISH_LABELS["risk_low"]: (
-                f"background-color: rgba(46, 125, 91, 0.12); "
-                f"color: {COLORS['low_risk']}; font-weight: 600;"
-            ),
-        }
-        return colors.get(val, "")
-
-    styled_df = display_df.style.map(
-        _color_risk, subset=[SWEDISH_LABELS["th_risk_class"]]
     )
 
     st.dataframe(
-        styled_df,
+        display_df,
         use_container_width=True,
         hide_index=True,
         column_config={
-            SWEDISH_LABELS["th_prognosis"]: st.column_config.NumberColumn(
-                format="%.1f %%",
+            SWEDISH_LABELS["index_compare_ours"]: st.column_config.NumberColumn(
+                format="%.1f"
             ),
+            SWEDISH_LABELS["index_compare_scb"]: st.column_config.NumberColumn(
+                format="%.0f"
+            ),
+            SWEDISH_LABELS["drift_5y"]: st.column_config.NumberColumn(format="%+.1f"),
+            SWEDISH_LABELS["drift_10y"]: st.column_config.NumberColumn(format="%+.1f"),
         },
     )
 
-    csv_export = display_df.copy()
-    csv_export[SWEDISH_LABELS["th_prognosis"]] = csv_export[
-        SWEDISH_LABELS["th_prognosis"]
-    ].apply(lambda x: format_pct(x))
-    csv_data = csv_export.to_csv(index=False).encode("utf-8")
+    csv_data = display_df.to_csv(index=False).encode("utf-8")
     st.download_button(
         label=SWEDISH_LABELS["btn_download_csv"],
         data=csv_data,
-        file_name="riksoversikt_ranking.csv",
+        file_name="riksoversikt_position.csv",
         mime="text/csv",
     )
 
 # ---------------------------------------------------------------------------
-# Section 6: Footer
+# Section 7: Footer
 # ---------------------------------------------------------------------------
 
 st.html(footer_note(SWEDISH_LABELS["footer_source"], "v1.0", updated=_UPDATED_DATE))

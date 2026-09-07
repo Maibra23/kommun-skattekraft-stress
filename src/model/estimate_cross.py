@@ -54,6 +54,8 @@ import logging
 from pathlib import Path
 
 import pandas as pd
+
+from src.provenance import analysis_year
 import statsmodels.api as sm
 
 logger = logging.getLogger(__name__)
@@ -74,11 +76,11 @@ X_VARS: list[str] = [
 
 #: Unemployment ends in 2024, so the complete-case panel does too. Position
 #: alone runs to 2026; this model cannot. See artifacts/data_provenance.json.
-LATEST_YEAR: int = 2024
+LATEST_YEAR: int = analysis_year()
 
 #: Four years is enough to show the intervals overlap and the signs hold,
 #: without reaching back into a materially different labour market.
-ESTIMATION_YEARS: tuple[int, ...] = (2021, 2022, 2023, 2024)
+ESTIMATION_YEARS: tuple[int, ...] = tuple(range(LATEST_YEAR - 3, LATEST_YEAR + 1))
 
 
 # ---------------------------------------------------------------------------

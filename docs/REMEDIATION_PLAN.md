@@ -586,8 +586,8 @@ STEP  TASK                                            PHASE  DELEGATION
  [x] 6   T2.2 + T2.3  Decomposition + diagnostics        2    [SOLO]  done 2026-09-07
  [x] 7   T2.4  Demote FE to inference panel              2    [SOLO]  done 2026-09-07
  [x] --- GATE  Phase 2 complete (R2, residual, VIF)            PASSED 2026-09-07
- [ ] 8a  T1.2  Dashboard leads with position/drift       1    [SOLO]  <- NEXT (the cutover)
- [ ] 8b  T1.3  Show SCB index alongside                  1    [PARALLEL-A]
+ [x] 8a  T1.2  Dashboard leads with position/drift       1    [SOLO]  done 2026-09-07 (the cutover)
+ [x] 8b  T1.3  Show SCB index alongside                  1    folded into 8a
  [ ] 9a  T3.1  Rolling-origin backtest harness           3    [SUBAGENT]   optional
  [ ] 9b  T3.2  5-year drift forecaster                   3    [SOLO]       optional
  [ ] 9c  T3.3  Publish backtest in UI                    3    [PARALLEL-C] optional
@@ -1029,6 +1029,46 @@ The skattekraft check costs **no extra query**: riket is implied by the 290 komm
 **Two things worth knowing for later.**
 - `fetch_education` had **no test file at all** before this change. One exists now, carrying the disclosure probe. Its other paths remain untested.
 - The education probe costs four small queries per cold run (a sample of 5 kommuner × 2 sexes × 2 age selections). If that ever matters, sample fewer kommuner rather than dropping the probe: it is the only thing standing between `edu_share` — 640 summed cells per kommun, and the dominant cross-sectional driver — and the failure that hit population.
+
+---
+
+### 2026-09-07 — step 8 complete · the cutover · the dashboard leads with what is actually known
+
+**Done.** T1.2 and T1.3 landed together in one commit, as §11.7 requires — the deployed site reads committed artifacts with no build step, so it had to work at this commit and not one later. T1.3 was folded in rather than deferred: it touches the same file T1.2 rewrites, and the two index measures had to be labelled at the same moment position became the headline number. Suite is **352 passed**, of which `pytest -m "not baseline"` runs 336.
+
+**Three decisions were taken by the user before any code was written**, because they change what the dashboard *is* rather than how it is built: the vulnerability score survives as one map layer and nothing else; T1.3 folds in; and the KPI row leads with spread and movers rather than with the median kommun or with rank stability.
+
+**What the pages now show.**
+
+| | Before | After |
+|---|---|---|
+| Landing lead | "en panelmodell som identifierar kommuner med svag prognosticerad tillväxt" | where a kommun stands and which way it moves; *"modellen förklarar dem, den förutsäger dem inte"* |
+| Flow diagram | four equal boxes feeding a regression, three outputs including *Prognos 2025* | two identified drivers solid, two controls dashed and muted; outputs are position and decomposition, no forecast |
+| Coefficient chart | raw β, sorted by magnitude | **β × SD with 95 % intervals**, controls greyed, identification stated in the table |
+| Riksöversikt KPIs | median prognos, kommuner i hög risk, största nedgång, R²(within) = 0,8 % | index spread, largest 10-year fall and rise, **cross-sectional R² = 69 %** |
+| Map | one layer, vulnerability | **three layers** — position (sequential), 5-year drift (diverging, zero-centred), vulnerability (unchanged) |
+| Sidebar filter | risk-class quintiles | position bands (under 90 / 90–110 / över 110) |
+| Kommun page lead | KPI row starting with skattekraft 2024 | *"{kommun} ligger på index 76 av riksgenomsnittet, en förflyttning på −1,2 indexenheter sedan 2021"* |
+| Decomposition | five hardcoded bars, two of them unidentified variables | bars for the two attributed components plus residual; controls listed as numbers **with their intervals** under an explicit "går inte att särskilja" |
+| Kommun selector | sorted by vulnerability rank | sorted by position, lowest first |
+
+**The colour semantics are separated, and a test enforces it.** Position is a level on a new `SEQUENTIAL_SCALE`; drift is signed on a reversed diverging scale with `vmin == -vmax`; the vulnerability palette is untouched. A test asserts position is not diverging and does not reuse `DIVERGING_SCALE`, because the plan's caution — that sharing them would mislead — is the kind of thing that erodes silently. The position ramp is clipped to 80–130: the median kommun sits at 96,6 and the maximum at 208, so an unclipped scale renders nine kommuner in ten as one colour.
+
+**No page reads a hardcoded analysis year any more.** `src/provenance.py` resolves `complete_case_max_year` and `panel_max_year` from the artifact, and the live model modules (`estimate_cross`, `decompose_cross`, `diagnostics`) read it too. Three hardcoded 2024s remain, all in retiring code: `predict.py` (deprecated forecast), `decompose.py` (superseded by `decompose_cross`), and `estimate.py`'s `large_only` subsample, where 2024 defines a fixed sample rather than an analysis year. T3.x can take them with the modules.
+
+**Two things the cutover removed from the deployed runtime.** `pages/01_Riksoversikt.py` no longer unpickles `model_results.pkl` — R²(within) has been a column in `coefficients.parquet` since T2.4 — so **`linearmodels` is no longer imported by the deployed app at all**. And no page now reads `decomposition.parquet` or `ranking.parquet`; both are still written, and are now free for T3.x to retire without touching the UI.
+
+**Verified by running the pages, not by reading them.** `tests/test_pages_render.py` executes all three through Streamlit's `AppTest` against the real committed artifacts and fails on any uncaught exception — 17 tests. This matters because an HTTP 200 from a Streamlit page proves only that the shell was served; the script runs afterwards over the websocket, so a page that raises still returns 200. The first version of these tests used `AppTest.from_file` and failed on all three pages with `KeyError: 'url_pathname'` — the shared sidebar's `st.page_link` cannot resolve outside a multipage context. Reaching the pages through `switch_page` fixes it. That was a harness limitation, not a page defect: a real `streamlit run` served all three.
+
+**A test written for this commit caught exactly what it was written for.** `test_every_referenced_label_exists` scans every `SWEDISH_LABELS["..."]` reference in `app.py`, the pages and `src/ui/`, and asserts the key exists. It failed on five keys the new SVG and stat strip referenced before those keys were added. A missing key raises `KeyError` at render time, which on Streamlit Cloud is a stack trace where the page should be.
+
+**Seven user-facing strings that T4.2 owns were corrected here instead**, because this commit is what makes them false: `method_model_name` (the FE model is no longer the headline), `landing_vars_title` ("vikter" → "koefficienter", closing F6), `landing_model_explanation` and `landing_model_example` (both described a 2025 forecast), `landing_vars_explanation` and `landing_vars_example` (both described raw coefficients), and `landing_lead`. `chart_distribution`, `map_subtitle`, `landing_nav_national_desc` and `landing_step_4` likewise. **T4.2 still owns the README and the risk-class labels.**
+
+**Notes for whoever runs this next.**
+- The stat strip said "15 ÅR PANEL" and "FE"; it now says 17 and "2 IDENTIFIERADE DRIVKRAFTER". The 15 had been false since the 2026 rebuild.
+- `kpi_r2_tooltip` is now unused — the R² KPI is cross-sectional and has its own tooltip. Left in place for T4.2 to remove.
+- Streamlit 1.56 warns that `use_container_width` is deprecated after 2025-12-31. Pre-existing and repo-wide; not touched here.
+- The peer table compares by position rather than by vulnerability score, so different kommuner appear as peers. That is the intended change: peers should be kommuner in a similar position, not kommuner with a similar forecast.
 
 ---
 

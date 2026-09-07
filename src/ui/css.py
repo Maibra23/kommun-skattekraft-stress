@@ -44,6 +44,20 @@ DIVERGING_SCALE = [
     "#B94A48",
 ]
 
+# Sequential scale for *levels* — relative position against the national mean.
+# Deliberately not DIVERGING_SCALE: a diverging palette implies a meaningful
+# midpoint, and an index level has none.  Single hue, pale to saturated, so
+# "darker is higher" reads without a legend.  See REMEDIATION_PLAN.md T1.2.
+SEQUENTIAL_SCALE = [
+    "#F2F5F9",
+    "#D6E0EC",
+    "#B0C4DC",
+    "#84A2C6",
+    "#5A7FBD",
+    "#3D5F94",
+    "#28406B",
+]
+
 CHART_PALETTE = [
     "#4A6FA5",
     "#2E7D5B",

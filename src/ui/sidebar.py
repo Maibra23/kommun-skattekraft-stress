@@ -2,17 +2,21 @@
 
 render_sidebar(page_key) builds a 260 px navy sidebar containing: a brand
 block (gold accent bar, 'KSS' mark, title, sub), navigation links to the three
-pages, a year selector (st.pills, single, default 2024), a risk-class filter
-(st.pills, multi, options from SWEDISH_LABELS), a color-coded risk legend, and
-a footer with data source, last-updated date, and version string.
+pages, a position filter (st.pills, multi, options from POSITION_BANDS), a
+legend for those bands, and a footer with data source and version string.
+
+The filter used to cut on risk class -- quintiles of a forecast that scored
+r = +0.016 against realised growth, and relative by construction, so exactly
+58 kommuner were always "hog risk". It now cuts on observed position against
+the national mean. See REMEDIATION_PLAN.md T1.2.
 
 All label strings come from SWEDISH_LABELS in src/ui/labels.py.
 """
 
 import streamlit as st
 
-from src.ui.css import COLORS
-from src.ui.labels import SWEDISH_LABELS
+from src.ui.css import COLORS, SEQUENTIAL_SCALE
+from src.ui.labels import POSITION_BANDS, SWEDISH_LABELS
 
 
 # ---------------------------------------------------------------------------
@@ -25,16 +29,15 @@ _NAV_ITEMS = [
     {"key": "kommun", "label": SWEDISH_LABELS["nav_kommun"], "page": "pages/02_Kommunjamforelse"},
 ]
 
-_RISK_OPTIONS = [
-    SWEDISH_LABELS["risk_high"],
-    SWEDISH_LABELS["risk_medium"],
-    SWEDISH_LABELS["risk_low"],
-]
+#: Highest band first, so the pills read top-down like the legend.
+_BAND_OPTIONS = [band.label for band in reversed(POSITION_BANDS)]
 
-_RISK_LEGEND = [
-    (COLORS["high_risk"], SWEDISH_LABELS["risk_high"]),
-    (COLORS["medium_risk"], SWEDISH_LABELS["risk_medium"]),
-    (COLORS["low_risk"], SWEDISH_LABELS["risk_low"]),
+#: Swatches taken from the map's sequential ramp, so the sidebar and the
+#: choropleth agree that darker means higher.
+_BAND_LEGEND = [
+    (SEQUENTIAL_SCALE[5], POSITION_BANDS[2].label),
+    (SEQUENTIAL_SCALE[3], POSITION_BANDS[1].label),
+    (SEQUENTIAL_SCALE[1], POSITION_BANDS[0].label),
 ]
 
 
@@ -51,10 +54,9 @@ def render_sidebar(page_key: str) -> dict:
             'kommun'.  Used to highlight the active navigation link.
 
     Returns:
-        Dict with keys:
-            'selected_year' (int): The year selected in the year pill.
-            'selected_risks' (list[str]): Selected risk class labels
-                (Swedish strings from SWEDISH_LABELS).
+        Dict with key 'selected_bands' (list[str]): the selected position-band
+        labels. Empty selections are treated as "all", so the pages never
+        render an empty map.
     """
     with st.sidebar:
         # ---- Brand block ----
@@ -84,24 +86,24 @@ def render_sidebar(page_key: str) -> dict:
 
         st.html('<div style="height: 8px;"></div>')
 
-        # ---- Risk filter ----
+        # ---- Position filter ----
         st.html(
             f'<div class="shai-sidebar-section-label">'
-            f'{SWEDISH_LABELS["label_risk_filter"]}</div>'
+            f'{SWEDISH_LABELS["label_position_filter"]}</div>'
         )
-        selected_risks = st.pills(
-            label=SWEDISH_LABELS["label_risk_filter"],
-            options=_RISK_OPTIONS,
-            default=_RISK_OPTIONS,
+        selected_bands = st.pills(
+            label=SWEDISH_LABELS["label_position_filter"],
+            options=_BAND_OPTIONS,
+            default=_BAND_OPTIONS,
             selection_mode="multi",
             label_visibility="collapsed",
         )
-        if not selected_risks:
-            selected_risks = _RISK_OPTIONS
+        if not selected_bands:
+            selected_bands = _BAND_OPTIONS
 
-        # ---- Risk legend ----
+        # ---- Band legend ----
         legend_html = '<div class="shai-risk-legend">'
-        for color, label in _RISK_LEGEND:
+        for color, label in _BAND_LEGEND:
             legend_html += (
                 f'<div class="shai-risk-legend-item">'
                 f'<div class="shai-risk-legend-dot" style="background:{color};"></div>'
@@ -110,6 +112,10 @@ def render_sidebar(page_key: str) -> dict:
             )
         legend_html += '</div>'
         st.html(legend_html)
+        st.html(
+            f'<div class="shai-sidebar-note">'
+            f'{SWEDISH_LABELS["band_legend_note"]}</div>'
+        )
 
         # ---- Footer ----
         st.html(f"""
@@ -120,5 +126,5 @@ def render_sidebar(page_key: str) -> dict:
         """)
 
     return {
-        "selected_risks": list(selected_risks),
+        "selected_bands": list(selected_bands),
     }

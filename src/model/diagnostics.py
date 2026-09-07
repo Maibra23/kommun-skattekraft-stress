@@ -41,6 +41,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from src.provenance import analysis_year
+
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -64,7 +66,8 @@ VIF_SEVERE: float = 10.0
 #: The audit reported the within-design pairs above this in absolute value.
 CORR_HIGH: float = 0.65
 
-_LATEST_YEAR: int = 2024
+#: Read from the provenance artifact, not hardcoded (src/provenance.py).
+_LATEST_YEAR: int = analysis_year()
 
 
 # ---------------------------------------------------------------------------

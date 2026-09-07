@@ -4,11 +4,17 @@ SWEDISH_LABELS is the single source of truth for every string visible to
 dashboard users.  Code that hardcodes Swedish text in component logic is
 rejected in code review, always import from here.
 
-Also provides three number formatting helpers:
+Also provides number formatting helpers:
   format_sek(value)              - integer SEK with narrow no-break space thousands separator
   format_pct(value, decimals)    - percentage with comma decimal and % suffix
   format_signed_pct(value, decimals) - signed percentage with explicit + or - sign
+  format_index_points(value)     - signed movement in index points
+
+and the position bands that replaced the risk-class quintiles at the T1.2
+cutover: POSITION_BANDS and classify_position.
 """
+
+from typing import NamedTuple
 
 # ---------------------------------------------------------------------------
 # Swedish labels (PRD §9, verbatim)
@@ -34,6 +40,15 @@ SWEDISH_LABELS = {
     # Sidebar controls
     "label_year": "ÅR",
     "label_risk_filter": "RISKKLASS",
+    "label_position_filter": "POSITION MOT RIKET",
+
+    # Position bands (replaced the risk-class quintiles at the T1.2 cutover)
+    "band_low": "Under 90",
+    "band_mid": "90–110",
+    "band_high": "Över 110",
+    "band_legend_note": (
+        "Kommunens skattekraft i procent av det oviktade riksgenomsnittet."
+    ),
     "label_kommun_select": "VÄLJ KOMMUN",
 
     # Risk classes
@@ -60,7 +75,7 @@ SWEDISH_LABELS = {
     "axis_kommuner_count": "Antal kommuner",
     "chart_historical": "Historisk skattekraft",
     "chart_decomposition": "Strukturell dekomponering",
-    "chart_distribution": "Fördelning av prognosticerad tillväxt",
+    "chart_distribution": "Fördelning av position",
 
     # Table headers
     "th_rank": "Rang",
@@ -90,7 +105,7 @@ SWEDISH_LABELS = {
 
     # Map
     "map_title": "Geografisk fördelning",
-    "map_subtitle": "Sårbarhetsindex per kommun",
+    "map_subtitle": "Välj vad kartan ska visa",
     "map_legend_caption": "Sårbarhetsindex (Lägre = bättre, Högre = sämre)",
     "map_color_scale_note": "Färgskala: Grön = låg sårbarhet, Gul = medel, Röd = hög sårbarhet",
 
@@ -110,7 +125,7 @@ SWEDISH_LABELS = {
     "footer_method_link": "Metodologi",
 
     # Methodology callouts
-    "method_model_name": "Tvåvägs fixed effects panelmodell",
+    "method_model_name": "Tvärsnittsmodell + panelmodell för samband över tid",
     "method_period": "Period: 2010 till 2026 (modellen skattas på 2010–2024)",
     "method_units": (
         "290 kommuner, 17 år, 4 930 observationer. Skattekraft finns till och "
@@ -120,55 +135,59 @@ SWEDISH_LABELS = {
 
     # Landing page
     "landing_lead": (
-        "En panelmodell som identifierar kommuner med svag prognosticerad "
-        "skattekraftstillväxt och dekomponerar drivkrafterna bakom "
-        "skillnaderna mellan kommuner."
+        "Var står din kommun mot riksgenomsnittet, och åt vilket håll rör den "
+        "sig? Skillnaderna mellan kommuner är stora, trögrörliga och mätbara — "
+        "modellen förklarar dem, den förutsäger dem inte."
     ),
     "landing_stat_kommuner": "KOMMUNER",
     "landing_stat_panel": "ÅR PANEL",
     "landing_stat_vars": "STRUKTURVARIABLER",
     "landing_stat_fe": "FIXED EFFECTS",
+    "landing_stat_identified": "IDENTIFIERADE DRIVKRAFTER",
     "landing_model_title": "Modellöversikt",
-    "landing_vars_title": "Variabler & vikter",
+    "landing_vars_title": "Variabler & koefficienter",
     "landing_pipeline_title": "Pipelinesteg",
     "landing_nav_title": "Utforska dashboarden",
     "landing_sources_title": "Källor & metod",
 
     # Landing page — section explanations (collapsible)
     "landing_model_explanation": (
-        "Diagrammet ovan visar hur modellen fungerar: fyra strukturvariabler "
-        "(arbetslöshet, försörjningskvot, befolkningstillväxt och utbildningsnivå) "
-        "matas in i en regressionsmodell som producerar tre resultat: "
-        "en tillväxtprognos för 2025, en sårbarhetsrangordning och en "
-        "strukturell dekomponering av drivkrafterna."
+        "Fyra strukturvariabler matas in i modellen, men de bär inte lika "
+        "mycket. Mellan kommuner går bara två av dem att särskilja: "
+        "utbildningsnivå, som är den klart starkaste, och öppen arbetslöshet. "
+        "Försörjningskvot och befolkningstillväxt ingår som kontroller — deras "
+        "effekt går inte att skilja från noll när kommuner jämförs med "
+        "varandra. Resultatet är en förklaring av kommunens läge, inte en "
+        "prognos för nästa år."
     ),
     "landing_model_example": (
-        "Tänk dig en kommun med stigande arbetslöshet och åldrande befolkning. "
-        "Modellen fångar att dessa faktorer historiskt sett hänger samman med "
-        "lägre skattekraftstillväxt, och ger kommunen en högre sårbarhetspoäng. "
-        "Kommunalrådet kan sedan se exakt hur mycket arbetslösheten respektive "
-        "demografin bidrar till den svaga prognosen, och prioritera insatser därefter."
+        "Filipstad ligger 16,7 indexenheter under riksgenomsnittet. Modellen "
+        "hänför 12,9 av dem till utbildningsnivån och 4,0 till arbetslösheten, "
+        "och lämnar 0,1 oförklarat. Danderyd ligger 99,3 enheter över — där "
+        "förklarar samma modell knappt hälften. Sambandet är starkast i mitten "
+        "av fördelningen och svagast i toppen."
     ),
     "landing_model_expander": "Hur läser jag diagrammet?",
     "landing_vars_explanation": (
-        "Staplarna visar hur starkt varje variabel påverkar skattekraftstillväxten. "
-        "Negativa värden (röda) innebär att en ökning av variabeln är förknippad "
-        "med lägre tillväxt. Stjärnorna (***) anger statistisk signifikans."
+        "Staplarna visar hur mycket kommunens indexläge skiljer sig när en "
+        "variabel ändras med en standardavvikelse. Strecken är 95-procentiga "
+        "konfidensintervall: omsluter strecket noll går effekten inte att "
+        "skilja från slumpen, och variabeln redovisas som kontroll."
     ),
     "landing_vars_example": (
-        "Exempel: koefficienten för öppen arbetslöshet är ca −0,06. Det innebär "
-        "att om en kommuns arbetslöshet ökar med 1 procentenhet (t.ex. från 8 % "
-        "till 9 %), förväntas skattekraftstillväxten minska med ungefär 0,06 "
-        "procentenheter, allt annat lika. Effekten är liten per enhet men "
-        "kan bli betydande vid stora förändringar."
+        "Exempel: utbildningsnivån ligger på +10,0 indexenheter. En kommun vars "
+        "andel eftergymnasialt utbildade är en standardavvikelse högre än en "
+        "annans ligger alltså ungefär 10 indexenheter högre i skattekraft. "
+        "Det är ett starkt och robust samband — men det ligger nära en "
+        "omskrivning av samma sak, inte en knapp att trycka på."
     ),
     "landing_vars_expander": "Hur tolkar jag koefficienterna?",
     "landing_nav_explanation": (
         "Dashboarden har två huvudvyer. Välj den som passar din frågeställning."
     ),
     "landing_nav_national_desc": (
-        "Kartvy och rangordning av alla 290 kommuners "
-        "prognosticerade skattekraftstillväxt."
+        "Karta och tabell över alla 290 kommuners position mot riket och deras "
+        "förflyttning över fem och tio år."
     ),
     "landing_nav_kommun_desc": (
         "Detaljerad vy med historisk trend, strukturell "
@@ -177,7 +196,7 @@ SWEDISH_LABELS = {
     "landing_step_1": "Datainsamling",
     "landing_step_2": "Rensning",
     "landing_step_3": "Estimering",
-    "landing_step_4": "Prognos",
+    "landing_step_4": "Förklaring",
 
     # Riksöversikt
     "chart_ranking_title": "Rangordning",
@@ -199,7 +218,13 @@ SWEDISH_LABELS = {
     "svg_panel_ols": "PanelOLS, 2-way FE",
     "svg_prognosis": "Prognos 2025",
     "svg_ranking": "Rangordning",
-    "svg_decomposition": "Dekomponering",
+    "svg_decomposition": "Dekomponering av läget",
+    # The flow diagram must not draw four equal drivers: two of the four are
+    # not separately identified between kommuner (T1.2).
+    "svg_identified_heading": "GÅR ATT SÄRSKILJA",
+    "svg_controls_heading": "KONTROLLER — EFFEKT EJ SKILD FRÅN NOLL",
+    "svg_cross_section": "Tvärsnittsmodell",
+    "svg_position": "Kommunens läge mot riket",
 
     # Contextual summary (Riksöversikt)
     "national_summary_template": (
@@ -214,6 +239,106 @@ SWEDISH_LABELS = {
         "avvikelse från riksgenomsnittet. Positiva staplar (gröna) drar "
         "uppåt, negativa (röda) drar nedåt."
     ),
+
+    # ---- Position and drift: the descriptive spine (T1.1, rendered by T1.2) ----
+    "position_index": "Index mot riksgenomsnittet",
+    "position_index_short": "Index",
+    "position_scb_index": "SCB:s index",
+    "drift_5y": "Förflyttning 5 år",
+    "drift_10y": "Förflyttning 10 år",
+    "unit_index_points": "indexenheter",
+
+    # Choropleth layer toggle
+    "map_layer_label": "Vad kartan visar",
+    "map_layer_position": "Nuvarande position",
+    "map_layer_drift": "Förflyttning 5 år",
+    "map_layer_vulnerability": "Sårbarhetsindex (avvecklas)",
+    "map_legend_position": (
+        "Skattekraft i procent av det oviktade riksgenomsnittet. "
+        "Mörkare = högre. Skalan är beskuren vid 80 och 130."
+    ),
+    "map_legend_drift": (
+        "Förändring i indexenheter de senaste fem åren. "
+        "Rött = tappat mark mot riket, grönt = vunnit mark."
+    ),
+
+    # The two index measures have different denominators (METHODOLOGY §7.13)
+    "index_compare_title": "Två mått på samma sak",
+    "index_compare_explanation": (
+        "Vårt index delar kommunens skattekraft med det **oviktade** "
+        "genomsnittet av de 290 kommunerna. SCB:s publicerade index delar med "
+        "**riksmedelvärdet**, som är befolkningsviktat och därför högre — "
+        "storstadskommuner väger tyngre i det. Därför ligger vårt tal alltid "
+        "över SCB:s, i genomsnitt med 7,0 indexenheter och som mest med 17,6. "
+        "Ingen av dem är fel; de svarar på olika frågor. Jämför aldrig ett "
+        "tal från det ena måttet med ett tal från det andra."
+    ),
+    "index_compare_ours": "Vårt index (oviktat)",
+    "index_compare_scb": "SCB:s index (viktat)",
+
+    # Riksöversikt KPI row after the cutover
+    "kpi_index_spread": "Högsta / lägsta index",
+    "kpi_largest_fall_10y": "Största fall, 10 år",
+    "kpi_largest_rise_10y": "Största ökning, 10 år",
+    "kpi_cross_r2": "Modellens förklaringsgrad",
+    "kpi_cross_r2_tooltip": (
+        "Andel av skillnaderna i skattekraft mellan kommuner som de fyra "
+        "strukturvariablerna förklarar, i tvärsnittet för {year}. Det är ett "
+        "annat mått än panelmodellens R² inom kommuner, som är lågt av "
+        "konstruktion och redovisas separat längre ner."
+    ),
+    "national_position_summary": (
+        "Skillnaderna mellan kommuner är stora och trögrörliga. {high_name} "
+        "ligger på index {high:.0f} och {low_name} på {low:.0f}. Rangordningen "
+        "är i praktiken låst: sambandet mellan ett års position och nästa års "
+        "är 0,99, och över tio år 0,93. Det som rör sig gör det långsamt — "
+        "därför visas förflyttning över fem och tio år, inte över ett."
+    ),
+
+    # Kommun page lead
+    "kommun_position_lead": (
+        "{kommun} ligger på index **{position:.0f}** av riksgenomsnittet, "
+        "en förflyttning på **{drift:+.1f} indexenheter** sedan {since}."
+    ),
+    "kommun_position_lead_no_drift": (
+        "{kommun} ligger på index **{position:.0f}** av riksgenomsnittet."
+    ),
+    "chart_position_history": "Position över tid",
+    "axis_index": "Index (riket = 100)",
+
+    # Decomposition of the position gap (T2.2)
+    "decomp_position_title": "Vad förklarar kommunens läge?",
+    "decomp_position_explanation": (
+        "Staplarna visar hur långt kommunen ligger från riksgenomsnittet i "
+        "indexenheter, uppdelat på de variabler som går att särskilja mellan "
+        "kommuner. Resten är oförklarad."
+    ),
+    "decomp_controls_title": "Ingår i modellen, går inte att särskilja",
+    "decomp_controls_explanation": (
+        "Försörjningskvot och befolkningstillväxt ingår i modellen som "
+        "kontrollvariabler, men mellan kommuner går deras effekt inte att "
+        "skilja från noll: konfidensintervallen omsluter noll i varje år "
+        "2021–{year}. De visas därför som siffror, inte som staplar — en "
+        "stapel skulle påstå en säkerhet som inte finns."
+    ),
+    "decomp_residual_note": (
+        "Modellen är linjär och träffar sämst i toppen av fördelningen. För de "
+        "allra rikaste kommunerna är en stor del av avvikelsen oförklarad."
+    ),
+
+    # Coefficients shown on a comparable scale (T2.1)
+    "landing_vars_scale_note": (
+        "Effekterna visas per standardavvikelse, inte per enhet. Råa "
+        "koefficienter går inte att jämföra med varandra när variablerna mäts "
+        "i olika enheter — en försörjningskvot rör sig mellan 0,5 och 1,2 "
+        "medan utbildningsandelen rör sig mellan 6 och 61 procent."
+    ),
+    "axis_beta_sd": "Effekt i indexenheter per standardavvikelse",
+    "vars_table_effect_sd": "Effekt per standardavvikelse",
+    "vars_table_ci": "95 % konfidensintervall",
+    "vars_table_identified": "Går att särskilja",
+    "identified_yes": "Ja",
+    "identified_no": "Nej — intervallet omsluter noll",
 
     # Within-time inference panel (REMEDIATION_PLAN.md T2.4).
     # The two-way FE model answers a different question than the ranking and
@@ -488,3 +613,68 @@ def format_signed_pct(value: float, decimals: int = 1) -> str:
         Formatted string like '+2,3 %' or '-1,8 %'.
     """
     return f"{value:+.{decimals}f}".replace(".", ",") + " %"
+
+
+def format_index_points(value: float, decimals: int = 1) -> str:
+    """Format a signed movement in index points.
+
+    Drift is a difference in index points, not a growth rate — "Filipstad fell
+    1,2 indexenheter" is a statement about position relative to the country,
+    not about its tax base shrinking (METHODOLOGY §2.7).
+
+    Args:
+        value: Movement in index points.
+        decimals: Number of decimal places.
+
+    Returns:
+        Formatted string like '+1,2' or '-0,4'.
+    """
+    return f"{value:+.{decimals}f}".replace(".", ",")
+
+
+# ---------------------------------------------------------------------------
+# Position bands
+# ---------------------------------------------------------------------------
+
+
+class PositionBand(NamedTuple):
+    """One band of relative position, used for filtering and for legends.
+
+    These replaced the risk-class quintiles at the T1.2 cutover. The quintiles
+    cut a forecast that scored r = +0.016 against realised growth, and they
+    were relative by construction — exactly 58 kommuner were always "hög risk",
+    even in a year when every tax base grew. A band is a cut of an observed
+    level, so it means what it says and its membership can change.
+    """
+
+    key: str
+    lower: float
+    upper: float
+    label: str
+
+
+#: Contiguous and exhaustive: every kommun falls in exactly one band. The cuts
+#: sit at 90 and 110 because the middle band then holds roughly the central
+#: two-thirds of kommuner (the median sits at 96,6).
+POSITION_BANDS: tuple[PositionBand, ...] = (
+    PositionBand("low", float("-inf"), 90.0, SWEDISH_LABELS["band_low"]),
+    PositionBand("mid", 90.0, 110.0, SWEDISH_LABELS["band_mid"]),
+    PositionBand("high", 110.0, float("inf"), SWEDISH_LABELS["band_high"]),
+)
+
+
+def classify_position(index: float) -> PositionBand | None:
+    """Return the band a relative-position index falls in.
+
+    Args:
+        index: Relative position, riket = 100.
+
+    Returns:
+        The matching band, or None when the value is missing.
+    """
+    if index is None or index != index:  # NaN
+        return None
+    for band in POSITION_BANDS:
+        if band.lower <= index < band.upper:
+            return band
+    return None

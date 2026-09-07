@@ -13,6 +13,7 @@ Legend caption comes from SWEDISH_LABELS['map_legend_caption'].
 """
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 import branca.colormap as cm
@@ -21,8 +22,13 @@ import pandas as pd
 import streamlit as st
 from streamlit_folium import st_folium
 
-from src.ui.css import COLORS, DIVERGING_SCALE
+from src.ui.css import COLORS, DIVERGING_SCALE, SEQUENTIAL_SCALE
 from src.ui.labels import SWEDISH_LABELS, format_pct, format_sek
+
+#: Drift is signed: falling position must read as the warning colour and rising
+#: as the reassuring one.  DIVERGING_SCALE runs green -> red for vulnerability,
+#: where high is bad; for drift the low end is the bad end, so it is reversed.
+DIVERGING_SCALE_REVERSED = list(reversed(DIVERGING_SCALE))
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _GEOJSON_PATH = _PROJECT_ROOT / "data" / "geo" / "kommuner.geojson"
@@ -46,17 +52,172 @@ _MAP_ZOOM_START = 5
 _VMIN = -2.5
 _VMAX = 2.5
 
-# Tooltip field aliases (Swedish)
+
+# ---------------------------------------------------------------------------
+# Map layers (REMEDIATION_PLAN.md T1.2)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MapLayer:
+    """One selectable choropleth layer.
+
+    Attributes:
+        key: Stable identifier used in code and tests.
+        column: The column of the merged frame this layer colours by.
+        label: Swedish radio-button label.
+        colors: Colour ramp, low value first.
+        vmin: Value mapped to the first colour; values below are clipped.
+        vmax: Value mapped to the last colour; values above are clipped.
+        diverging: Whether the scale has a meaningful midpoint. Signed
+            quantities do; levels do not.
+        legend_caption: Caption under the legend gradient.
+        decimals: Digits shown in the tooltip.
+    """
+
+    key: str
+    column: str
+    label: str
+    colors: list[str]
+    vmin: float
+    vmax: float
+    diverging: bool
+    legend_caption: str
+    decimals: int = 1
+
+
+#: The three layers the plan specifies. Position and drift must never share a
+#: palette: position is a level on a sequential ramp, drift is signed and
+#: centred on zero. Reusing the vulnerability palette for drift would imply
+#: that a falling kommun is "high risk", which is a different claim.
+MAP_LAYERS: dict[str, MapLayer] = {
+    "position": MapLayer(
+        key="position",
+        column="relative_position",
+        label=SWEDISH_LABELS["map_layer_position"],
+        colors=SEQUENTIAL_SCALE,
+        # Clipped to the body of the distribution: the median kommun sits at
+        # 96.6 and the maximum at 208, so an unclipped ramp would render nine
+        # kommuner in ten as one indistinguishable colour.
+        vmin=80.0,
+        vmax=130.0,
+        diverging=False,
+        legend_caption=SWEDISH_LABELS["map_legend_position"],
+    ),
+    "drift": MapLayer(
+        key="drift",
+        column="drift_5y",
+        label=SWEDISH_LABELS["map_layer_drift"],
+        colors=DIVERGING_SCALE_REVERSED,
+        vmin=-4.0,
+        vmax=4.0,
+        diverging=True,
+        legend_caption=SWEDISH_LABELS["map_legend_drift"],
+    ),
+    "vulnerability": MapLayer(
+        key="vulnerability",
+        column="vulnerability_score",
+        label=SWEDISH_LABELS["map_layer_vulnerability"],
+        colors=DIVERGING_SCALE,
+        vmin=_VMIN,
+        vmax=_VMAX,
+        diverging=True,
+        legend_caption=SWEDISH_LABELS["map_legend_caption"],
+        decimals=2,
+    ),
+}
+
+
+def resolve_layer(selection: str) -> MapLayer:
+    """Return the layer named by a key or by its Swedish label.
+
+    The radio widget hands back the label; code and tests use the key.
+
+    Args:
+        selection: Either a MAP_LAYERS key or a layer's Swedish label.
+
+    Returns:
+        The matching MapLayer.
+
+    Raises:
+        KeyError: If nothing matches.
+    """
+    if selection in MAP_LAYERS:
+        return MAP_LAYERS[selection]
+    for layer in MAP_LAYERS.values():
+        if layer.label == selection:
+            return layer
+    raise KeyError(
+        f"Okänt kartlager: {selection!r}. Giltiga lager: "
+        + ", ".join(f"{k} ({v.label})" for k, v in MAP_LAYERS.items())
+    )
+
+# Tooltip field aliases (Swedish), in display order.  Every field is optional:
+# which ones exist depends on what the caller merged in, and after T1.2 the
+# position layers carry no vulnerability columns at all.
 _TOOLTIP_ALIASES = {
     "kommun_name": SWEDISH_LABELS["th_kommun"],
+    "position_fmt": SWEDISH_LABELS["position_index"],
+    "scb_index_fmt": SWEDISH_LABELS["position_scb_index"],
+    "drift_5y_fmt": SWEDISH_LABELS["drift_5y"],
+    "drift_10y_fmt": SWEDISH_LABELS["drift_10y"],
+    "tax_base_per_capita_fmt": SWEDISH_LABELS["th_skattekraft"],
+    "unemployment_rate_fmt": SWEDISH_LABELS["th_unemployment"],
+    "population_fmt": SWEDISH_LABELS["tooltip_population"],
     "risk_class_label": SWEDISH_LABELS["th_risk_class"],
     "vulnerability_score_fmt": SWEDISH_LABELS["tooltip_vulnerability_score"],
     "predicted_growth_fmt": SWEDISH_LABELS["th_prognosis"],
     "vulnerability_rank": SWEDISH_LABELS["th_rank"],
-    "tax_base_per_capita_fmt": SWEDISH_LABELS["th_skattekraft"],
-    "unemployment_rate_fmt": SWEDISH_LABELS["th_unemployment"],
-    "population_fmt": SWEDISH_LABELS["tooltip_population"],
 }
+
+
+def _format_tooltip_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Add the formatted tooltip columns the frame has the inputs for.
+
+    Args:
+        df: Frame keyed by kommun_kod, carrying any subset of the source
+            columns.
+
+    Returns:
+        The same frame with formatted `*_fmt` columns added where possible.
+    """
+
+    def _signed_points(value: float) -> str:
+        return f"{value:+.1f}".replace(".", ",")
+
+    formatters = {
+        "position_fmt": ("relative_position", lambda v: f"{v:.1f}".replace(".", ",")),
+        "scb_index_fmt": ("tax_base_index_riket", lambda v: f"{v:.0f}"),
+        "drift_5y_fmt": ("drift_5y", _signed_points),
+        "drift_10y_fmt": ("drift_10y", _signed_points),
+        "tax_base_per_capita_fmt": ("tax_base_per_capita", format_sek),
+        "unemployment_rate_fmt": ("unemployment_rate", format_pct),
+        "population_fmt": (
+            "population",
+            lambda v: f"{int(v):,}".replace(",", " "),
+        ),
+        "vulnerability_score_fmt": (
+            "vulnerability_score",
+            lambda v: f"{v:+.2f}".replace(".", ","),
+        ),
+        "predicted_growth_fmt": ("predicted_growth_2025", format_pct),
+    }
+
+    for target, (source, fmt) in formatters.items():
+        if source in df.columns:
+            df[target] = df[source].apply(lambda v, f=fmt: "" if pd.isna(v) else f(v))
+
+    if "risk_class" in df.columns:
+        risk_label_map = {
+            "lag": SWEDISH_LABELS["risk_low"],
+            "medel": SWEDISH_LABELS["risk_medium"],
+            "hog": SWEDISH_LABELS["risk_high"],
+        }
+        df["risk_class_label"] = (
+            df["risk_class"].astype(object).map(risk_label_map).fillna("")
+        )
+
+    return df
 
 
 # ---------------------------------------------------------------------------
@@ -66,21 +227,26 @@ _TOOLTIP_ALIASES = {
 
 def render_choropleth(
     data: pd.DataFrame,
+    layer: "str | MapLayer" = "position",
     height: int = 480,
     key: str = "kss_choropleth",
 ) -> None:
     """Render an interactive Folium choropleth in Streamlit.
 
-    The map colors municipalities by vulnerability_score using a diverging
-    green-to-red scale.  Tooltips show Swedish labels and formatted values.
+    The colour scale comes from the selected layer, and the layers do not share
+    one: relative position is a level on a sequential ramp, five-year drift is
+    signed and centred on zero, and the vulnerability score keeps the original
+    diverging scale. See MAP_LAYERS.
 
     Args:
-        data: DataFrame with required columns: kommun_kod, vulnerability_score,
-            predicted_growth_2025, vulnerability_rank, risk_class, kommun_name,
-            tax_base_per_capita, unemployment_rate, population.
+        data: DataFrame keyed by kommun_kod. It must carry the selected layer's
+            column; every other column named in _TOOLTIP_ALIASES is optional and
+            appears in the tooltip only when present.
+        layer: A MAP_LAYERS key, a layer's Swedish label, or a MapLayer.
         height: Map height in pixels.
         key: Streamlit component key for st_folium.
     """
+    map_layer = layer if isinstance(layer, MapLayer) else resolve_layer(layer)
     if not _GEOJSON_PATH.exists():
         st.warning(SWEDISH_LABELS["choropleth_missing_geojson"])
         return
@@ -91,38 +257,24 @@ def render_choropleth(
     df = data.copy()
     df["kommun_kod"] = df["kommun_kod"].astype(str).str.zfill(4)
 
-    # Format display columns for tooltips
-    risk_label_map = {
-        "lag": SWEDISH_LABELS["risk_low"],
-        "medel": SWEDISH_LABELS["risk_medium"],
-        "hog": SWEDISH_LABELS["risk_high"],
-    }
-    df["risk_class_label"] = df["risk_class"].astype(object).map(risk_label_map).fillna("")
-    df["vulnerability_score_fmt"] = df["vulnerability_score"].apply(
-        lambda x: f"{x:+.2f}".replace(".", ",")
-    )
-    df["predicted_growth_fmt"] = df["predicted_growth_2025"].apply(
-        lambda x: format_pct(x)
-    )
-    df["tax_base_per_capita_fmt"] = df["tax_base_per_capita"].apply(
-        lambda x: format_sek(x)
-    )
-    df["unemployment_rate_fmt"] = df["unemployment_rate"].apply(
-        lambda x: format_pct(x)
-    )
-    df["population_fmt"] = df["population"].apply(
-        lambda x: f"{int(x):,}".replace(",", "\u202f")
-    )
+    # Format display columns for tooltips.  Which columns exist depends on the
+    # layer the caller is showing, so each is formatted only when present.
+    df = _format_tooltip_columns(df)
 
     lookup = df.set_index("kommun_kod").to_dict("index")
 
-    # Build linear colormap (used for coloring polygons)
+    # Build linear colormap from the selected layer
     colormap = cm.LinearColormap(
-        colors=DIVERGING_SCALE,
-        vmin=_VMIN,
-        vmax=_VMAX,
-        caption=SWEDISH_LABELS["map_legend_caption"],
+        colors=map_layer.colors,
+        vmin=map_layer.vmin,
+        vmax=map_layer.vmax,
+        caption=map_layer.legend_caption,
     )
+
+    # Value used when a kommun has no data for this layer: the midpoint of a
+    # diverging scale is meaningful (zero drift), the low end of a sequential
+    # one is not, so an absent level is drawn at the bottom of the ramp.
+    fallback = 0.0 if map_layer.diverging else map_layer.vmin
 
     # Create base map centered on Sweden
     m = build_base_map()
@@ -131,8 +283,12 @@ def render_choropleth(
     def style_function(feature):
         kod = _extract_kommun_kod(feature)
         row = lookup.get(kod, {})
-        score = row.get("vulnerability_score", 0.0)
-        fill_color = colormap(max(_VMIN, min(_VMAX, score)))
+        value = row.get(map_layer.column, fallback)
+        if value is None or pd.isna(value):
+            value = fallback
+        fill_color = colormap(
+            max(map_layer.vmin, min(map_layer.vmax, float(value)))
+        )
         return {
             "fillColor": fill_color,
             "color": "#FFFFFF",
@@ -149,8 +305,12 @@ def render_choropleth(
         }
 
     # Add GeoJSON layer with tooltips
-    tooltip_fields = list(_TOOLTIP_ALIASES.keys())
-    tooltip_aliases = list(_TOOLTIP_ALIASES.values())
+    # Only the fields this frame actually carries: after the cutover the
+    # position layers have no vulnerability columns, and an alias pointing at a
+    # missing field renders as a blank row in every tooltip.
+    present = [f for f in _TOOLTIP_ALIASES if f in df.columns]
+    tooltip_fields = present
+    tooltip_aliases = [_TOOLTIP_ALIASES[f] for f in present]
 
     # Inject data into GeoJSON properties for tooltips
     for feature in geojson["features"]:
@@ -184,10 +344,10 @@ def render_choropleth(
 
     # Add responsive legend as custom HTML element
     legend_html = _build_responsive_legend(
-        colors=DIVERGING_SCALE,
-        vmin=_VMIN,
-        vmax=_VMAX,
-        caption=SWEDISH_LABELS["map_legend_caption"],
+        colors=map_layer.colors,
+        vmin=map_layer.vmin,
+        vmax=map_layer.vmax,
+        caption=map_layer.legend_caption,
     )
     m.get_root().html.add_child(folium.Element(legend_html))
 
