@@ -385,7 +385,7 @@ Two hard rules for delegation:
 **Definition of done** *(revised 2026-09-07)*:
 - `artifacts/decomposition_cross.parquet` decomposes the position gap into the **identified** components plus residual; components sum exactly. The pre-existing `decomposition.parquet` is left untouched for the deployed UI until step 8.
 - Unidentified variables appear in the artifact flagged as controls, not as attributed components.
-- Mean |residual| share of total gap **< 40 %**. Two identified variables carry R² = 0.688, so this should hold comfortably; if it does not, the target or the coefficients are wrong.
+- ~~Mean |residual| share of total gap **< 40 %**~~ — **corrected 2026-09-07: that threshold is unreachable by construction.** R² is a variance share, so R² = 0.688 implies |residual| ≈ 56 % in absolute-deviation terms, and the per-kommun ratio explodes for kommuner sitting at the national average. Test the **residual variance share < 40 %** instead (measured: 31.2 %), plus a check that 1 − that share reproduces the estimator's R². See the step-6 status-log entry.
 - Test covers the sum identity, a hand-computed single-kommun case, and that no unidentified variable is emitted as an attributed component.
 
 ---
@@ -576,8 +576,8 @@ STEP  TASK                                            PHASE  DELEGATION
  [x] 4   T1.1  Position and drift module                 1    [SOLO]  done 2026-09-07
  [x] 5   T2.1  Cross-sectional estimator                 2    [SOLO]  done 2026-09-07
  [x] --- GATE  Cross-sectional R2 > 0.60                       PASSED 2026-09-07 (0.690-0.723)
- [ ] 6   T2.2 + T2.3  Decomposition + diagnostics        2    [SOLO]  merged 2026-09-07  <- NEXT
- [ ] 7   T2.4  Demote FE to inference panel              2    [SOLO]
+ [x] 6   T2.2 + T2.3  Decomposition + diagnostics        2    [SOLO]  done 2026-09-07
+ [ ] 7   T2.4  Demote FE to inference panel              2    [SOLO]  <- NEXT
  [ ] 8a  T1.2  Dashboard leads with position/drift       1    [SOLO]
  [ ] 8b  T1.3  Show SCB index alongside                  1    [PARALLEL-A]
  [ ] 9a  T3.1  Rolling-origin backtest harness           3    [SUBAGENT]   optional
@@ -853,6 +853,27 @@ As with T0.3's fixture, agreement across two independent implementations means t
 **Independently audited on review**, not merely accepted: 202 tests re-run, the artifact checked against every clause of the revised DoD, and all four β × SD values plus their intervals reproduced against the ad-hoc computation from the T2.1 evidence block. The other artifacts were confirmed byte-identical (`max numeric diff 0.00e+00`), so the deployed dashboard is genuinely untouched rather than assumed to be.
 
 **Note for step 6.** T2.3's own reframing suggests folding the diagnostics into T2.1. Partly moot now: per-variable SD, β × SD, CI in SD units and `identified` are already emitted here, which is the half T2.3 called "the diagnostic this phase actually needs". What remains for T2.3 is genuinely separate — VIF and the condition number for **both** designs, where the within-design numbers are the ones that will show F3's problem. Recommend running T2.3 before or alongside T2.2 rather than after: T2.3 is what tells the decomposition how much to trust separating these variables into bars at all.
+
+---
+
+### 2026-09-07 — step 6 complete · F3 closed in both directions · a DoD threshold corrected
+
+**Done.** `src/model/diagnostics.py` and `src/model/decompose_cross.py`, writing `artifacts/diagnostics.parquet` and `artifacts/decomposition_cross.parquet`. 30 new tests; suite is **232 passed**. Both wired into `pipeline.py` as step 7b, diagnostics first — they say how far the variables can be separated, and the decomposition then draws only what the identification flag permits. Verified by deleting both artifacts and running `--force-refresh` from cold.
+
+**F3 is closed, in both directions, and the within-design numbers reproduce the audit exactly.** Entity-demeaned pairwise correlations: education × unemployment **−0.655**, education × dependency **+0.714**, unemployment × dependency **−0.703** — the audit's three figures to three decimals, from a third independent implementation. In the cross-section, max VIF is **1.95** and no pair exceeds |0.65|. So the finding is real where the audit found it and absent where the new model works, which is what licenses T2.2 to attribute at all.
+
+**One nuance the audit's framing missed.** Those within-design correlations of 0.65–0.71 produce a max VIF of only **2.55** — below the conventional warning threshold of 5. F3 is therefore "moderate correlation, not severe collinearity". It inflates variance somewhat; it was never the reason the old model failed. The estimand mismatch was.
+
+**The T2.2 threshold in this plan was arithmetically impossible and is now corrected.** The revised DoD said "mean |residual| share of total gap < 40 %", reasoning that "two identified variables carry R² = 0.688, so this should hold comfortably". It cannot, for two independent reasons:
+
+1. **The denominator goes to zero.** A kommun sitting at the national average has a gap near zero by construction — Östersund's is 0.27 index points — so its ratio explodes to 43 on an unremarkable residual. The mean of those ratios is 2.0, and it describes the distribution of gaps rather than the quality of the fit.
+2. **The threshold contradicts the R² it was derived from.** R² is a *variance* share: residual variance is 1 − 0.688 = **31 %**, which in absolute-deviation terms is √0.31 ≈ **56 %**. A mean |residual| share below 40 % would require R² ≈ 0.84. The number was unreachable the day it was written.
+
+The DoD's *intent* — the residual must not dominate — is now tested as the residual **variance** share, which is the quantity R² actually bounds: **31.2 %, against the 40 % threshold**. A second test asserts that `1 − residual variance share` reproduces the estimator's R² to 0.02, so a decomposition drifting from the coefficients it claims to use fails loudly. This is the third metric in this project to look right and mean something else, after "vikter" and the raw-β bar chart.
+
+**Face validity, and one honest limitation.** Filipstad sits −16.7 index points from the average: education −12.9, unemployment −4.0, residual **+0.1**. Explained almost exactly. Danderyd sits +99.3: education +45.2, unemployment +4.2, residual **+49.9** — half unexplained. The linear model does not capture the extreme tail, where tax base concentrates far faster than education share rises. **T1.2 should not present a decomposition for the top handful of kommuner without saying so**, and T4.1 should record it as a limitation: the attribution is trustworthy in the body of the distribution and weak at the top.
+
+**Controls are reported, never attributed.** `dependency_ratio` and `population_growth_pct` appear as `control_*` columns with their implied contributions, so a reader can see they are small (−0.68 and +1.65 for Filipstad) without being invited to read them as findings. The module reads the `identified` flag from `coefficients_cross.parquet` rather than hardcoding names — a test flips the flag and asserts the attributed set changes, so the judgement lives in one place.
 
 ---
 

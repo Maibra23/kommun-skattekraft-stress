@@ -38,6 +38,8 @@ _PREDICTION_ARTIFACTS = [
 ]
 _DECOMPOSITION_ARTIFACTS = [
     ARTIFACTS_DIR / "decomposition.parquet",
+    ARTIFACTS_DIR / "decomposition_cross.parquet",
+    ARTIFACTS_DIR / "diagnostics.parquet",
 ]
 # Descriptive spine (REMEDIATION_PLAN.md T1.1). Depends on the panel only, not
 # on the model, so it is regenerated with the panel rather than with steps 5-7.
@@ -205,6 +207,22 @@ def main() -> None:
                 7,
                 "Compute structural decomposition",
                 run_decomposition,
+            )
+
+            # Step 7b: Diagnostics, then the cross-sectional decomposition.
+            # Order matters: the diagnostics say how far the variables can be
+            # separated at all, and the decomposition then draws only what the
+            # identification flag permits (REMEDIATION_PLAN.md T2.3, T2.2).
+            from src.model.diagnostics import run_diagnostics
+
+            _run_step(7, "Compute collinearity and scale diagnostics", run_diagnostics)
+
+            from src.model.decompose_cross import run_decomposition_cross
+
+            _run_step(
+                7,
+                "Decompose the position gap (identified components only)",
+                run_decomposition_cross,
             )
 
         # ---------------------------------------------------------------
