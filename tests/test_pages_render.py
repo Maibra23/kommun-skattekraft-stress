@@ -181,3 +181,40 @@ class TestRetiredLayerExplainsItself:
         assert app.warning, "the retired layer must carry its scored record"
         text = " ".join(str(w.value) for w in app.warning)
         assert "0,02" in text, "the callout must state what the score actually scored"
+
+
+class TestBacktestPanelIsPublished:
+    """T3.3: the forecast's track record is permanent and needs no interaction.
+
+    A dashboard that shows its own hit rate is worth more than one showing an
+    untested number, and this panel is the standing defence against repeating
+    the r = 0.016 history.
+    """
+
+    def test_the_panel_renders_without_any_interaction(self, riks):
+        from src.ui.labels import SWEDISH_LABELS
+
+        assert SWEDISH_LABELS["backtest_title"] in _rendered_text(riks)
+
+    def test_it_states_the_naive_benchmark_beside_the_model(self, riks):
+        from src.ui.labels import SWEDISH_LABELS
+
+        text = _rendered_text(riks)
+        assert SWEDISH_LABELS["backtest_naive"] in text
+        assert SWEDISH_LABELS["backtest_persistence"] in text
+        assert SWEDISH_LABELS["backtest_rmse"] in text
+
+    def test_it_names_the_horizon_and_the_sample(self, riks):
+        import pandas as pd
+
+        forecast = pd.read_parquet("artifacts/forecast.parquet")
+        text = _rendered_text(riks)
+        assert str(int(forecast.iloc[0]["horizon"])) in text
+        assert str(int(forecast.iloc[0]["backtest_origins"])) in text
+
+    def test_the_table_shows_the_forecast_with_its_interval(self, riks):
+        from src.ui.labels import SWEDISH_LABELS
+
+        columns = list(riks.dataframe[0].value.columns)
+        assert SWEDISH_LABELS["forecast_interval_col"] in columns
+        assert any("Prognos" in c for c in columns)

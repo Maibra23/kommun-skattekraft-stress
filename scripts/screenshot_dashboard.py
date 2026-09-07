@@ -26,10 +26,15 @@ _OUTPUT_DIR = _PROJECT_ROOT / "docs" / "screenshots"
 
 #: Desktop, tablet and phone.  The phone width is where the fixed pixel chart
 #: margins are most likely to crush the plot area.
+#:
+#: The heights are deliberately far taller than a real screen.  Streamlit
+#: renders into its own scrolling container, so Playwright's ``full_page``
+#: screenshot captures only what fits the viewport and silently truncates the
+#: rest — every capture before 2026-09-07 showed just the top of each page.
 VIEWPORTS: dict[str, tuple[int, int]] = {
-    "desktop": (1440, 1100),
-    "tablet": (900, 1200),
-    "phone": (390, 1400),
+    "desktop": (1440, 3400),
+    "tablet": (900, 3600),
+    "phone": (390, 4200),
 }
 
 #: Streamlit derives a page's URL slug from its filename with the numeric
@@ -125,7 +130,9 @@ def main() -> int:
 
     viewports = VIEWPORTS
     if args.width:
-        viewports = {f"w{args.width}": (args.width, 1200)}
+        # Tall for the same reason the defaults are: Streamlit's scroll
+        # container defeats full_page, so height must be generous.
+        viewports = {f"w{args.width}": (args.width, 3400)}
 
     port = _free_port()
     print(f"Starting Streamlit on port {port} …")

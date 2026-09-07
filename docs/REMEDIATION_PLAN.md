@@ -588,10 +588,10 @@ STEP  TASK                                            PHASE  DELEGATION
  [x] --- GATE  Phase 2 complete (R2, residual, VIF)            PASSED 2026-09-07
  [x] 8a  T1.2  Dashboard leads with position/drift       1    [SOLO]  done 2026-09-07 (the cutover)
  [x] 8b  T1.3  Show SCB index alongside                  1    folded into 8a
- [ ] 9a  T3.1  Rolling-origin backtest harness           3    [SUBAGENT]   optional
- [ ] 9b  T3.2  5-year drift forecaster                   3    [SOLO]       optional
- [ ] 9c  T3.3  Publish backtest in UI                    3    [PARALLEL-C] optional
- ---     GATE  Out-of-sample Spearman > 0.25, else do not ship forecast
+ [x] 9a  T3.1  Rolling-origin backtest harness           3    [SOLO]  done 2026-09-07
+ [x] 9b  T3.2  5-year drift forecaster                   3    [SOLO]  done 2026-09-07
+ [x] 9c  T3.3  Publish backtest in UI                    3    [SOLO]  done 2026-09-07
+ [x] --- GATE  Out-of-sample Spearman > 0.25                   PASSED 2026-09-07 (0.329)
  [ ] 10a T4.1  Rewrite METHODOLOGY.md                    4    [SOLO]
  [ ] 10b T4.2  Reframe user-facing language              4    [PARALLEL-D]
  [ ] 10c T4.3  Log deviation                             4    [PARALLEL-D]
@@ -1069,6 +1069,46 @@ The skattekraft check costs **no extra query**: riket is implied by the 290 komm
 - `kpi_r2_tooltip` is now unused — the R² KPI is cross-sectional and has its own tooltip. Left in place for T4.2 to remove.
 - Streamlit 1.56 warns that `use_container_width` is deprecated after 2025-12-31. Pre-existing and repo-wide; not touched here.
 - The peer table compares by position rather than by vulnerability score, so different kommuner appear as peers. That is the intended change: peers should be kommuner in a similar position, not kommuner with a similar forecast.
+
+---
+
+### 2026-09-07 — Phase 3 complete · the forecast earned its place, and the gate is code
+
+**Done.** `src/model/backtest.py`, `src/model/forecast.py`, the T3.3 panel on Riksöversikt, and `artifacts/forecast.parquet`. 37 new tests; suite is **390 passed**. The harness was written and green **before** the forecaster existed, which is the ordering the whole phase is about.
+
+**The gate passes.** Pooled out-of-sample over 7 origins (2015–2021), N = 2 030:
+
+| | RMSE | bias | Pearson r | Spearman ρ |
+|---|---|---|---|---|
+| **drift model** | **2.112** | +0.129 | **+0.444** | **+0.329** |
+| naive constant mean | 2.349 | −0.000 | — | +0.007 |
+| persistence | 2.978 | −0.000 | +0.174 | +0.156 |
+
+Spearman **+0.329 > 0.25**, so the forecast ships. The plan estimated r ≈ 0.36 / ρ ≈ 0.32 from the audit; measured +0.444 / +0.329. It beats both benchmarks on error, and it is still modest — ρ = 0.33 means the ordering between kommuner remains largely unpredictable, which the UI says in as many words.
+
+**The persistence benchmark was worth adding.** T3.1 mandates only the constant-mean benchmark, which for a drift target is nearly vacuous — drift averages to zero, so the naive mean *is* zero and has no correlation with anything by construction (ρ = 0.007). Persistence — "assume the last five years repeat" — scores ρ = **+0.156**, and that is the number a drift forecaster actually has to beat. Both are emitted on every report; the summary refuses to print without them.
+
+**A second DoD threshold in this plan is arithmetically impossible, and this is the correction.** T3.2 asks for out-of-sample Spearman > 0.25 *and* "predicted dispersion within 30 % of realised dispersion". For a least-squares conditional-mean forecast, SD(ŷ) = |r| · SD(y). A ratio within 30 % of parity therefore requires **r ≥ 0.70**, i.e. R² ≥ 0.49 — while the same DoD asks only for ρ > 0.25. The two cannot both hold, and the measured ratio (0.922 / 2.323 = **40 %**) is exactly what r = 0.444 predicts. This is the same shape of error as T2.2's "residual < 40 % of the gap", which was also unreachable by construction.
+
+The *intent* is unambiguous from the plan's own words — "nominal intervals will be far too narrow, exactly as the current model's predicted SD (0.33 pp) was three times too narrow against realised (0.98 pp)" — so the criterion is now **interval coverage**, which is what that intent actually names: a nominal 80 % interval must contain about 80 % of realised outcomes at an origin whose errors did not set the quantiles. **Measured: 81 % against a nominal 80 %.** Shrinkage of a conditional mean is correct behaviour; an overconfident interval is not, and only the second is a defect.
+
+**The gate is enforced in code, not by discipline.** `build_forecast` raises `ForecastRejected` and produces nothing when out-of-sample Spearman misses the bar; `pipeline.py` catches it, logs it, and continues, because a project without a forward-looking number is a supported outcome rather than a pipeline failure. A test drives the model with pure noise and asserts the refusal. The plan's instruction that a failing forecast "is not shipped" was previously a sentence someone had to remember.
+
+**The score travels with the forecast.** Every row of `forecast.parquet` carries `backtest_spearman`, `backtest_rmse`, `backtest_naive_rmse`, `backtest_persistence_rmse`, the origin count and N. A consumer cannot read the number without the evidence beside it, which is precisely how r = 0.016 reached production.
+
+**Face validity.** Largest predicted five-year falls: Överkalix −1.30, Norsjö −1.06, Pajala −0.90, Haparanda −0.74. Largest rises: Solna +4.99, Danderyd +4.84, Lund +4.75. Every interval is wide enough to span zero for the falls — Överkalix is [−3.82, +1.01] — which is honest at this level of skill and is why the table prints the interval beside the point estimate rather than under a tooltip.
+
+**Two harness properties worth keeping.**
+- *Leakage is tested, not assumed.* Spy estimators assert the training frame never extends past its origin, features come only from the origin year, and no outcome is read from the years between the origin and the scored year. A backtest that can see the future reports whatever its author hoped for.
+- *Correlations are NaN, not 0.0, when undefined.* The naive-mean benchmark predicts a constant, which has no correlation with anything. Printing 0.000 would read as "measured and found useless" rather than "not applicable" — a distinction that matters in a report whose whole purpose is honest scoring.
+
+**One screenshot-harness defect found and fixed.** Playwright's `full_page` capture does not work against Streamlit, which renders into its own scrolling container: every screenshot taken before this commit showed only the first viewport of each page, silently truncating the rest. The viewports are now deliberately taller than any real screen. This is the second time the screenshot script has been wrong in a way that produced a plausible-looking image — the first was navigating to a page URL that does not exist.
+
+**Notes for whoever runs this next.**
+- The interval is a constant offset, identical for every kommun. It is honest but unconditional: a kommun whose structural variables sit far outside the training range gets the same width as one in the middle. Conditional intervals would need a heteroscedastic model and more origins than seven.
+- Seven origins is not many. The harness reports per-origin metrics precisely so that a reader can see the spread: Spearman ranges 0.20 (2020) to 0.40 (2016).
+- `predictions.parquet` and `ranking.parquet` are still written and still unread by any page except the retired vulnerability map layer. Retiring them, and `decompose.py` with them, is now unblocked.
+- T4.1 should quote this backtest rather than §3.4's argument that "predictive validity is the right standard". The standard was right; the old model failed it, and this one passes a harder version of it.
 
 ---
 

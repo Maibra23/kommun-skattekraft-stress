@@ -110,6 +110,20 @@ def _load_vulnerability() -> pd.DataFrame:
 
 
 @st.cache_data
+def _load_forecast() -> pd.DataFrame:
+    """The five-year drift forecast, if it cleared its own gate.
+
+    The artifact is absent when the forecast failed its backtest, which is a
+    supported outcome rather than an error: Phases 0-2 are a complete product
+    without a forward-looking number (REMEDIATION_PLAN.md T3.2).
+    """
+    path = _ARTIFACTS_DIR / "forecast.parquet"
+    if not path.exists():
+        return pd.DataFrame()
+    return pd.read_parquet(path)
+
+
+@st.cache_data
 def _load_cross_r2() -> float:
     """Cross-sectional R² for the analysis year, from the coefficient table."""
     coefs = pd.read_parquet(_ARTIFACTS_DIR / "coefficients_cross.parquet")
@@ -117,6 +131,7 @@ def _load_cross_r2() -> float:
     return float(row["r_squared"].iloc[0])
 
 
+forecast_df = _load_forecast()
 position_df = _load_position().merge(_load_names(), on="kommun_kod", how="left")
 panel_latest = _load_panel_latest()
 vulnerability_df = _load_vulnerability()
@@ -370,6 +385,80 @@ with st.container(border=True):
     )
 
 # ---------------------------------------------------------------------------
+# Section 5b: The forecast and its track record (T3.2, T3.3)
+# ---------------------------------------------------------------------------
+
+if not forecast_df.empty:
+    _f = forecast_df.iloc[0]
+    _horizon = int(_f["horizon"])
+
+    with st.container(border=True):
+        st.html(
+            card_header(
+                SWEDISH_LABELS["forecast_title"].format(horizon=_horizon),
+                subtitle=SWEDISH_LABELS["backtest_title"],
+            )
+        )
+        st.html(
+            '<div class="shai-explanation">'
+            + SWEDISH_LABELS["forecast_lead"].format(
+                horizon=_horizon,
+                coverage=int(round(_f["interval_coverage"] * 100)),
+            )
+            + "</div>"
+        )
+        st.html(
+            '<div class="shai-explanation">'
+            + SWEDISH_LABELS["backtest_lead"].format(
+                horizon=_horizon,
+                origins=int(_f["backtest_origins"]),
+                n=f"{int(_f['backtest_n']):,}".replace(",", " "),
+            )
+            + "</div>"
+        )
+
+        # Visible without interaction: the panel is the standing defence
+        # against shipping an unscored forecast again.
+        render_kpi_row(
+            [
+                kpi_card(
+                    SWEDISH_LABELS["backtest_spearman"],
+                    value=f"{_f['backtest_spearman']:.2f}".replace(".", ","),
+                    variant="default",
+                ),
+                kpi_card(
+                    SWEDISH_LABELS["backtest_rmse"],
+                    value=f"{_f['backtest_rmse']:.2f}".replace(".", ","),
+                    variant="default",
+                ),
+                kpi_card(
+                    SWEDISH_LABELS["backtest_naive"],
+                    value=f"{_f['backtest_naive_rmse']:.2f}".replace(".", ","),
+                    variant="default",
+                ),
+                kpi_card(
+                    SWEDISH_LABELS["backtest_persistence"],
+                    value=f"{_f['backtest_persistence_rmse']:.2f}".replace(".", ","),
+                    variant="default",
+                ),
+            ]
+        )
+        st.html(
+            '<div class="shai-explanation">'
+            + SWEDISH_LABELS["backtest_verdict_better"].format(
+                rho=f"{_f['backtest_spearman']:.2f}".replace(".", ",")
+            )
+            + " "
+            + SWEDISH_LABELS["backtest_coverage"]
+            + f": {_f['interval_coverage_measured']:.0%}".replace("%", " %")
+            + f" (nominellt {_f['interval_coverage']:.0%})".replace("%", " %")
+            + "</div>"
+        )
+        st.html(
+            f'<div class="shai-explanation">{SWEDISH_LABELS["backtest_caveat"]}</div>'
+        )
+
+# ---------------------------------------------------------------------------
 # Section 6: Table of all kommuner
 # ---------------------------------------------------------------------------
 
@@ -387,6 +476,12 @@ with st.container(border=True):
         label=SWEDISH_LABELS["index_compare_scb"], year=_POSITION_YEAR
     )
     table_df = filtered_df.sort_values("relative_position", ascending=False)
+    if not forecast_df.empty:
+        table_df = table_df.merge(
+            forecast_df[["kommun_kod", "drift_forecast", "lower", "upper"]],
+            on="kommun_kod",
+            how="left",
+        )
     display_df = pd.DataFrame(
         {
             SWEDISH_LABELS["th_kommun"]: table_df["kommun_name"].values,
@@ -400,6 +495,20 @@ with st.container(border=True):
             SWEDISH_LABELS["drift_10y"]: table_df["drift_10y"].round(1).values,
         }
     )
+
+    if not forecast_df.empty:
+        _horizon = int(forecast_df.iloc[0]["horizon"])
+        display_df[SWEDISH_LABELS["forecast_col"].format(horizon=_horizon)] = (
+            table_df["drift_forecast"].round(1).values
+        )
+        # The interval is shown as text beside the point forecast: a bare
+        # number invites more confidence than a backtest at rho 0.33 supports.
+        display_df[SWEDISH_LABELS["forecast_interval_col"]] = [
+            f"{lo:+.1f} … {hi:+.1f}".replace(".", ",")
+            if pd.notna(lo)
+            else "–"
+            for lo, hi in zip(table_df["lower"], table_df["upper"])
+        ]
 
     st.dataframe(
         display_df,

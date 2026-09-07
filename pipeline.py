@@ -31,6 +31,7 @@ _MODEL_ARTIFACTS = [
     ARTIFACTS_DIR / "model_results.pkl",
     ARTIFACTS_DIR / "coefficients.parquet",
     ARTIFACTS_DIR / "coefficients_cross.parquet",
+    ARTIFACTS_DIR / "forecast.parquet",
 ]
 _PREDICTION_ARTIFACTS = [
     ARTIFACTS_DIR / "predictions.parquet",
@@ -224,6 +225,21 @@ def main() -> None:
                 "Decompose the position gap (identified components only)",
                 run_decomposition_cross,
             )
+
+            # Step 8: the five-year drift forecast (REMEDIATION_PLAN.md T3.2).
+            # It backtests itself first and raises ForecastRejected rather than
+            # writing anything when out-of-sample skill misses the gate. That
+            # is not a pipeline failure — Phases 0-2 are a complete product
+            # without a forward-looking number — so it is caught and logged.
+            from src.model.forecast import ForecastRejected, run_forecast
+
+            try:
+                _run_step(8, "Forecast five-year drift (backtested)", run_forecast)
+            except ForecastRejected as exc:
+                logger.warning(
+                    "Forecast not shipped: it did not clear its own gate. %s",
+                    exc,
+                )
 
         # ---------------------------------------------------------------
         # Summary

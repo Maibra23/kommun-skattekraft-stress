@@ -382,6 +382,43 @@ SWEDISH_LABELS = {
     "axis_our_index": "Vårt index (oviktat)",
     "axis_scb_index": "SCB:s index (viktat)",
 
+    # The forecast and its track record (T3.2, T3.3).  The panel is permanent
+    # and needs no interaction: a dashboard that shows its own hit rate is
+    # worth more than one showing an untested number, and it is the standing
+    # defence against this project repeating its own history.
+    "forecast_title": "Prognos: förflyttning {horizon} år framåt",
+    "forecast_lead": (
+        "Modellen skattar hur långt en kommun rör sig mot riksgenomsnittet de "
+        "kommande {horizon} åren, utifrån strukturvariablerna i dag. Intervallet "
+        "är {coverage} % och kommer från prognosens egna träffar i "
+        "efterhandstestet — inte från regressionens nominella standardfel, som "
+        "beskriver osäkerheten om linjen snarare än om en enskild kommun."
+    ),
+    "forecast_col": "Prognos {horizon} år",
+    "forecast_interval_col": "Intervall",
+    "backtest_title": "Prognosens träffsäkerhet",
+    "backtest_lead": (
+        "Prognosen är testad mot utfall som den inte fått se: modellen skattas "
+        "om vid varje startår och jämförs med vad som faktiskt hände "
+        "{horizon} år senare. {origins} startår, {n} kommunår."
+    ),
+    "backtest_spearman": "Rangkorrelation (Spearman)",
+    "backtest_rmse": "Medelfel (RMSE)",
+    "backtest_naive": "Jämförelse: gissa genomsnittet",
+    "backtest_persistence": "Jämförelse: anta att trenden fortsätter",
+    "backtest_coverage": "Intervallets träffsäkerhet",
+    "backtest_verdict_better": (
+        "Modellen slår båda jämförelserna. Den är ändå blygsam: en "
+        "rangkorrelation på {rho} betyder att ordningen mellan kommuner till "
+        "stor del förblir oförutsägbar, och intervallen är breda av samma skäl."
+    ),
+    "backtest_caveat": (
+        "Den tidigare prognosen i det här projektet redovisades aldrig mot "
+        "utfall. När den till slut testades hamnade korrelationen på 0,02 och "
+        "den förlorade mot att gissa riksgenomsnittet. Därför står den här "
+        "rutan kvar permanent: om prognosen försämras syns det här."
+    ),
+
     # Within-time inference panel (REMEDIATION_PLAN.md T2.4).
     # The two-way FE model answers a different question than the ranking and
     # must be shown under its own heading, physically separated from it.
