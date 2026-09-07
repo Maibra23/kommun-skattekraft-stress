@@ -324,7 +324,7 @@ SWEDISH_LABELS = {
     "index_compare_explanation": (
         "Vi jämför med ett snitt där alla 290 kommuner väger lika mycket. "
         "SCB jämför med ett snitt där stora kommuner väger tyngre. Därför "
-        "ligger vårt tal alltid lite högre, i snitt 7 indexenheter. Båda är "
+        "ligger vårt tal alltid lite högre, i snitt 8 indexenheter. Båda är "
         "rätt, de svarar bara på olika frågor. <strong>Jämför aldrig ett tal "
         "från det ena måttet med ett tal från det andra.</strong>"
     ),
@@ -665,7 +665,7 @@ SWEDISH_LABELS = {
         "\n\n"
         "Rangkorrelationen 0,33 betyder att den får ordningen ungefär rätt, "
         "men långt ifrån helt rätt. Den slår båda jämförelserna: medelfelet "
-        "är 2,1 mot 2,4 för att gissa genomsnittet och 3,0 för att anta att "
+        "är 2,1 mot 2,3 för att gissa genomsnittet och 3,0 för att anta att "
         "trenden fortsätter. Använd den som en av flera ingångar, inte som "
         "ett facit."
     ),
