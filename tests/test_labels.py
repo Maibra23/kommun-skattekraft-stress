@@ -111,3 +111,80 @@ def test_the_scan_actually_finds_references():
         len(_LABEL_REF.findall(s.read_text(encoding="utf-8"))) for s in _UI_SOURCES
     )
     assert found > 50, f"expected many label references, found {found}"
+
+
+# ---------------------------------------------------------------------------
+# No string the dashboard renders may describe the retired model.
+#
+# T4.2's definition of done is exactly this, and it was missed once: after the
+# cutover, eight rendered explanations still described a vulnerability ranking,
+# risk classes, and contributions to *growth*. The page code had changed and
+# the copy explaining it had not. Only a check that reads both can catch that.
+# ---------------------------------------------------------------------------
+
+#: Strings that discuss the retired model on purpose — the retirement callout,
+#: the backtest's account of what the old forecast scored, and the column
+#: headers of the retired layer itself.
+_MAY_DISCUSS_THE_RETIRED_MODEL = {
+    "vulnerability_retired_title",
+    "vulnerability_retired_text",
+    "map_layer_vulnerability",
+    "map_legend_caption",
+    "tooltip_vulnerability_score",
+    "th_risk_class",
+    "th_prognosis",
+    "backtest_caveat",
+    "backtest_title",
+    "backtest_lead",
+    "forecast_title",
+    "forecast_lead",
+    "forecast_col",
+    "method_period",
+    "method_units",
+    "guide_text",
+    "landing_model_explanation",
+}
+
+#: Vocabulary that belongs to the retired vulnerability ranking.
+_RETIRED_VOCABULARY = re.compile(
+    r"sårbarhet|sårbara|riskklass|prognosticerad|vikter\b", re.IGNORECASE
+)
+
+
+def _rendered_label_keys() -> set[str]:
+    referenced: set[str] = set()
+    for source in _UI_SOURCES:
+        referenced |= set(_LABEL_REF.findall(source.read_text(encoding="utf-8")))
+    # Built by f-string on the national page, one per map layer.
+    referenced |= {"map_legend_position_full", "map_legend_drift_full"}
+    return referenced
+
+
+def test_no_rendered_label_describes_the_retired_ranking():
+    offenders = {}
+    for key in sorted(_rendered_label_keys()):
+        if key in _MAY_DISCUSS_THE_RETIRED_MODEL or key not in SWEDISH_LABELS:
+            continue
+        match = _RETIRED_VOCABULARY.search(SWEDISH_LABELS[key])
+        if match:
+            offenders[key] = match.group(0)
+    assert not offenders, (
+        "these strings are shown to users and describe the retired model: "
+        f"{offenders}"
+    )
+
+
+def test_the_allowlist_does_not_hide_a_stale_string():
+    """Every allowlisted key must genuinely be about the retired model, so the
+    allowlist cannot quietly become a place to park copy nobody fixed."""
+    for key in _MAY_DISCUSS_THE_RETIRED_MODEL:
+        assert key in SWEDISH_LABELS, f"allowlisted key no longer exists: {key}"
+
+
+def test_decomposition_copy_talks_about_index_points_not_growth():
+    """T4.2 item 6 by name: the decomposition target changed from growth to
+    position, so copy describing 'procentenheter lägre tillväxt' is wrong on
+    the quantity, independently of anything else."""
+    text = SWEDISH_LABELS["explain_decomp_text"].lower()
+    assert "indexenheter" in text
+    assert "skattekraftstillväxt" not in text

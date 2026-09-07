@@ -1153,4 +1153,43 @@ The risk-class relabelling is the substantive one. The quintile cut is **relativ
 
 ---
 
+### 2026-09-07 — full plan review · 64 DoD clauses audited · one real gap found and closed
+
+Every Definition of Done in this plan was checked mechanically against the repository rather than against memory: 64 clauses across T0.1–T4.3, plus the five gates. **63 passed on the first run. One did not, and it was a genuine miss.**
+
+**The gap: T4.2's definition of done was not met, and I had reported it as complete.** The DoD says "no user-facing string describes a metric or model that Phase 2 demoted". Nine strings still did, and all of them were rendered:
+
+| Label | Said | Where it appeared |
+|---|---|---|
+| `explain_choropleth_text` | "färgkodade efter sårbarhetsindex … gröna, gula, röda" | under the map, which is now blue-sequential position |
+| `explain_histogram_text` | "prognosticerad skattekraftstillväxt" and the risk-class boundary lines | under a histogram that follows the map layer |
+| `explain_ranking_text` | "rangordnar efter prognosticerad tillväxt 2025 … Rang 1 = mest sårbar" | under a table sorted by position with no risk class |
+| `explain_peers_text` | "baserat på sårbarhetsindex" | peers are matched on position |
+| `explain_decomp_text` | "bidrar med 0,3 procentenheter lägre skattekraftstillväxt" | **T4.2 item 6 named this string explicitly** |
+| `explain_coef_chart_text` | raw β and the dependency-ratio scale caveat | the chart shows β × SD with intervals |
+| `explain_trend_text` | "från 2010 till 2024" | the panel runs to 2026 |
+| `guide_text` | the "Riskklass" sidebar filter and its three classes | the filter is position bands |
+| `concept_skattekraft_text` | "er kommun rankas som 45:e mest sårbara av 290" | a ranking that no longer exists |
+
+The page code changed at the cutover and the copy explaining it did not. Nothing caught this because every existing test asked whether a label *exists*, never what it *says*.
+
+**Closed, and made unrepeatable.** All nine rewritten. `tests/test_labels.py` now scans every label the UI actually references and fails if its text carries the retired vocabulary — sårbarhet, riskklass, prognosticerad, vikter — against a small allowlist of strings that discuss the retired model on purpose, such as the retirement callout. A second test asserts every allowlisted key still exists, so the allowlist cannot quietly become a parking space for copy nobody fixed. A third asserts the decomposition copy talks about index points rather than growth, which is T4.2 item 6 by name.
+
+**Two apparent failures were my audit's own bugs**, not the repository's, and are recorded because a review that hides its false positives is worth less: the §9 check searched for a Swedish heading in a document written in English, and the "2025 forecast language" check matched the retirement callout, which says "tillväxtprognos för 2025" deliberately. Both corrected; the audit now reports 64/64.
+
+**Everything else verified.** The 14 load-bearing figures in `METHODOLOGY.md` were re-checked against the artifacts they are drawn from. All five gates hold. The suite is **397 passed**, `pytest -m "not baseline"` still splits cleanly, and the three pages render at 1440, 900 and 390 px.
+
+**Documentation status across the repository.**
+
+| Document | State |
+|---|---|
+| `METHODOLOGY.md` | Current. Every T4.1 row addressed; §12.7–12.8 carry the SCB findings |
+| `KRI_Dataset_Identification.md` | Current. §4 rewritten for the population fix; §2 and §5 carry the new cross-checks |
+| `DEVIATIONS.md` | Current. §6.3 population, §6.4 the unlocked model |
+| `README.md` | Current. Rewritten, not patched |
+| `REMEDIATION_PLAN.md` | Current, including its own corrected thresholds |
+| `PRD.md`, `TASKS.md`, `REVIEW_2026-04-24.md` | **Deliberately unchanged.** Records of what was planned and reviewed at the time; DEVIATIONS is where departures belong |
+
+---
+
 **End of REMEDIATION_PLAN.md**
