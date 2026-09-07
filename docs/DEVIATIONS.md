@@ -160,4 +160,38 @@ Found on 2026-09-07 during a live review of Phase 0, by comparing the panel agai
 
 ---
 
+### 6.4 PRD §5 "Empirical Model (Locked)" was deliberately unlocked
+
+**Original plan (PRD 5):** The empirical model was declared locked: a two-way fixed-effects panel regression of skattekraft growth on four structural variables, producing a vulnerability score, a quintile risk class, and a one-year-ahead growth forecast. "Locked" meant it was not to be renegotiated during implementation.
+
+**Deviation:** It was unlocked and substantially replaced. This is the largest specification change in the project's history and the one most in need of a record.
+
+**What forced it.** An audit on 2026-09-04 scored the shipped forecast against outcomes SCB had by then published:
+
+| Metric | Result |
+|---|---|
+| Pearson r, predicted vs realised 2025 growth | **+0.016** |
+| RMSE | 1.512 pp against 0.974 pp for guessing the national mean |
+| Predicted dispersion | 0.33 pp against a realised 0.98 pp |
+| Realised growth by risk class | låg 4.74 %, medel 4.52 %, hög 4.68 % — unseparated and non-monotone |
+
+The forecast lost to the naive benchmark by 55 %, and the risk classes did not order kommuner by what happened. Reproduced three times through independent code paths agreeing to four decimal places, so this was a property of the model rather than of the measurement.
+
+**The diagnosis was an estimand mismatch, not a bug.** The model was correctly estimated. It was answering a different question from the one the dashboard asked. **98.2 % of the variation in relative position is between kommuner**, and entity fixed effects absorb exactly that variation — so a two-way FE specification was structurally incapable of ranking kommuner, however well it was fitted. Year-demeaned persistence of the growth rate is about −0.05, so the one-year target was not recoverable either.
+
+**Resolution.** Four changes, each with its own evidence:
+
+1. **A descriptive spine that needs no model.** Relative position and drift over 1, 3, 5 and 10 years, from skattekraft alone. Rank stability is 0.99 at one year and 0.93 at ten — the most reliable thing the project can say, and it was previously absent from the dashboard entirely.
+2. **A cross-sectional estimator for the ranking.** Same four variables, no entity effects, R² = 0.690–0.723 across 2021–2024. Two of the four variables are not separately identified between kommuner and are reported as controls rather than drawn as bars; the identification judgement is a boolean in the artifact, not a rule someone has to remember.
+3. **The FE model kept, demoted, and relabelled.** It answers "within a kommun over time" and is presented under its own heading with an explicit statement that it cannot rank kommuner. Its lagged specification is now primary: every regressor's within-kommun correlation peaks at t−1 or later.
+4. **The forecast rebuilt on terms that make the failure hard to repeat.** Five-year drift rather than one-year growth; a rolling-origin backtest written *before* the forecaster; two mandatory benchmarks; intervals from the backtest's own errors; and a gate enforced in code that writes nothing when out-of-sample Spearman falls below 0.25. Measured: **+0.329**, beating both benchmarks, with intervals calibrated at 81 % against a nominal 80 %.
+
+**What the vulnerability score's fate is.** Retired from every part of the dashboard except one map layer, which carries a callout stating what it scored. `predictions.parquet` and `ranking.parquet` are still written and read by nothing else.
+
+**Two thresholds in the remediation plan itself proved arithmetically impossible** and were corrected in place rather than quietly met: T2.2's "mean |residual| < 40 % of the gap" (unreachable given the R² it was derived from) and T3.2's "predicted dispersion within 30 % of realised" (requires r ≥ 0.70 while the same DoD asks only for ρ > 0.25). Both were replaced with criteria that test the same intent — residual *variance* share, and interval *coverage*.
+
+**Reference:** `docs/REMEDIATION_PLAN.md` in full, including its status log; METHODOLOGY 2.6, 2.7, 3.4, 3.5, 6.4, 7.10, 7.13–7.16.
+
+---
+
 **End of DEVIATIONS.md**

@@ -592,9 +592,10 @@ STEP  TASK                                            PHASE  DELEGATION
  [x] 9b  T3.2  5-year drift forecaster                   3    [SOLO]  done 2026-09-07
  [x] 9c  T3.3  Publish backtest in UI                    3    [SOLO]  done 2026-09-07
  [x] --- GATE  Out-of-sample Spearman > 0.25                   PASSED 2026-09-07 (0.329)
- [ ] 10a T4.1  Rewrite METHODOLOGY.md                    4    [SOLO]
- [ ] 10b T4.2  Reframe user-facing language              4    [PARALLEL-D]
- [ ] 10c T4.3  Log deviation                             4    [PARALLEL-D]
+ [x] 10a T4.1  Rewrite METHODOLOGY.md                    4    [SOLO]  done 2026-09-07
+ [x] 10b T4.2  Reframe user-facing language              4    [SOLO]  done 2026-09-07
+ [x] 10c T4.3  Log deviation                             4    [SOLO]  done 2026-09-07
+ [x] --- GATE  No claim contradicted by artifacts/             PASSED 2026-09-07
 ```
 
 **Estimated total:** 35–48 hours. Steps 1–7 (23–32 h) deliver a coherent, defensible product; Phase 3 is genuinely optional.
@@ -1109,6 +1110,46 @@ The *intent* is unambiguous from the plan's own words — "nominal intervals wil
 - Seven origins is not many. The harness reports per-origin metrics precisely so that a reader can see the spread: Spearman ranges 0.20 (2020) to 0.40 (2016).
 - `predictions.parquet` and `ranking.parquet` are still written and still unread by any page except the retired vulnerability map layer. Retiring them, and `decompose.py` with them, is now unblocked.
 - T4.1 should quote this backtest rather than §3.4's argument that "predictive validity is the right standard". The standard was right; the old model failed it, and this one passes a harder version of it.
+
+---
+
+### 2026-09-07 — Phase 4 complete · the documentation no longer contradicts the artifacts
+
+**Done.** T4.1, T4.2 and T4.3 in one pass. Suite unchanged at **394 passed** — this phase moves prose, not behaviour, and the one code change is three label strings.
+
+**Every row of T4.1's correction table is addressed.**
+
+| Section | Was | Now |
+|---|---|---|
+| §7.10 | "the vulnerability score is dominated by the entity fixed effects" — **rendered to users** | Corrected: entity effects are **8.8 %** of prediction variance, structural conditions ≈ 91 %. The previous claim conflated the variation used for *estimation* with the variation in the *prediction* |
+| §7.10, §9 | `dependency_ratio` as the dominant driver at 59.1 % | The inversion, with the table: `edu_share` alone gives R² 0.656 of 0.690; dependency and population growth add **0.001** each and span zero in every year |
+| §3.4 | "predictive validity is the right standard" | The standard is kept — it was right. What changed is that the model was finally held to it, and failed: r = +0.016, RMSE 1.512 against a naive 0.974 |
+| New §3.5 | — | The five-year drift forecast and the harness that gates it |
+| §7.6 | the t−2 lag "does not bias the analysis" | True of the growth ratio, **false of the X–Y pairing**, with the lag-correlation table |
+| §2 | two-way FE as *the* model | One of two, since §2.6/§2.7 landed with T2.4 |
+| §6.4 | fit checks built on R²(within) > 0.10 | Replaced by the checks the project now stands on: cross-sectional R², residual variance share, out-of-sample Spearman, both benchmarks, interval calibration, VIF |
+| §7.13 | one paragraph on unweighted statistics | Both measures, both denominators, and the finding that **ours exceeds SCB's for every kommun-year** — mean +7.02, max +17.56 |
+| New §7.14 | — | Collinearity measured in both designs. F3 is real where the audit found it and is "moderate correlation, not severe collinearity": max VIF 2.55, below the threshold of 5 |
+| New §7.15 | — | The attribution is close to a restatement. `edu_share` correlates +0.810 with the index; it is a description, not a lever |
+| New §7.16 | — | The decomposition is weakest where the numbers are largest: Filipstad's residual is +0.1, Danderyd's is +49.9 |
+| §9, the Metod tab | explained a ranking that no longer exists | Rewritten around position, drift, what can be separated, and what the forecast has actually scored |
+
+**T4.2's seven strings: five were already corrected at the cutover**, because that commit is what made them false, and doing it later would have meant shipping known-false copy in between. The two that remained are done here — the risk-class labels and the R² tooltip.
+
+The risk-class relabelling is the substantive one. The quintile cut is **relative**: exactly 58 kommuner land in the bottom fifth every year, including years when every kommun's tax base grew. "Hög risk" asserted fiscal distress; the data only ever supported "nedersta femtedelen". The labels now say that.
+
+**The README was rewritten rather than patched.** It opened with "rangordnar Sveriges kommuner efter förväntad skattekraftsutveckling fram till 2025" — a closed horizon and a discredited ranking in one sentence. It now leads with position and drift, states that the project is descriptive, lists what can and cannot be separated, and carries a short note on the project's own history, because a reader who finds `predictions.parquet` deserves to know why it is still there.
+
+**T4.3 is DEVIATIONS §6.4**, recording that PRD §5 "Empirical Model (Locked)" was deliberately unlocked, with the audit evidence, the estimand diagnosis, the four resolutions, and — because the plan's own errors belong in the same record — the two thresholds in this plan that proved arithmetically impossible and were corrected in place.
+
+**One decision against the plan's instruction, taken deliberately.** T4.1 expected `test_entity_effects_do_not_dominate` to be *deleted* along with the claim it contradicted. It is kept. The figure it locks (8.8 %) is now asserted **by** the corrected §7.10 rather than against the old one, so deleting the test would remove the only automatic check on a number the documentation states. The reason is recorded in the test's own docstring.
+
+**The Phase 4 gate passes: no claim in `METHODOLOGY.md` is contradicted by `artifacts/`.** Every figure quoted in the rewritten sections was read from the committed artifacts or from a live SCB query in this session, and the ones that are load-bearing are asserted by tests.
+
+**What remains, and it is small.**
+- `predictions.parquet`, `ranking.parquet`, `decompose.py` and `predict.py` are all still written and read by nothing except the retired map layer. Retiring them is a clean, self-contained change whenever someone wants it.
+- `PRD.md`, `TASKS.md` and `REVIEW_2026-04-24.md` still describe the pre-remediation project. Left as written throughout: they are records of what was planned and reviewed at the time, and DEVIATIONS is where departures belong.
+- The Streamlit `use_container_width` deprecation lands 2025-12-31 and is repo-wide.
 
 ---
 

@@ -36,7 +36,8 @@ These are the four right-hand-side variables in our model.
 ### 1.4 What this model is NOT
 
 * **Not a causal model.** The estimated coefficients describe associations within a panel, not causal effects. Reverse causality (low growth leads to unemployment) is plausible. The fixed-effects specification controls for time-invariant confounders but not for simultaneity.
-* **Not a long-horizon forecast.** Predictions are one-year-ahead only. Out-of-sample accuracy beyond 2025 is not claimed.
+* **Not a one-year forecast, as of 2026-09-07.** One-year growth is not recoverable from this data (§3.4). The forecast is five-year drift in relative position, scored out of sample before shipping, at Spearman +0.329 (§3.5).
+* **Not a lever.** `edu_share` correlates +0.810 with the tax base index and is by far the strongest cross-sectional driver. "Kommuner whose residents are more educated have a higher tax base" is robust and close to mechanical; it is a description of the same underlying fact, not an instrument a kommun can pull. See §7.15.
 * **Not a substitute for the official utjämningssystem analysis.** That analysis uses confidential micro-data and richer covariates. This is a public-data, replicable analog.
 
 ---
@@ -222,9 +223,52 @@ Where mu and sigma are mean and standard deviation across all 290 predictions. T
 
 Quintiles computed on `predicted_growth_2025`, not on `vulnerability_score` (mathematically equivalent but cleaner to document).
 
-### 3.4 Why prediction is defensible despite causal limitations
+### 3.4 The standard was right. The model failed it, and here is the replacement.
 
-Prediction does not require causal identification. It requires that the relationship between RHS variables and growth is stable enough to extrapolate one period ahead. Two-way FE controls for many confounders, and the one-year horizon limits structural change risk. For a stress monitor (early-warning tool) rather than a policy counterfactual, predictive validity is the right standard.
+*Rewritten 2026-09-07 (T4.1).*
+
+This section used to argue that "prediction does not require causal identification … for a stress monitor rather than a policy counterfactual, predictive validity is the right standard." **The argument is sound and is kept.** The problem was never the standard; it was that the model was never held to it.
+
+**What happened when it finally was.** The 2025 horizon has closed and SCB has published the outcome, so the forecast could be scored against reality:
+
+| Metric | Result |
+|---|---|
+| Pearson r, predicted vs realised 2025 growth | **+0.016** |
+| Spearman ρ | +0.033 |
+| RMSE | 1.512 pp |
+| RMSE, naive "guess the national mean" | **0.974 pp** |
+| Predicted dispersion vs realised | 0.33 pp against 0.98 pp — three times too narrow |
+| Realised growth by risk class | låg 4.74 %, medel 4.52 %, hög 4.68 % — not separated, not monotone |
+
+The forecast lost to guessing the national mean by 55 %, and the risk classes did not order kommuner by what actually happened. Reproduced three times through independent code paths (the audit's ad-hoc scripts, the T0.3 fetch-layer fixture, and the committed panel) agreeing to four decimal places, so this is a property of the model rather than of how it was measured.
+
+**Why one-year growth was never recoverable.** Year-demeaned autocorrelation of the growth rate is about **−0.05**: a kommun that grew unusually fast last year is very slightly *less* likely to do so again. That is a property of the data, and no estimator repairs it. The raw pooled figure looks positive (+0.15 to +0.29 depending on the window) only because national wage growth moves all 290 kommuner together — variation a two-way FE model removes by construction and therefore cannot exploit.
+
+**What replaced it.** A five-year drift forecast, scored on every available origin before being shipped (§3.5). It clears the same standard this section always named:
+
+| | RMSE | Spearman ρ |
+|---|---|---|
+| **drift model** | **2.112** | **+0.329** |
+| naive constant mean | 2.349 | +0.007 |
+| persistence ("the trend continues") | 2.978 | +0.156 |
+
+### 3.5 The five-year drift forecast, and the harness that gates it
+
+*Added 2026-09-07 (T3.1–T3.3, T4.1).*
+
+**Target.** Movement in relative position over five years, in index points — not one-year growth, which is not recoverable, and not a level, which is nearly frozen.
+
+**Estimation.** Drift over [t−5, t] regressed on the four structural variables as they stood at t−5, then applied to today's values. Fitted in `src/model/forecast.py`.
+
+**Scoring.** `src/model/backtest.py` refits at every origin year on data truncated to that year, predicts five years ahead, and scores against the realised outcome. Seven origins (2015–2021), N = 2 030. Leakage is asserted by tests, not assumed: the training frame never extends past its origin, features come only from the origin year, and no outcome is read from the years in between.
+
+**Benchmarks are mandatory in every report.** Two of them. The plan required the naive constant mean; for a *drift* target that benchmark is nearly vacuous, because drift averages to zero, so the naive prediction is zero and has no correlation with anything by construction. **Persistence** — assume the last five years repeat — is the benchmark that bites, at ρ = +0.156.
+
+**Intervals come from the backtest's own errors**, never from the regression's nominal standard error. A nominal interval describes uncertainty about the fitted line; what a reader needs is uncertainty about an unseen kommun five years out. Nominal 80 % coverage, measured **81 %** at an origin whose errors did not set the quantiles.
+
+**The gate is enforced in code.** `build_forecast` raises `ForecastRejected` and writes nothing when out-of-sample Spearman falls below 0.25. A project without a forward-looking number is a supported outcome, not a failure; leaving that decision to a reader's discipline is how the previous forecast shipped.
+
+**Honest reading of the result.** ρ = 0.33 is modest. It means the ordering between kommuner remains largely unpredictable and the intervals are wide — Överkalix's five-year forecast is −1.30 index points with an interval of [−3.82, +1.01], which spans zero. The dashboard prints that interval beside the point estimate rather than hiding it.
 
 ---
 
@@ -311,9 +355,24 @@ The pipeline raises an error and stops if any of these fail. Failure indicates a
 
 ### 6.4 Model fit checks
 
-| Check | Expected | Actual (2026-04-24 review) | Status |
+*Revised 2026-09-07 (T4.1). The old table judged the project on R²(within) of a specification that is no longer the headline. The checks below are the ones that decide whether this project ships.*
+
+| Check | Bar | Measured | Status |
 |---|---|---|---|
-| R2 (within) | Originally expected >0.10 | **0.0083** - see 7.10 for explanation | Note: Below prior expectation |
+| **Cross-sectional R², analysis year** | > 0.60 | **0.690** (0.702 / 0.712 / 0.723 for 2021–2023) | Pass |
+| **Decomposition residual variance share** | < 40 % | **31.2 %**, and 1 − that reproduces the estimator's R² to 0.002 | Pass |
+| **Forecast, out-of-sample Spearman** | > 0.25 or do not ship | **+0.329** over 7 origins, N = 2 030 | Pass |
+| **Forecast beats the naive mean** | RMSE lower | **2.112** against 2.349 | Pass |
+| **Forecast beats persistence** | RMSE lower | 2.112 against **2.978** | Pass |
+| **Interval calibration** | ≈ nominal coverage | **81 %** measured against 80 % nominal, out of sample | Pass |
+| Max VIF, cross-sectional design | < 5 | **1.95** | Pass |
+
+The legacy within-design checks are retained below for continuity, and are no longer what the project stands on:
+
+| Check (within design) | Expected | Actual (2026-04-24 review) | Status |
+|---|---|---|---|
+| R2 (within), contemporaneous spec | Originally expected >0.10 | **0.0083** - see 7.10 | Note: Below prior expectation |
+| R2 (within), lagged spec — now primary | — | **0.0364**, 4.4x the contemporaneous | See 2.6 |
 | At least 2 of 4 betas statistically significant | At cluster-robust 5% level | 3 of 4 significant (unemployment p<0.001, dependency p<0.001, population p=0.008; education p=0.52 n.s.) | Pass |
 | Sign of beta_1 (unemployment) | Negative | **-0.059** (p<0.001) | Pass |
 | Sign of beta_3 (population growth) | Originally expected positive | **-0.080** (p=0.008) - negative after two-way demeaning; see 7.11 | Note: Sign reversal (explained) |
@@ -349,7 +408,20 @@ Migration flows (in/out flytting) and housing market variables (kommun-level hou
 
 ### 7.6 Skattekraft published with 2-year lag relative to income year
 
-The skattekraft figure for year *t* reflects income earned in year *t-2*. The 2025 published number reflects 2023 income. The dashboard displays this lag explicitly in tooltips and the methodology tab. For our growth rate calculation, this is consistent across years and does not bias the analysis, but it does mean "2024 skattekraft" actually summarizes 2022 economic activity.
+The skattekraft figure for year *t* reflects income earned in year *t-2*. The 2025 published number reflects 2023 income. The dashboard displays this lag explicitly in tooltips and the methodology tab.
+
+**Corrected 2026-09-07 (T4.1).** This section used to say the lag "does not bias the analysis". That is true of the *growth rate calculation* — the lag is consistent across years, so a ratio of two lagged figures is unaffected — and **false of the pairing between X and Y**. Regressing skattekraft growth at *t* on structural variables at *t* pairs each regressor with an outcome that was substantially determined two years earlier.
+
+The data says so plainly. Within-kommun correlation of growth with each regressor, by lag:
+
+| Lag | `unemployment_rate` | `dependency_ratio` | `population_growth_pct` | `edu_share` |
+|---|---|---|---|---|
+| t (contemporaneous) | −0.180 | +0.151 | −0.132 | +0.217 |
+| **t−1** | **−0.500** | **+0.376** | −0.087 | **+0.481** |
+| t−2 | −0.405 | +0.288 | **−0.287** | +0.380 |
+| t−3 | −0.152 | +0.235 | +0.115 | +0.323 |
+
+Every regressor's association peaks at t−1 or later. This is why the lagged specification is now primary (§2.6), and it closes audit finding F4.
 
 ### 7.7 Education variable moves slowly
 
@@ -365,7 +437,7 @@ The pipeline requests unemployment rates using the SCB-provided total-aggregate 
 
 This approach was adopted during pipeline implementation when the SCB STATIV tables were restructured (see 12.2). Using the published total avoids the weighting ambiguity entirely and ensures the series matches the aggregate figures SCB publishes in its statistical news releases.
 
-### 7.10 Low R2(within) is expected after two-way demeaning
+### 7.10 Low R2(within), and what the prediction was actually made of
 
 The within R2 of 0.0083 means that the four structural variables explain only 0.83% of the residual variation **after removing entity and year fixed effects**. This does not mean the model is useless - it means the entity and year effects absorb the vast majority of variation, which is the point of two-way FE.
 
@@ -375,10 +447,29 @@ The within R2 of 0.0083 means that the four structural variables explain only 0.
 * What remains after absorbing both layers is the **within-kommun, between-year deviation from trend** - a very small residual signal.
 * The individual coefficients are still statistically significant and economically meaningful: a 1 pp increase in unemployment within a kommun is associated with a -0.059 pp decrease in tax base growth, holding all else constant.
 
-**Implications for prediction:**
-* The vulnerability score is dominated by the entity fixed effects (historical patterns), not by current structural conditions.
-* The structural variables contribute a small marginal adjustment on top of the entity-specific baseline.
-* This is honest and should be communicated: the model ranks kommuner primarily by their historical trajectory, with modest adjustments for current structural conditions.
+**Implications for prediction — corrected 2026-09-07, the previous text was factually wrong.**
+
+This section used to say that "the vulnerability score is dominated by the entity fixed effects (historical patterns), not by current structural conditions", and that claim was rendered to users in the Metod tab. It is the opposite of what the artifact says. Decomposing the prediction's variance:
+
+| Component | Share of prediction variance |
+|---|---|
+| Structural conditions (the four variables) | **≈ 91 %** |
+| Entity fixed effects | **8.8 %** |
+
+The score was dominated by the structural variables, not by the entity effects. What the entity effects absorb is the *variation used for estimation*, which is a different quantity from the variation in the *prediction*, and the two were conflated.
+
+**The larger correction is what replaced the score entirely.** The dominance question is now moot: the vulnerability score was retired in Phase 2–3 because it did not work, not because its variance decomposed one way or the other. See §3.4.
+
+**And the driver ordering inverts between designs.** The dashboard reported `dependency_ratio` as the largest contributor at 59.1 % of prediction variance. That figure is from the *within* design. Between kommuner — which is the question a reader of a kommun ranking is actually asking — `dependency_ratio` has a confidence interval spanning zero in every year 2021–2024 and adds **0.001** to R². The ordering that holds between kommuner is:
+
+| Variable | Adds to cross-sectional R² | β × SD (index points) | 95 % CI |
+|---|---|---|---|
+| `edu_share` | 0.656 of 0.690 on its own | **+10.03** | [+6.36, +13.70] |
+| `unemployment_rate` | +0.031 | **−2.69** | [−3.84, −1.53] |
+| `dependency_ratio` | +0.001 | −0.64 | [−2.44, +1.15] |
+| `population_growth_pct` | +0.001 | −0.56 | [−1.98, +0.85] |
+
+**Two of the four variables are not separately identified between kommuner**, and the reason is scale rather than collinearity: `dependency_ratio` has a cross-kommun SD of 0.116, so it barely varies between kommuner at all. Its VIF is 1.93 — collinearity is not the problem (§7.14).
 
 **In academic context:** Two-way FE specifications commonly show low within R2 in municipal-level panels (see Wooldridge 2010 ch. 10; Angrist & Pischke 2009 ch. 5). The R2 statistic is not the right criterion for assessing whether coefficients are informative - t-statistics and coefficient stability across robustness specifications are more relevant.
 
@@ -399,7 +490,61 @@ The population growth coefficient beta_3 = -0.080 (p = 0.008) is negative, which
 
 ### 7.13 Unweighted cross-sectional statistics
 
-The national mean, vulnerability scores (z-scores), and rankings treat all 290 kommuner equally regardless of population size. Stockholm (population ~1 million) receives the same weight as Bjurholm (population ~2,400). This is standard for cross-sectional municipal analysis where the unit of interest is the municipality as a fiscal entity, not the individual resident. For population-weighted analysis, SCB's published "riksmedelvärde" (~271,000 SEK) should be consulted instead.
+The project's own statistics treat all 290 kommuner equally regardless of population size. Stockholm (~1 million) counts the same as Bjurholm (~2 400). This is the right frame for a ranking *of kommuner as fiscal entities*, and it is not the frame SCB uses.
+
+**Expanded 2026-09-07 (T4.1): the project now carries both measures, and they must never be mixed.**
+
+| | `relative_position` (ours) | `tax_base_index_riket` (SCB) |
+|---|---|---|
+| Denominator | unweighted mean of the 290 kommuner | population-weighted riksmedelvärde |
+| 2024 denominator | 230 660 SEK | 251 437 SEK |
+| 2026 denominator | 248 378 SEK | 270 969 SEK |
+| Rounding | unrounded | whole percent |
+| Mean across the 290 kommuner | exactly 100 by construction | **91.7** |
+
+Because the weighted denominator is the larger one, **our index exceeds SCB's for every single kommun-year** — mean +7.02 index points, minimum +4.52, maximum +17.56. Danderyd 2026 reads 208 on ours and 191 on SCB's. Neither is wrong; they answer different questions.
+
+The two correlate at Pearson 0.9967 and Spearman 0.9911, so rankings barely differ — but a *level* quoted from one and compared to a level from the other is simply an error, and a reader who checks our figure against Regionfakta will find a discrepancy that has nothing to do with data quality. The dashboard therefore shows both, labels each with its denominator, states the offset in words, and plots all 290 kommuner against the 45° line so the systematic nature is visible rather than asserted.
+
+SCB's rounding is also too coarse to measure drift over short windows: a kommun can move a whole index point on rounding alone, which is why `relative_position` is unrounded and is the measure drift is computed from.
+
+### 7.14 Collinearity was measured, not assumed — and it is not the problem
+
+*Added 2026-09-07 (T4.1). Closes audit finding F3.*
+
+The audit flagged that three of six within-kommun variable pairs exceed |0.65| and that this had never been checked. It has been now, for both designs, and the result is not what the finding implied.
+
+| Design | Max VIF | Pairs above \|0.65\| | Condition number |
+|---|---|---|---|
+| Within (entity-demeaned) | **2.55** | 3 — edu × unemployment −0.655, edu × dependency +0.714, unemployment × dependency −0.703 | 93 |
+| Cross-sectional (analysis year) | **1.95** | 0 — strongest pair is edu × population growth at +0.567 | 510 |
+
+Those three within-design correlations reproduce the audit's figures to three decimals from an independent implementation, so the finding is real where it was found. But a maximum VIF of 2.55 is **below the conventional warning threshold of 5**. F3 is therefore "moderate correlation, not severe collinearity": it inflates variance somewhat and was never the reason the old model failed. The estimand mismatch was.
+
+**Collinearity is also not why two variables are unidentified between kommuner.** `dependency_ratio` has a cross-sectional VIF of 1.93 and is still not separable from zero — because its cross-kommun SD is 0.116. It barely varies between kommuner. That is a scale problem, and no amount of decorrelation fixes it.
+
+### 7.15 The attribution is close to a restatement, and must be read that way
+
+*Added 2026-09-07 (T4.1).*
+
+`edu_share` correlates **+0.810** with the tax base index and carries almost the whole cross-sectional fit: on its own it gives R² = 0.656 of a total 0.690. The decomposition therefore attributes most of a kommun's position to its education share.
+
+That relationship is robust, and it is also close to mechanical. Taxable employment income and educational attainment are two measurements of substantially the same underlying thing — a local labour market's earning capacity. "Kommuner whose residents are more educated have a higher tax base" is a true and useful description. It is **not** a lever: a kommun cannot raise its tax base by raising its education share the way the bar chart's length might suggest, because the bar is largely restating the outcome in another unit.
+
+This is the single most important caveat for a reader of the decomposition, and the dashboard says so rather than leaving the bar to speak for itself.
+
+### 7.16 The decomposition is weakest exactly where the numbers are largest
+
+*Added 2026-09-07 (T4.1).*
+
+The model is linear, and the top of the distribution is not. Two worked cases from the analysis year:
+
+| | Gap from the mean | Education | Unemployment | Residual |
+|---|---|---|---|---|
+| Filipstad | −16.7 | −12.9 | −4.0 | **+0.1** |
+| Danderyd | +99.3 | +45.2 | +4.2 | **+49.9** |
+
+Filipstad is explained almost exactly. For Danderyd, **half the gap is unexplained** — tax base concentrates at the top far faster than education share rises. The attribution is trustworthy in the body of the distribution and weak in the tail, so a decomposition shown for one of the handful of richest kommuner must say so. The kommun page carries that note.
 
 ---
 
@@ -433,17 +578,28 @@ The snapshot can only be copied forward, never regenerated from source. Treat it
 
 This section is shown in the dashboard's Metod tab to help kommun-level users interpret results.
 
-**What does "två vägs fixed effects" mean?**
-The model controls for all time-invariant differences between kommuner (geography, industry mix, history) and all year-level shocks that affect every kommun (national policy, economy-wide events). What's left explains differences in growth that come from changes within a kommun over time.
+*Rewritten 2026-09-07 (T4.1). The previous text explained a ranking that no longer exists and a prediction that had never been scored.*
 
-**Why is my kommun ranked where it is?**
-The vulnerability ranking reflects predicted growth in 2025 based on your kommun's most recent values for unemployment, dependency ratio, population growth, and education share, combined with your kommun's historical growth pattern. A high rank does not mean fiscal crisis; it means weaker predicted growth than other kommuner.
+**Where does my kommun stand?**
+On an index where the unweighted average of all 290 kommuner is 100. Below 100 means a smaller tax base per inhabitant than the typical kommun. SCB publishes its own index with a population-weighted denominator, which runs about 7 points lower for every kommun; both are shown, and a number from one should never be compared with a number from the other (§7.13).
 
-**Can I trust the prediction?**
-The prediction is a model-based estimate, not a forecast in the strict economic sense. Use it as one input among many. Local knowledge of upcoming events (a major employer relocation, a planned development project) is not in the model and should be combined with the prediction.
+**Which way is my kommun moving?**
+Förflyttning is the change in that index over five or ten years, measured in index points. It is a statement about position *relative to the country*, not about the tax base shrinking: a kommun can grow in kronor every year and still fall on the index if others grow faster. One-year movement is mostly rounding and noise, which is why it is not shown.
+
+**Why does the ranking barely change between years?**
+Because the underlying fact barely changes. The correlation between one year's ordering and the next is 0.99, and 0.93 over ten years. 98 % of the variation in relative position is *between* kommuner rather than within them over time. That stability is the most reliable thing this project can tell you, and it is why the dashboard leads with position rather than with a forecast.
 
 **What does the decomposition tell me?**
-The decomposition shows which structural factors are pulling your kommun above or below the national average. If the "demographics" bar is large and negative, your dependency ratio is heavier than average and that explains part of the gap. If the "residual" bar is large, kommun-specific factors not captured by the four structural variables matter most.
+How far your kommun sits from the national average, split across the variables that can be told apart between kommuner. Only two can: education share and open unemployment. Dependency ratio and population growth are in the model as controls, but between kommuner their effect cannot be distinguished from zero, so they are shown as numbers rather than bars — a bar would claim a precision that is not there (§7.14).
+
+**Is the education bar something we can act on?**
+Not directly. Education share correlates +0.81 with the tax base, and the two are close to measurements of the same underlying thing. It is a strong description of why kommuner differ; it is not a lever whose length tells you how much tax base a training programme would buy (§7.15).
+
+**Can I trust the forecast?**
+It has been scored, which the previous one never was. Over seven origin years it achieves a rank correlation of 0.33 with what actually happened five years later, beating both "guess the average" and "assume the trend continues". That is real but modest: the ordering between kommuner stays largely unpredictable, and the published interval is wide for that reason. The dashboard shows the track record permanently, so if it degrades you will see it.
+
+**What is the panel model at the bottom of the start page for?**
+A different question: within a single kommun over time, how do its structural conditions move with its tax base growth? That is worth knowing, and it cannot rank kommuner — the ranking comes from the cross-sectional model instead (§2.7).
 
 ---
 

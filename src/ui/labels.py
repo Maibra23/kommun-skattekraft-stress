@@ -51,10 +51,13 @@ SWEDISH_LABELS = {
     ),
     "label_kommun_select": "VÄLJ KOMMUN",
 
-    # Risk classes
-    "risk_low": "Låg",
-    "risk_medium": "Medel",
-    "risk_high": "Hög",
+    # Quintiles of the retired vulnerability score, relabelled by T4.2.
+    # The cut is *relative*: exactly 58 kommuner land in the bottom fifth every
+    # year, including years when every kommun's tax base grew. "Hög risk" said
+    # fiscal distress; the data only ever said "lowest fifth of this ranking".
+    "risk_low": "Översta femtedelen",
+    "risk_medium": "Mittersta tre femtedelar",
+    "risk_high": "Nedersta femtedelen",
 
     # KPI labels (national)
     "kpi_median_prognosis": "Median prognos 2025",
@@ -448,9 +451,11 @@ SWEDISH_LABELS = {
 
     # R² KPI tooltip
     "kpi_r2_tooltip": (
-        "R2(within) mäter hur mycket av variationen inom kommuner "
-        "som förklaras av strukturvariablerna, efter att kommun- och "
-        "årseffekter absorberats. Lågt värde är förväntat."
+        "R2(within) mäter hur mycket av variationen inom kommuner som "
+        "förklaras av strukturvariablerna, efter att kommun- och årseffekter "
+        "absorberats. Ett lågt värde är förväntat och säger inget om hur väl "
+        "modellen förklarar skillnader mellan kommuner — det måttet är "
+        "tvärsnittets R2, som redovisas separat och ligger på 0,69."
     ),
 
     # Footer data freshness

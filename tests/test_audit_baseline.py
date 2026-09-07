@@ -129,10 +129,14 @@ class TestVulnerabilityScore:
         assert shares["entity_fixed_effects"] == pytest.approx(8.8, abs=0.5)
 
     def test_entity_effects_do_not_dominate(self, baseline):
-        """METHODOLOGY 7.10 claims FE dominate the score.  They contribute 8.8%.
+        """Entity effects contribute 8.8 % of prediction variance, not most.
 
-        This test encodes the audit's contradiction of the documentation.  It
-        is expected to be deleted along with the claim in Phase 4 (T4.1).
+        This was written to encode the audit's contradiction of METHODOLOGY
+        7.10, and T4.1 expected to delete it once that claim was corrected.
+        The claim is corrected now, and the test is kept rather than deleted:
+        the figure it locks is still true, still surprising, and is quoted in
+        the corrected 7.10. Deleting it would remove the only automatic check
+        on a number the documentation now asserts.
         """
         shares = baseline["prediction_variance_shares_pct"]
         structural = sum(v for k, v in shares.items() if k != "entity_fixed_effects")
