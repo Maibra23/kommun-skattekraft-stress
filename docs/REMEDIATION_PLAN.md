@@ -608,6 +608,7 @@ Do not proceed past a gate until it passes.
 | Gate | Condition | If it fails |
 |---|---|---|
 | **After Phase 0** | Panel covers 2026; `tax_base_index_riket` populated; riket values match SCB exactly | SCB tables restructured again — consult `METHODOLOGY.md` §12 and fix fetchers before continuing |
+| **After Phase 0, every source** *(added 2026-09-07)* | Each fetched series matches **the publisher's own aggregate**, not merely last year's value: population within 0.05 % nationally and 1.5 % per kommun of SCB's published total; the skattekraft index within SCB's own rounding of `100 × kommun / riket`; education's age cells summing exactly to its published `tot16-74` | Do not build the panel. A client-side sum that disagrees with the publisher is a structural integrity failure (§11.6), not a plausibility oddity — this is the gate the 2025 population defect passed straight through because it existed only for skattekraft |
 | **After Phase 2** | Cross-sectional R² > 0.60; decomposition residual < 40 % of gap; VIF computed | Do not ship. The premise of the plan is that the cross-section carries the signal; if it does not, stop and re-audit |
 | **After Phase 3** | Out-of-sample Spearman > 0.25 | **Do not ship the forecast.** Deliver Phases 0–2 only. This is an acceptable outcome, not a failure |
 | **After Phase 4** | No claim in `METHODOLOGY.md` contradicted by `artifacts/` | Fix the doc, not the artifact |
@@ -981,6 +982,53 @@ The DoD bars hold on the **minimum**, not merely the mean: Spearman(t, t+1) mean
 So "this kommun has been drifting down, expect it to continue" earns Spearman ≈ **0.15** at five years. T3.1 mandates a *constant-mean* naive benchmark; for a drift target the constant-mean benchmark is nearly vacuous and **persistence is the benchmark that bites**. T3.2's gate of Spearman > 0.25 is therefore a real bar but a narrower margin over naive than it looks — roughly 0.15 to beat, not 0. Recommend T3.1 emit both benchmarks.
 
 **Finding 4, for T1.3 — the two position measures diverge by more than users will tolerate seeing side by side.** T1.3 is "show the SCB index alongside". Measured across all 4 930 rows, `relative_position` (unweighted) exceeds `tax_base_index_riket` (population-weighted) for **every single kommun-year**: mean **+7.02** index points, min +4.52, max +17.56. Danderyd 2026 reads **208 on ours and 191 on SCB's**; Lidingö 176 vs 162. The two correlate at Pearson 0.9967 / Spearman 0.9911, so nothing is wrong — the unweighted cross-kommun mean is 230 660 kr for 2024 while SCB's population-weighted riksmedelvärde is higher, which puts the unweighted mean of SCB's own index at **91.7**, not 100. METHODOLOGY §7.13 says never mix the two; "alongside" is the hardest case of mixing them. **T1.3 must label each with its denominator and state the systematic offset**, or every user who checks our number against Regionfakta will conclude the dashboard is wrong.
+
+---
+
+### 2026-09-07 — all five review recommendations tested against live SCB, then implemented
+
+Each recommendation was **tested before being written**, because two of them turned out not to work as stated. Suite is **294 passed**; the panel was rebuilt from cold in 317 s.
+
+**What the testing changed about the plan.**
+
+- *"Move the age groups to 5-year bands"* is **not portable**. `BefolkningNy` (2010–2024) declares no bands at all — 102 age codes, single years plus `tot`. The fix had to become "use the coarsest aligned bands the table offers, else single years", which is table-driven rather than a blanket change.
+- *Bands alone would not have fixed it.* Measured against SCB's published total for 2025: single ages are off by up to 75 people (1.005 %), 5-year bands by up to 19 (0.447 %). Bands cut the error roughly fourfold but never remove it. **Only reading the published total makes `population` exact**, which settled the design — the total comes from the publisher, the bands reduce the residual noise in `dependency_ratio`.
+- *"Generalise to all four fetchers"* holds for three. Population and education both sum client-side; skattekraft and unemployment read published values directly, so there is nothing to accumulate. Skattekraft gets a different cross-check instead, and unemployment needs none.
+
+**Rec 1 — population reads the publisher's total.** `fetch_population_total` pins each table's own total codes; `_age_codes` prefers a complete 5-year band set; `_age_code_to_group` now **raises** on any band spanning 20 or 65. That last guard exists because the reviewer made exactly that mistake by hand the day before — a 10-year band grouping put 65–69 year-olds in the working-age denominator and produced a 4-SD error. `compute_population_growth` takes the published totals and only falls back to summing when none are supplied.
+
+**Rec 2 — the publisher cross-check, where it applies.**
+
+| Fetcher | Check | Live result |
+|---|---|---|
+| population | summed groups vs published total | 0.0000 % for 2009–2024; 0.0015 % national / 0.4662 % worst kommun for 2025 |
+| skattekraft | published index vs `100 × kommun / riket` | worst deviation **0.495–0.550** across all 18 years, against SCB's own rounding bound of 0.5 |
+| education | single ages 16–74 vs published `tot16-74` | **exact**, all 290 kommuner, 2024 and 2025 — the table is not protected, and this keeps it honest |
+| unemployment | — | reads pre-aggregated rates; nothing is summed, so nothing can accumulate |
+
+The skattekraft check costs **no extra query**: riket is implied by the 290 kommuner already fetched, and estimating it as the median of `100 × per_capita / index` reproduced SCB's published riksmedelvärde to within 0.008 % (251 418 against 251 437 for 2024). A test caught that this design is scale-invariant — dividing every index by 100 rescales the implied riket and the identity still holds — so it now also anchors the implied riket to a plausible SEK band.
+
+**Rec 3 — §6.2's national check implemented and replaced.** The documented "within 0.1 %" check had never been written, and would not have caught the defect if it had: the error was 0.0015 % nationally. It is now a per-kommun bound as well, measured rather than guessed, and compared against SCB's figure rather than an internal expectation.
+
+**Rec 4 — a Phase-0 gate for every source**, not just skattekraft. The old gate required riket values to match SCB *for skattekraft alone*, which is precisely why skattekraft was verified against the publisher and population against last year.
+
+**Rec 5 — logged as DEVIATIONS §6.3.**
+
+**The rebuild changed exactly what it should and nothing else.**
+
+| | before | after |
+|---|---|---|
+| national 2025 population | 10 605 366 | **10 605 520** — SCB's published figure, exactly |
+| Överkalix 2025 population | 3 151 | **3 183** |
+| Överkalix 2025 growth | −1.562 % | **−0.5623 %** |
+
+290 rows changed, every one of them in 2025. `tax_base_per_capita`, `tax_base_growth_pct`, `tax_base_index_riket`, `unemployment_rate` and `edu_share` are unchanged in **every row** of the panel, and all eight artifacts are **byte-identical** — `model_results.pkl` was restored from git after confirming identical params, `nobs` and `rsquared_within`. The deployed dashboard reads exactly what it read this morning.
+
+**One hazard the fix introduced, found while planning the rebuild rather than after it.** Changing the age codes changes what a cached raw response contains while leaving it *fresh* by age, so the pipeline would have silently reused single-age caches and kept the old arithmetic. `_cache_matches_query` now compares a cache's age codes against the current query's and refetches on a mismatch — the same guard `_cache_shortfall` gives skattekraft.
+
+**Two things worth knowing for later.**
+- `fetch_education` had **no test file at all** before this change. One exists now, carrying the disclosure probe. Its other paths remain untested.
+- The education probe costs four small queries per cold run (a sample of 5 kommuner × 2 sexes × 2 age selections). If that ever matters, sample fewer kommuner rather than dropping the probe: it is the only thing standing between `edu_share` — 640 summed cells per kommun, and the dominant cross-sectional driver — and the failure that hit population.
 
 ---
 

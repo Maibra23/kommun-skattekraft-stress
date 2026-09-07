@@ -138,4 +138,26 @@ The estimation sample is unchanged. `PanelOLS` drops incomplete cases, so the mo
 
 ---
 
+### 6.3 Population is read from SCB's published total, not summed from age cells
+
+**Original plan (METHODOLOGY 2.2, 6.2):** Fetch single-year age counts from BE0101, sum them to obtain each kommun's population, and sanity-check the national total against an approximate expectation.
+
+**Deviation:** That arithmetic stopped being valid in 2025. SCB published that year in a new table, `BefolkningCKM`, whose cells are disclosure-protected: its published totals exceed the sum of the categories beneath them in every dimension. Summing roughly 200 protected cells per kommun therefore produced a population that was systematically short — 154 nationally, but **1.005 % in Överkalix**, which is one full standard deviation of `population_growth_pct`. The panel reported Överkalix shrinking 1.56 % in 2025 when SCB's own figures say 0.56 %. `BefolkningNy`, which serves 2010-2024, has no such gap: its parts sum to its published total exactly, for all 290 kommuner.
+
+Found on 2026-09-07 during a live review of Phase 0, by comparing the panel against SCB rather than against its own previous year.
+
+**Resolution:** Three changes, in `fetch_population` and `compute_derived`.
+
+1. `population` now comes from the publisher's own all-ages aggregate (`fetch_population_total`), pinned to each table's own total codes. It is exact by construction rather than assembled here.
+2. Age groups are read from 5-year bands where the table offers them, which cuts the cells summed per kommun from ~202 to 21 and the worst-kommun residual from 1.005 % to 0.447 %. `BefolkningNy` offers no bands and needs none. No band spanning 20 or 65 is ever selected — `_age_code_to_group` raises rather than assign one, because a 10-year band such as `60-69` would put 65-69 year-olds into the working-age denominator.
+3. `_verify_against_published_totals` compares the summed groups against the published total on every run and raises when they disagree: above 1.5 % for any kommun, or 0.05 % nationally. Per METHODOLOGY 11.6 this is a hard check — a client-side sum that disagrees with the publisher is a structural integrity failure.
+
+**Effect on the rebuilt panel:** 290 rows changed, all in 2025. The national 2025 population now matches SCB's published 10 605 520 exactly; Överkalix reads 3 183 and -0.5623 %. `dependency_ratio` moved by at most 0.046 and `population_growth_pct` by at most 1.00 pp, both in the smallest kommuner. **Every other value in the panel is unchanged, and all eight artifacts are byte-identical** — 2025 entered no specification, because `complete_case_max_year` is 2024.
+
+**Why it was worth fixing before it mattered:** the defect arms itself twice. The dashboard starts displaying 2025 the moment T1.2 stops hardcoding `year == 2024`, and 2025 enters the estimation sample when SCB publishes 2025 unemployment, expected February 2027.
+
+**Reference:** REMEDIATION_PLAN.md, the 2026-09-07 review entries; METHODOLOGY 6.2 and 12.8.
+
+---
+
 **End of DEVIATIONS.md**

@@ -41,7 +41,7 @@ from src.clean.compute_derived import (
 )
 from src.clean.harmonize_kommunkod import validate_and_harmonize
 from src.fetch.fetch_education import fetch_education
-from src.fetch.fetch_population import fetch_population
+from src.fetch.fetch_population import fetch_population, fetch_population_total
 from src.fetch.fetch_skattekraft import fetch_skattekraft
 from src.fetch.fetch_unemployment import fetch_unemployment
 
@@ -118,6 +118,12 @@ def build_panel(force_refresh: bool = False) -> pd.DataFrame:
 
     logger.info("Step 2/7: Fetching population (BE0101) …")
     df_pop = fetch_population(years=_FETCH_YEARS_POPULATION, force_refresh=force_refresh)
+    # SCB's published total, not the sum of the age groups: BefolkningCKM's
+    # cells are disclosure-protected and its parts do not add up to it
+    # (METHODOLOGY §12.8).  Cached by fetch_population's own verification pass.
+    df_pop_total = fetch_population_total(
+        years=_FETCH_YEARS_POPULATION, force_refresh=force_refresh
+    )
 
     logger.info("Step 3/7: Fetching unemployment (AA0003) …")
     df_unemp = fetch_unemployment(years=_FETCH_YEARS_UNEMPLOYMENT, force_refresh=force_refresh)
@@ -139,7 +145,7 @@ def build_panel(force_refresh: bool = False) -> pd.DataFrame:
     # --- Step 6: Compute derived variables ---
     logger.info("Step 6/7: Computing derived variables …")
     df_dep_ratio = compute_dependency_ratio(df_pop)
-    df_pop_growth = compute_population_growth(df_pop)
+    df_pop_growth = compute_population_growth(df_pop, totals=df_pop_total)
     df_skatt_growth = compute_tax_base_growth(df_skatt[["kommun_kod", "year", "tax_base_per_capita"]])
 
     # Drop the 2009 seed rows (needed only for the 2010 growth calc)

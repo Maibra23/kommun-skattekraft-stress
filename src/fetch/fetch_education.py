@@ -99,6 +99,9 @@ class TableConfig(NamedTuple):
     sex_dim_code: str
     sex_codes: list[str]
     region_codes: list[str]  # 4-digit municipality codes; replaces vs:RegionKommun07EjAggr
+    # Used only by the disclosure-protection probe (see _verify_probe_totals).
+    age_total_code: str | None = None
+    age_all_codes: tuple[str, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -160,6 +163,7 @@ def fetch_education(
             query_body = _build_query(config, years)
             df_raw = query_pxweb(config.table_url, query_body)
         df = _compute_edu_share(df_raw)
+        _probe_table_is_unprotected(config, max(years))
         save_df_cache(df, _CACHE_FILE)
 
     df = df[df["year"].isin(years)].reset_index(drop=True)
@@ -259,6 +263,10 @@ def _discover_table() -> TableConfig:
             sex_dim_code=sex_dim_code,
             sex_codes=sex_codes,
             region_codes=region_codes,
+            age_total_code=_resolve_age_total_code(meta, age_dim_code),
+            age_all_codes=tuple(
+                c for c in _dimension_values(meta, age_dim_code) if c.isdigit()
+            ),
         )
 
     raise ValueError(
@@ -564,6 +572,163 @@ def _compute_edu_share(df_raw: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Private helpers — verification
 # ---------------------------------------------------------------------------
+
+
+def _dimension_values(metadata: dict, code: str) -> list[str]:
+    """Return the declared values of one dimension, or [] if it is absent."""
+    for var in metadata.get("variables", []):
+        if var.get("code") == code:
+            return var.get("values", [])
+    return []
+
+
+def _resolve_age_total_code(metadata: dict, age_dim_code: str) -> str | None:
+    """Return the age dimension's own all-ages total code, if it has one.
+
+    UF0506 spells it 'tot16-74'. It covers a wider span than the 25–64 bracket
+    this fetcher uses, so it is not a substitute for the query — only a
+    reference the probe can sum towards.
+
+    Args:
+        metadata: Table metadata dict.
+        age_dim_code: The exact API name of the age dimension.
+
+    Returns:
+        The total code, or None if the dimension declares none.
+    """
+    for var in metadata.get("variables", []):
+        if var.get("code") != age_dim_code:
+            continue
+        for code, text in zip(var.get("values", []), var.get("valueTexts", [])):
+            if code.lower().startswith("tot") or text.strip().lower().startswith("tot"):
+                return code
+    return None
+
+
+def _probe_table_is_unprotected(config: TableConfig, year: int, sample: int = 5) -> None:
+    """Sum a sample of kommuner's age cells and compare to the published total.
+
+    Costs two small queries per sex on a handful of kommuner rather than a
+    second full fetch. Skipped, with a warning, when the table declares no
+    all-ages total to compare against.
+
+    Args:
+        config: The resolved table configuration.
+        year: The year to probe, normally the most recent requested.
+        sample: How many municipalities to probe.
+
+    Raises:
+        ValueError: If the sums disagree with the published totals.
+    """
+    if not config.age_total_code or not config.age_all_codes:
+        logger.warning(
+            "UF0506 declares no all-ages total code; skipping the "
+            "disclosure-protection probe. edu_share is a sum of ~640 cells per "
+            "kommun and is unverified against any published aggregate."
+        )
+        return
+
+    regions = list(config.region_codes)[:sample]
+
+    def _sum_for(age_values: list[str]) -> pd.Series:
+        frames = []
+        for sex in config.sex_codes:
+            body = {
+                "query": [
+                    {"code": "Region", "selection": {"filter": "item", "values": regions}},
+                    {
+                        "code": config.edu_dim_code,
+                        "selection": {"filter": "item", "values": config.edu_level_codes},
+                    },
+                    {
+                        "code": config.age_dim_code,
+                        "selection": {"filter": "item", "values": age_values},
+                    },
+                    {"code": config.sex_dim_code, "selection": {"filter": "item", "values": [sex]}},
+                    {
+                        "code": "ContentsCode",
+                        "selection": {"filter": "item", "values": [config.contents_code]},
+                    },
+                    {"code": "Tid", "selection": {"filter": "item", "values": [str(year)]}},
+                ],
+                "response": {"format": "json"},
+            }
+            frames.append(query_pxweb(config.table_url, body))
+
+        raw = pd.concat(frames, ignore_index=True)
+        region_col = next(c for c in raw.columns if c.lower() == "region")
+        known = {region_col.lower(), config.edu_dim_code.lower(),
+                 config.age_dim_code.lower(), config.sex_dim_code.lower(),
+                 "tid", "contentscode"}
+        value_col = next(c for c in raw.columns if c.lower() not in known)
+        return (
+            pd.to_numeric(raw[value_col], errors="coerce")
+            .fillna(0)
+            .groupby(raw[region_col].astype(str).str.zfill(4))
+            .sum()
+        )
+
+    logger.info(
+        "Probing UF0506 for disclosure protection: %d kommuner, year %d.",
+        len(regions),
+        year,
+    )
+    counts = pd.DataFrame(
+        {
+            "summed": _sum_for(list(config.age_all_codes)),
+            "published": _sum_for([config.age_total_code]),
+        }
+    ).rename_axis("kommun_kod").reset_index()
+
+    _verify_probe_totals(counts, year)
+
+
+def _verify_probe_totals(counts: pd.DataFrame, year: int) -> None:
+    """Assert a client-side sum reproduces the table's own published total.
+
+    ``edu_share`` sums roughly 640 cells per kommun, which makes this the most
+    exposed of the four fetchers to the failure that hit population in 2025:
+    SCB began disclosure-protecting `BefolkningCKM`'s cells, so its parts
+    stopped adding up to its published totals and the summed figure ran up to
+    1 % short in the smallest kommuner (METHODOLOGY §12.8).
+
+    UF0506 is *not* protected — verified live on 2026-09-07, where the sum of
+    single ages 16–74 equalled the published `tot16-74` exactly for all 290
+    kommuner in both 2024 and 2025. This check exists so that if that ever
+    changes, the pipeline says so instead of quietly shifting `edu_share`.
+
+    Equality is required exactly: an unprotected table has no reason to differ
+    by even one person, and any nonzero difference is the signal itself.
+
+    Args:
+        counts: Frame with kommun_kod, ``summed`` and ``published`` columns.
+        year: The probed year, for the error message.
+
+    Raises:
+        ValueError: If any sampled kommun's sum differs from the published
+            total.
+    """
+    diff = (counts["summed"] - counts["published"]).abs()
+    if not (diff > 0).any():
+        logger.info(
+            "Education probe %d: client-side sums match the published age total "
+            "exactly for all %d sampled kommuner.",
+            year,
+            len(counts),
+        )
+        return
+
+    worst = counts.loc[diff.idxmax()]
+    raise ValueError(
+        f"Year {year}: summing UF0506's age cells no longer reproduces its own "
+        f"published total. Kommun {worst['kommun_kod']} sums to "
+        f"{worst['summed']:.0f} against a published {worst['published']:.0f} "
+        f"({int((diff > 0).sum())} of {len(counts)} sampled kommuner differ). "
+        "SCB has most likely begun disclosure-protecting this table's cells, "
+        "which would bias edu_share downward, worst in the smallest kommuner. "
+        "Read the shares from a published aggregate instead of summing. "
+        "See METHODOLOGY §12.8 for the same failure in BE0101."
+    )
 
 
 def _verify(df: pd.DataFrame, years: list[int]) -> None:

@@ -291,11 +291,14 @@ The pipeline raises an error and stops if any of these fail. Failure indicates a
 
 ### 6.2 Population checks
 
-| Check | Expected |
-|---|---|
-| National total 2024 | Approximately 10.55 million |
-| Stockholm kommun (0180) is largest | True |
-| Sum of kommun populations approximates national total | Within 0.1% |
+| Check | Expected | Severity |
+|---|---|---|
+| National total 2024 | Approximately 10.55 million | hard |
+| Stockholm kommun (0180) is largest | True | soft |
+| Summed age groups vs **SCB's published total for that kommun** | Within 1.5 % per kommun | hard |
+| Summed age groups vs SCB's published totals, nationally | Within 0.05 % | hard |
+
+*Revised 2026-09-07.* The last two rows replace a check that read "sum of kommun populations approximates national total, within 0.1 %". That check was never implemented, and it would not have caught §12.8 if it had been: the error was 0.0015 % nationally while reaching 1 % in one kommun, so a national tolerance is structurally blind to it. The comparison is now against SCB's own published figure rather than an internal expectation, and it is bounded per kommun as well as nationally. Tolerances are measured, not guessed — see §12.8.
 
 ### 6.3 Growth rate sanity
 
@@ -613,7 +616,15 @@ For 2024 and earlier this cannot happen: a live re-fetch of `BefolkningNy` confi
 * `dependency_ratio` 2025 — the perturbation partly cancels between numerator and denominator, but not fully: against a 5-year-band computation it differs by up to 0.036 (median 0.0015) on a variable whose SD is 0.101, so ~0.35 SD at worst, again in the smallest kommuner.
 * **No model result is affected today.** `complete_case_max_year` is 2024, so 2025 enters no specification: not the FE panel, not the 2024 cross-section, not the decomposition. Relative position and drift come from skattekraft alone and are untouched.
 
-**Not yet fixed.** The fix is to stop deriving the total by summation: read `population` from the published aggregate and keep the single-age query only for the age groups it is actually needed for, or move the age groups to 5-year bands. This becomes load-bearing the moment SCB publishes 2025 unemployment (expected February 2027), because `complete_case_max_year` then moves to 2025 and these values enter the estimation sample.
+**Fixed 2026-09-07**, in the same day's work that found it. Three changes:
+
+1. **`population` comes from the publisher.** `fetch_population_total` requests each table's own all-ages aggregate — `Alder=TotSA, Kon=TotSa, Civilstand=SC` for CKM, `Alder='tot'` summed over both sexes for `BefolkningNy`, which has no sex total. The figure is exact by construction instead of assembled here.
+2. **Age groups use 5-year bands where the table offers them.** That cuts the cells summed per kommun from ~202 to 21 and the worst-kommun residual from 1.005 % to 0.447 %. `BefolkningNy` offers no bands and needs none. Bands are all-or-nothing — a partial set would leave a hole — and `_age_code_to_group` **raises** on any band spanning 20 or 65, because a 10-year band such as `60-69` would put 65-69 year-olds into the working-age denominator and quietly deflate every dependency ratio.
+3. **`_verify_against_published_totals` runs on every fetch**, comparing the summed groups against the published total and raising above 1.5 % for any kommun or 0.05 % nationally (§6.2). Per §11.6 this is a hard check.
+
+Measured on the rebuilt panel: the national 2025 population is now **10 605 520**, matching SCB exactly; Överkalix reads 3 183 and −0.5623 %. The published-total check reports 0.0000 % for every year 2009–2024 and 0.0015 % nationally with a 0.4662 % worst kommun for 2025. 290 rows changed, all in 2025; every other panel value is unchanged and all eight artifacts are byte-identical.
+
+**One hazard the fix introduced, and guarded.** Changing the age codes changes what a cached raw response contains while leaving it *fresh* by age. `_cache_matches_query` now compares a cache's age codes against the codes the current query would request and refetches on a mismatch — the same guard `_cache_shortfall` provides for skattekraft.
 
 ---
 

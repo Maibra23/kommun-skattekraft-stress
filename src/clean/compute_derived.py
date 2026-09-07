@@ -97,11 +97,19 @@ def compute_dependency_ratio(pop_long: pd.DataFrame) -> pd.DataFrame:
     return wide[["kommun_kod", "year", "dependency_ratio"]]
 
 
-def compute_population_growth(pop_long: pd.DataFrame) -> pd.DataFrame:
+def compute_population_growth(
+    pop_long: pd.DataFrame, totals: pd.DataFrame | None = None
+) -> pd.DataFrame:
     """Compute total population and year-over-year growth per municipality.
 
-    Sums population across all age groups to obtain total population, then
-    computes:
+    Prefers SCB's published total when `totals` is supplied, and only falls
+    back to summing the age groups when it is not. The distinction is not
+    cosmetic: `BefolkningCKM` protects its cells, so its parts do not sum to
+    its published total, and in the smallest kommuner the summed figure is off
+    by up to 1 % — one full SD of the growth rate this function returns. For
+    Överkalix 2025 that is −1.56 % summed against −0.56 % published. See
+    METHODOLOGY §12.8.
+
         population_growth_pct_t = (pop_total_t / pop_total_{t-1} - 1) × 100
 
     The first year in the data for each municipality produces NaN for
@@ -110,16 +118,39 @@ def compute_population_growth(pop_long: pd.DataFrame) -> pd.DataFrame:
     Args:
         pop_long: Long-format DataFrame with columns
             [kommun_kod, year, age_group, population].
+        totals: Optional published totals [kommun_kod, year, population]. When
+            given it must cover every municipality-year in `pop_long`.
 
     Returns:
         DataFrame with columns [kommun_kod, year, population, population_growth_pct].
         population is total persons (int); population_growth_pct is float (percent).
+
+    Raises:
+        ValueError: If `totals` is given but does not cover every row.
     """
-    total = (
-        pop_long.groupby(["kommun_kod", "year"], as_index=False)["population"]
-        .sum()
-        .rename(columns={"population": "population"})
-    )
+    if totals is None:
+        total = pop_long.groupby(["kommun_kod", "year"], as_index=False)[
+            "population"
+        ].sum()
+        logger.info(
+            "compute_population_growth: no published totals supplied; summing age "
+            "groups. Exact for BefolkningNy, not for BefolkningCKM (METHODOLOGY §12.8)."
+        )
+    else:
+        keys = pop_long[["kommun_kod", "year"]].drop_duplicates()
+        total = keys.merge(
+            totals[["kommun_kod", "year", "population"]],
+            on=["kommun_kod", "year"],
+            how="left",
+        )
+        missing = total["population"].isna()
+        if missing.any():
+            sample = total.loc[missing, ["kommun_kod", "year"]].head(5).to_dict("records")
+            raise ValueError(
+                f"{int(missing.sum())} municipality-years have no published total, "
+                f"e.g. {sample}. Fetch the totals for every year in the panel."
+            )
+        total["population"] = total["population"].astype(int)
 
     total = total.sort_values(["kommun_kod", "year"])
 

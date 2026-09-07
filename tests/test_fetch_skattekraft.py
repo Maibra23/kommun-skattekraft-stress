@@ -153,3 +153,55 @@ class TestCoverage:
 
     def test_cache_schema_includes_index(self):
         assert "tax_base_index_riket" in fs._CACHE_DTYPES
+
+
+# ---------------------------------------------------------------------------
+# The publisher cross-check (REMEDIATION_PLAN.md, 2026-09-07 review).
+# SCB's index and its per-capita values come from the same table as two
+# separate ContentsCodes.  They must agree: index = 100 x kommun / riket,
+# to within SCB's own integer rounding of the index.  Needs no extra query —
+# riket is implied by the 290 kommuner already fetched.
+# ---------------------------------------------------------------------------
+
+
+def _consistent_frame(riket: float = 250_000.0) -> pd.DataFrame:
+    per_capita = [riket * f for f in (0.75, 1.0, 1.25, 1.9)]
+    return pd.DataFrame(
+        {
+            "kommun_kod": ["0001", "0002", "0003", "0004"],
+            "year": [2024] * 4,
+            "tax_base_per_capita": per_capita,
+            "tax_base_index_riket": [round(100 * v / riket) for v in per_capita],
+        }
+    )
+
+
+class TestIndexMatchesPerCapita:
+    def test_passes_on_a_consistent_pair(self):
+        fs._verify_index_matches_per_capita(_consistent_frame())
+
+    def test_passes_when_only_rounding_separates_them(self):
+        df = _consistent_frame(riket=251_437.0)
+        fs._verify_index_matches_per_capita(df)
+
+    def test_raises_when_the_index_is_a_fraction_not_a_percent(self):
+        df = _consistent_frame()
+        df["tax_base_index_riket"] = df["tax_base_index_riket"] / 100.0
+        with pytest.raises(ValueError, match="index"):
+            fs._verify_index_matches_per_capita(df)
+
+    def test_raises_when_one_kommun_is_paired_with_the_wrong_value(self):
+        """The failure mode the ContentsCode mapping exists to prevent."""
+        df = _consistent_frame()
+        df.loc[0, "tax_base_index_riket"] = df.loc[3, "tax_base_index_riket"]
+        with pytest.raises(ValueError, match="index"):
+            fs._verify_index_matches_per_capita(df)
+
+    def test_skips_silently_when_the_index_is_absent(self):
+        df = _consistent_frame().drop(columns="tax_base_index_riket")
+        fs._verify_index_matches_per_capita(df)
+
+    def test_skips_silently_when_the_index_is_entirely_null(self):
+        df = _consistent_frame()
+        df["tax_base_index_riket"] = None
+        fs._verify_index_matches_per_capita(df)

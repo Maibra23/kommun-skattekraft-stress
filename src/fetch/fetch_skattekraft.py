@@ -85,6 +85,20 @@ _INDEX_KEYWORDS: tuple[str, ...] = (
 _INDEX_MIN: float = 40.0
 _INDEX_MAX: float = 400.0
 
+# The published index is SCB's own rounding of 100 x kommun / riksmedelvärde to
+# whole percent, so it can sit at most 0.5 from the unrounded value.  Measured
+# 2026-09-07 against SCB's published riket: worst deviation 0.500 across all
+# 290 kommuner in both 2024 and 2026, and 0.55 when riket is estimated from the
+# kommuner themselves rather than fetched.  0.75 leaves room for the estimator
+# without admitting a real disagreement.
+_MAX_INDEX_ROUNDING_DEVIATION: float = 0.75
+
+# Plausible bounds for the riksmedelvärde the index implies.  Observed 173 063
+# SEK for 2010 and 270 859 for 2026, so these are wide enough to survive a
+# decade of nominal growth while still catching a changed index base.
+_IMPLIED_RIKET_MIN: float = 100_000.0
+_IMPLIED_RIKET_MAX: float = 500_000.0
+
 _CACHE_DTYPES: dict[str, str] = {
     "kommun_kod": "str_zfill4",
     "year": "int",
@@ -530,6 +544,85 @@ def _verify(df: pd.DataFrame, years: list[int]) -> None:
         )
 
     _verify_index(df_2024)
+    _verify_index_matches_per_capita(df)
+
+
+def _verify_index_matches_per_capita(df: pd.DataFrame) -> None:
+    """Check SCB's published index against SCB's own per-capita values.
+
+    The two metrics arrive as separate ContentsCodes from one table, and one
+    is a deterministic function of the other: index = 100 × kommun / riket.
+    The riksmedelvärde is not fetched — it is implied by the 290 kommuner
+    already in hand, so this costs no extra query. Estimating it as the median
+    of ``100 × per_capita / index`` reproduced SCB's published riket to within
+    0.008 % on the 2010–2026 panel (251 418 against 251 437 for 2024).
+
+    What it catches: an index expressed as a fraction rather than a percent, a
+    ContentsCode read positionally so that values are paired with the wrong
+    kommun, and any future redefinition of the index base. Per METHODOLOGY
+    §11.6 this is a hard check.
+
+    Skipped when the index column is absent or entirely null — it is a soft
+    dependency (see the module docstring).
+
+    Args:
+        df: Cleaned frame with tax_base_per_capita and, optionally,
+            tax_base_index_riket.
+
+    Raises:
+        ValueError: If any kommun-year deviates by more than SCB's own
+            rounding of the index to whole percent.
+    """
+    if "tax_base_index_riket" not in df.columns:
+        return
+    usable = df.dropna(subset=["tax_base_per_capita", "tax_base_index_riket"])
+    usable = usable[usable["tax_base_index_riket"] > 0]
+    if usable.empty:
+        return
+
+    for year, chunk in usable.groupby("year"):
+        implied_riket = (
+            100.0 * chunk["tax_base_per_capita"] / chunk["tax_base_index_riket"]
+        ).median()
+
+        # The ratio test below is scale-invariant: dividing every index by 100
+        # rescales the implied riket and the identity still holds.  Anchor it,
+        # so a fraction-vs-percent index or a changed base is caught here too
+        # rather than only by the range check on one year.
+        if not (_IMPLIED_RIKET_MIN <= implied_riket <= _IMPLIED_RIKET_MAX):
+            raise ValueError(
+                f"Year {year}: the index implies a riksmedelvärde of "
+                f"{implied_riket:,.0f} SEK, outside the plausible "
+                f"{_IMPLIED_RIKET_MIN:,.0f}–{_IMPLIED_RIKET_MAX:,.0f} range. "
+                "OE0101B0 is probably no longer a percent of the "
+                "riksmedelvärde, or the two ContentsCodes have been swapped."
+            )
+
+        deviation = (
+            chunk["tax_base_index_riket"]
+            - 100.0 * chunk["tax_base_per_capita"] / implied_riket
+        ).abs()
+        worst = deviation.max()
+        logger.info(
+            "Index cross-check %s: implied riksmedelvärde %.0f, worst deviation "
+            "%.3f (limit %.2f)",
+            year,
+            implied_riket,
+            worst,
+            _MAX_INDEX_ROUNDING_DEVIATION,
+        )
+        if worst > _MAX_INDEX_ROUNDING_DEVIATION:
+            offender = chunk.loc[deviation.idxmax()]
+            raise ValueError(
+                f"Year {year}: the published index disagrees with the published "
+                f"per-capita values by {worst:.3f} percentage points at kommun "
+                f"{offender['kommun_kod']} (index {offender['tax_base_index_riket']}, "
+                f"implied {100.0 * offender['tax_base_per_capita'] / implied_riket:.2f}), "
+                f"above the {_MAX_INDEX_ROUNDING_DEVIATION} limit that SCB's own "
+                "rounding explains. Verify that each ContentsCode is mapped by "
+                "code rather than by position, and that OE0101B0 is still a "
+                "percent of the riksmedelvärde."
+            )
 
 
 def _verify_index(df_2024: pd.DataFrame) -> None:
