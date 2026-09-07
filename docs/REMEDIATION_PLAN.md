@@ -289,6 +289,21 @@ Two hard rules for delegation:
 
 **How:** Two specifications. (a) Single-year OLS on the latest year, HC3 robust SE — the interpretable headline. (b) Pooled across years with year effects and kommun-clustered SE — for stability checking. **Do not add entity effects to either**; that would reintroduce the exact mismatch this task exists to remove. Expected signs from the audit run: dependency −6.08, unemployment −1.41, education +1.28, population growth −0.72.
 
+> **Evidence added 2026-09-07, before this task starts — read before choosing which spec leads.**
+>
+> The cross-section was run on the rebuilt panel for four consecutive years (`tax_base_index_riket` on the four structural variables, HC3, no entity effects). Two findings:
+>
+> | Year | N | R² | dependency | unemployment | edu_share | pop growth |
+> |---|---|---|---|---|---|---|
+> | 2021 | 290 | 0.702 | −5.17 | −1.25 | 1.05 | +0.20 |
+> | 2022 | 290 | 0.712 | −4.91 | −1.42 | 1.12 | −0.74 |
+> | 2023 | 290 | 0.723 | **−9.88** | −1.52 | 1.16 | −1.21 |
+> | 2024 | 290 | 0.690 | −5.55 | −1.30 | 1.18 | −0.68 |
+>
+> **1. The premise holds in every year, not just the one the audit tested.** R² is 0.69–0.72 throughout. The Phase-2 gate (R² > 0.60) is safe from four independent directions, so this task carries less risk than the plan assumed.
+>
+> **2. But single-year coefficients are not stable, and that contradicts this task's design.** `dependency_ratio` swings −4.91 → **−9.88** → −5.55 across adjacent years and `population_growth_pct` changes sign. A headline built on 2023 would tell a materially different story about dependency than one built on 2024 — while R² barely moves, which means fit is no guard against this. The task as written makes single-year OLS "the interpretable headline" and the pooled spec merely a stability check. **On this evidence that ordering should be reversed**, or the single-year headline must publish the year-to-year range beside it. Decide deliberately; do not inherit the ordering by default.
+
 **Caution — the central interpretive risk of this whole plan:** R² = 0.69 is partly mechanical. Education share, dependency ratio and unemployment are jointly determined with income levels; this is *association within a cross-section*, not causation. Every coefficient shipped from this module must be labelled descriptive. Carry `METHODOLOGY.md` §7.2 forward and strengthen it. If anyone starts saying "raising education by 1 pp would raise the tax base by 1.28 index points", the plan has failed.
 
 **Definition of done:**
@@ -654,3 +669,25 @@ The gate asked whether the 2025 backtest, re-run on data SCB has now actually pu
 The shipped forecast still loses to guessing the national mean, by 55 %. Predicted dispersion is 0.33 pp against a realised 0.98 pp — three times too narrow, exactly as the audit found. Risk classes remain unseparated and mis-ordered against realised growth: låg 4.74 %, medel 4.52 %, hög 4.68 %. "Hög risk" did not grow more slowly than "låg risk"; it grew faster.
 
 **Consequence:** the plan's premise stands, nothing needs re-auditing, and Phase 1 is cleared to start. Step 4 (T1.1, the position and drift module) is next, and it now has 2026 skattekraft and the official SCB index available to build on.
+
+---
+
+### 2026-09-07 — data status confirmed before Phase 1 · AKU ruled out · Phase 2 previewed
+
+Recorded so the state of the data is approvable at a glance rather than reconstructed from three commits.
+
+**Where the data actually stands.** Complete through **2024** for all five variable groups; through **2025** for four of five; through **2026** for skattekraft alone. `complete_case_max_year` = 2024. Full table and rationale in METHODOLOGY 2.3.2.
+
+**The single gap is unemployment 2025, and it is SCB's gap, not ours.** No municipal open-unemployment figure for 2025 exists at SCB in any table. The STATIV annual refresh appears to land in February (the live table was updated 2026-02-13 carrying 2022–2024), so 2025 should arrive around **February 2027**.
+
+**AKU was investigated and ruled out — permanently, on geography.** `AM0401N/NAKUBefolkningLK` is quarterly and runs to 2026K2, which makes it a standing temptation whenever the 2025 gap becomes inconvenient. Its `Region` dimension holds 26 values: Sweden, a "rest of country" aggregate, the 21 counties, and **exactly three municipalities** (Stockholm, Malmö, Göteborg). Three of 290. AKU samples ~29 500 individuals and publishes margins of error as first-class content codes; municipal estimates for small kommuner are not producible from it at any level of effort. `AM0401N` is itself the "Regional data" folder, so nothing municipal sits beneath it. Written up in KRI 3 known-issue 3 so it is not re-investigated.
+
+**The cost of waiting is measured, not assumed.** Spearman(position_t, position_t+1) = 0.991; 0.929 at ten years. Moving the cross-section from 2024 to 2025 would move the median kommun **2 rank places out of 290**. Meanwhile the descriptive spine — the part users see — is computed from skattekraft alone and already runs to 2026, so Phase 1 is unaffected by the gap entirely.
+
+**Phase 2 previewed while the question was open, with two results worth carrying forward.** The cross-sectional specification was run for 2021–2024: R² = 0.702, 0.712, 0.723, 0.690. The plan's Phase-2 gate (R² > 0.60) is therefore safe in every recent year, not merely the one the audit tested. But individual coefficients are *not* stable — `dependency_ratio` swings −4.91 → −9.88 → −5.55 across adjacent years while R² barely moves, so goodness of fit gives no warning. T2.1 as written makes single-year OLS the headline and pooling only a robustness check; that ordering should be reconsidered before the task starts. The finding is recorded inside T2.1 itself rather than only here, because whoever executes it may not read this log.
+
+**Net effect on the plan: none of the sequencing changes.** Phase 1 is clear to start, Phase 2's premise is better supported than before, and the one open data gap neither blocks nor materially alters either.
+
+---
+
+**End of REMEDIATION_PLAN.md**

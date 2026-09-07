@@ -93,6 +93,32 @@ Truncating every source to the shortest would discard the newest skattekraft, wh
 
 **Any analysis needing all four structural variables must read `complete_case_max_year` from `artifacts/data_provenance.json` rather than assuming `max(panel.year)`.** That file records each source's coverage and is regenerated on every pipeline run. Assuming the panel's own maximum year would silently use 2026, where three of the four variables are null.
 
+#### 2.3.2 Data status as of 2026-09-07, and when it changes
+
+| Variables | Complete through | Constraint |
+|---|---|---|
+| skattekraft, growth, SCB index | **2026** | none — SCB publishes this two years ahead |
+| dependency ratio, population, population growth | **2025** | 2026 population does not exist until Feb 2027 |
+| education share | **2025** | 2026 education does not exist until 2027 |
+| unemployment | **2024** | **the binding constraint** — see below |
+| **all five together** | **2024** | `complete_case_max_year` |
+
+**Why skattekraft is ahead is not an accident, and it is not a forecast.** Because of the t−2 rule (7.6), the tax base for year *t* is set from income in *t−2*: the 2026 figure reflects **2024 income**. It is a decided, published amount, not a projection. This also means pairing 2026 skattekraft with hypothetical 2026 values of the other variables would be pairing 2024 income with 2026 conditions — the ragged tail reflects the real structure of these statistics rather than a gap to be closed.
+
+**The unemployment gap closes around February 2027.** `AA0003B/IntGr1KomUtbBAS` was last updated 2026-02-13 carrying 2022–2024, so the annual STATIV refresh appears to land in February. Until then no municipal open-unemployment figure for 2025 exists at SCB.
+
+**Sources checked and ruled out for filling 2025 unemployment** (verified 2026-09-07 — recorded so this is not re-investigated):
+
+| Source | Why not |
+|---|---|
+| `AA0003B/IntGr1KomUtbBAS` | the live STATIV table; `Tid` = 2022–2024, no 2025 |
+| `AM0210D/ArRegArbStatus` (BAS) | municipal, but 2020–2024 and a different definition |
+| `AM0401N/NAKUBefolkningLK` (AKU/LFS) | quarterly to 2026K2, but `Region` holds only **3 municipalities** (Stockholm, Malmö, Göteborg) out of 290. AKU is a sample survey — its own ContentsCodes include "Margin of error ±" — so municipal estimates for small kommuner are not producible |
+| `AM0207` (RAMS) | municipal series end 2018/2021 |
+| Kolada `N01720`, `N03937` | carry 2025, but at 0.72x and 3.65x our levels respectively; splicing puts a definitional break at the estimation year. See 12.6 |
+
+**The cost of waiting is low.** Relative position is near-frozen: Spearman(position_t, position_t+1) = 0.991 and 0.929 at ten years. Moving the cross-section from 2024 to 2025 would move the median kommun **2 rank places out of 290**. The descriptive spine, which is what users see, is unaffected either way because it is computed from skattekraft alone and already runs to 2026.
+
 ### 2.4 Estimation
 
 `linearmodels.PanelOLS` with `entity_effects=True, time_effects=True`. Standard errors clustered at kommun level (`cov_type='clustered', cluster_entity=True`).
