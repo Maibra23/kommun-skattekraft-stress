@@ -191,6 +191,14 @@ kpi_cards = [
 render_kpi_row(kpi_cards)
 
 st.html(
+    f'<div class="shai-vintage">'
+    + SWEDISH_LABELS["vintage_note"].format(
+        position_year=_POSITION_YEAR, analysis_year=_ANALYSIS_YEAR
+    )
+    + "</div>"
+)
+
+st.html(
     '<div class="shai-summary">'
     + SWEDISH_LABELS["national_position_summary"].format(
         high_name=_highest["kommun_name"],
@@ -243,12 +251,29 @@ with col_map:
         )
         active_layer = resolve_layer(_layer_label)
         render_choropleth(map_df, layer=active_layer)
+        if active_layer.key == "vulnerability":
+            st.warning(
+                f"**{SWEDISH_LABELS['vulnerability_retired_title']}** — "
+                + SWEDISH_LABELS["vulnerability_retired_text"]
+            )
+        else:
+            st.html(
+                '<div class="shai-explanation">'
+                + SWEDISH_LABELS[f"map_legend_{active_layer.key}_full"]
+                + "</div>"
+            )
         with st.expander(SWEDISH_LABELS["explain_choropleth_expander"]):
             st.markdown(SWEDISH_LABELS["explain_choropleth_text"])
 
 with col_hist:
     with st.container(border=True):
-        st.html(card_header(SWEDISH_LABELS["chart_distribution"]))
+        st.html(
+            card_header(
+                SWEDISH_LABELS["chart_distribution_of"].format(
+                    quantity=active_layer.label.lower()
+                )
+            )
+        )
 
         # The histogram follows the map: same quantity, same units, so the two
         # cannot disagree about what is being shown.
@@ -305,6 +330,45 @@ with st.container(border=True):
         f'{SWEDISH_LABELS["index_compare_explanation"]}</div>'
     )
 
+    _both = position_df.dropna(subset=["relative_position", "tax_base_index_riket"])
+    fig_idx = go.Figure()
+    _lo = float(min(_both["tax_base_index_riket"].min(), _both["relative_position"].min())) - 5
+    _hi = float(max(_both["tax_base_index_riket"].max(), _both["relative_position"].max())) + 5
+    # Where the two measures would agree.  Every kommun sits above it.
+    fig_idx.add_trace(
+        go.Scatter(
+            x=[_lo, _hi], y=[_lo, _hi], mode="lines",
+            line=dict(color=COLORS["text_tertiary"], width=1, dash="dash"),
+            hoverinfo="skip", showlegend=False,
+        )
+    )
+    fig_idx.add_trace(
+        go.Scatter(
+            x=_both["tax_base_index_riket"],
+            y=_both["relative_position"],
+            mode="markers",
+            marker=dict(size=6, color=COLORS["secondary"], opacity=0.65),
+            customdata=_both[["kommun_name"]].to_numpy(),
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>"
+                + SWEDISH_LABELS["axis_scb_index"] + ": %{x:.0f}<br>"
+                + SWEDISH_LABELS["axis_our_index"] + ": %{y:.1f}<extra></extra>"
+            ),
+            showlegend=False,
+        )
+    )
+    idx_layout = get_chart_layout(
+        height=380,
+        xaxis_title=SWEDISH_LABELS["axis_scb_index"],
+        yaxis_title=SWEDISH_LABELS["axis_our_index"],
+        showlegend=False,
+    )
+    fig_idx.update_layout(**idx_layout)
+    st.plotly_chart(fig_idx, use_container_width=True, config={"displayModeBar": False})
+    st.html(
+        f'<div class="shai-explanation">{SWEDISH_LABELS["index_scatter_note"]}</div>'
+    )
+
 # ---------------------------------------------------------------------------
 # Section 6: Table of all kommuner
 # ---------------------------------------------------------------------------
@@ -314,17 +378,24 @@ with st.container(border=True):
     with st.expander(SWEDISH_LABELS["explain_ranking_expander"]):
         st.markdown(SWEDISH_LABELS["explain_ranking_text"])
 
+    # Both index measures carry their year, because position runs to a later
+    # year than the structural variables elsewhere on the page.
+    _ours = SWEDISH_LABELS["col_with_year"].format(
+        label=SWEDISH_LABELS["index_compare_ours"], year=_POSITION_YEAR
+    )
+    _scb = SWEDISH_LABELS["col_with_year"].format(
+        label=SWEDISH_LABELS["index_compare_scb"], year=_POSITION_YEAR
+    )
     table_df = filtered_df.sort_values("relative_position", ascending=False)
     display_df = pd.DataFrame(
         {
             SWEDISH_LABELS["th_kommun"]: table_df["kommun_name"].values,
             SWEDISH_LABELS["th_lan"]: table_df["lan_name"].values,
-            SWEDISH_LABELS["index_compare_ours"]: table_df[
-                "relative_position"
-            ].round(1).values,
-            SWEDISH_LABELS["index_compare_scb"]: table_df[
-                "tax_base_index_riket"
-            ].values,
+            _ours: table_df["relative_position"].round(1).values,
+            _scb: table_df["tax_base_index_riket"].values,
+            SWEDISH_LABELS["index_diff"]: (
+                table_df["relative_position"] - table_df["tax_base_index_riket"]
+            ).round(1).values,
             SWEDISH_LABELS["drift_5y"]: table_df["drift_5y"].round(1).values,
             SWEDISH_LABELS["drift_10y"]: table_df["drift_10y"].round(1).values,
         }
@@ -335,12 +406,9 @@ with st.container(border=True):
         use_container_width=True,
         hide_index=True,
         column_config={
-            SWEDISH_LABELS["index_compare_ours"]: st.column_config.NumberColumn(
-                format="%.1f"
-            ),
-            SWEDISH_LABELS["index_compare_scb"]: st.column_config.NumberColumn(
-                format="%.0f"
-            ),
+            _ours: st.column_config.NumberColumn(format="%.1f"),
+            _scb: st.column_config.NumberColumn(format="%.0f"),
+            SWEDISH_LABELS["index_diff"]: st.column_config.NumberColumn(format="%+.1f"),
             SWEDISH_LABELS["drift_5y"]: st.column_config.NumberColumn(format="%+.1f"),
             SWEDISH_LABELS["drift_10y"]: st.column_config.NumberColumn(format="%+.1f"),
         },

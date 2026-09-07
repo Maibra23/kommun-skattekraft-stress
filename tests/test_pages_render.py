@@ -117,12 +117,24 @@ class TestRiksoversiktContent:
         assert riks.dataframe, "the kommun table is missing"
         assert len(riks.dataframe[0].value) == 290
 
-    def test_table_carries_both_index_measures(self, riks):
+    def test_table_carries_both_index_measures_and_their_difference(self, riks):
         from src.ui.labels import SWEDISH_LABELS
 
         columns = list(riks.dataframe[0].value.columns)
-        assert SWEDISH_LABELS["index_compare_ours"] in columns
-        assert SWEDISH_LABELS["index_compare_scb"] in columns
+        joined = " ".join(columns)
+        assert SWEDISH_LABELS["index_compare_ours"] in joined
+        assert SWEDISH_LABELS["index_compare_scb"] in joined
+        assert SWEDISH_LABELS["index_diff"] in columns
+
+    def test_every_column_mixing_vintages_names_its_year(self, riks):
+        """Position runs to a later year than the structural variables, so a
+        bare column header would silently mix two vintages."""
+        from src.provenance import panel_max_year
+        from src.ui.labels import SWEDISH_LABELS
+
+        columns = list(riks.dataframe[0].value.columns)
+        indexed = [c for c in columns if SWEDISH_LABELS["index_compare_ours"] in c]
+        assert indexed and str(panel_max_year()) in indexed[0]
 
 
 class TestKommunPageContent:
@@ -154,3 +166,18 @@ class TestKommunPageContent:
         ]
         assert control_tables, "controls must be shown with confidence intervals"
         assert len(control_tables[0]) == 2
+
+
+class TestRetiredLayerExplainsItself:
+    """Selecting the retired score must say why it is retired, where it is used."""
+
+    def test_callout_appears_only_for_the_vulnerability_layer(self):
+        from src.ui.choropleth import MAP_LAYERS
+
+        app = _page(_PAGES[0])
+        assert not app.warning, "no callout on the default position layer"
+
+        app.radio[0].set_value(MAP_LAYERS["vulnerability"].label).run()
+        assert app.warning, "the retired layer must carry its scored record"
+        text = " ".join(str(w.value) for w in app.warning)
+        assert "0,02" in text, "the callout must state what the score actually scored"

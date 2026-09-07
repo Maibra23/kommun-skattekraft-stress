@@ -32,6 +32,8 @@ st.set_page_config(
     menu_items={"Get Help": None, "Report a bug": None},
 )
 
+import streamlit.components.v1 as components  # noqa: E402
+
 from src.provenance import analysis_year, panel_max_year  # noqa: E402
 from src.ui.chart_theme import get_chart_layout  # noqa: E402
 from src.ui.components import (  # noqa: E402
@@ -145,11 +147,22 @@ st.html(f"""
 # ---------------------------------------------------------------------------
 
 st.html(f"""
-<div class="shai-card">
+<div class="shai-card" style="margin-bottom:0;border-bottom:none;
+                              border-radius:4px 4px 0 0;padding-bottom:0;">
     <div class="shai-card-header">
         <div><h3>{SWEDISH_LABELS["landing_model_title"]}</h3></div>
         <span class="shai-tag">{SWEDISH_LABELS["method_model_name"]}</span>
     </div>
+</div>
+""")
+
+# Rendered through components.html rather than st.html: st.html sanitises
+# the <svg> element away, keeping only its text nodes, so the diagram
+# silently did not appear at all.  Verified 2026-09-07 by screenshot.
+components.html(
+    f"""
+    <style>body {{ margin: 0; background: #FFFFFF;
+                   font-family: 'Source Sans 3', sans-serif; }}</style>
     <svg viewBox="0 0 800 170" xmlns="http://www.w3.org/2000/svg"
          style="width:100%;max-width:800px;margin:12px auto;display:block;"
          aria-hidden="true">
@@ -238,6 +251,13 @@ st.html(f"""
             </marker>
         </defs>
     </svg>
+    """,
+    height=190,
+)
+
+st.html(f"""
+<div class="shai-card" style="margin-top:0;border-top:none;
+                              border-radius:0 0 4px 4px;padding-top:0;">
     <p style="font-family: 'Source Sans 3', sans-serif; font-size: 14px;
               color: {COLORS['text_secondary']}; margin: 12px 20px 4px 20px;
               line-height: 1.6;">
@@ -277,7 +297,7 @@ fig_coefs.add_trace(
         y=plot_df["label"],
         orientation="h",
         marker_color=[
-            (COLORS["low_risk"] if v >= 0 else COLORS["high_risk"])
+            (COLORS["positive"] if v >= 0 else COLORS["negative"])
             if ident
             else COLORS["text_tertiary"]
             for v, ident in zip(plot_df["beta_sd"], plot_df["identified"])
@@ -292,9 +312,12 @@ fig_coefs.add_trace(
             thickness=1.2,
             width=6,
         ),
+        # Labels sit inside the bar: with error bars drawn, an outside label
+        # lands on top of the whisker.  Verified by screenshot 2026-09-07.
         text=[f"{v:+.1f}".replace(".", ",") for v in plot_df["beta_sd"]],
-        textposition="outside",
-        textfont={"family": "IBM Plex Mono", "size": 12, "color": COLORS["text_primary"]},
+        textposition="inside",
+        insidetextanchor="middle",
+        textfont={"family": "IBM Plex Mono", "size": 12, "color": "#FFFFFF"},
         hovertemplate=(
             "<b>%{y}</b><br>%{x:+.2f} "
             + SWEDISH_LABELS["unit_index_points"]

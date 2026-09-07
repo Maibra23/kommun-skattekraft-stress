@@ -25,9 +25,10 @@ from streamlit_folium import st_folium
 from src.ui.css import COLORS, DIVERGING_SCALE, SEQUENTIAL_SCALE
 from src.ui.labels import SWEDISH_LABELS, format_pct, format_sek
 
-#: Drift is signed: falling position must read as the warning colour and rising
-#: as the reassuring one.  DIVERGING_SCALE runs green -> red for vulnerability,
-#: where high is bad; for drift the low end is the bad end, so it is reversed.
+#: DIVERGING_SCALE runs orange (low) to blue (high), which is already the right
+#: direction for drift: falling behind reads warm, gaining reads cool.  The
+#: vulnerability score runs the other way — a high score is the bad end — so
+#: that layer takes the reversed ramp.
 DIVERGING_SCALE_REVERSED = list(reversed(DIVERGING_SCALE))
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -108,7 +109,7 @@ MAP_LAYERS: dict[str, MapLayer] = {
         key="drift",
         column="drift_5y",
         label=SWEDISH_LABELS["map_layer_drift"],
-        colors=DIVERGING_SCALE_REVERSED,
+        colors=DIVERGING_SCALE,
         vmin=-4.0,
         vmax=4.0,
         diverging=True,
@@ -118,7 +119,7 @@ MAP_LAYERS: dict[str, MapLayer] = {
         key="vulnerability",
         column="vulnerability_score",
         label=SWEDISH_LABELS["map_layer_vulnerability"],
-        colors=DIVERGING_SCALE,
+        colors=DIVERGING_SCALE_REVERSED,
         vmin=_VMIN,
         vmax=_VMAX,
         diverging=True,
@@ -348,6 +349,7 @@ def render_choropleth(
         vmin=map_layer.vmin,
         vmax=map_layer.vmax,
         caption=map_layer.legend_caption,
+        diverging=map_layer.diverging,
     )
     m.get_root().html.add_child(folium.Element(legend_html))
 
@@ -405,18 +407,30 @@ def _build_responsive_legend(
     vmin: float,
     vmax: float,
     caption: str,
+    diverging: bool = True,
 ) -> str:
     """Build a responsive HTML legend that scales with map container width.
+
+    The middle tick used to be a hardcoded "0", which was right while the only
+    layer was a zero-centred z-score and wrong the moment a sequential level
+    scale arrived: the position ramp runs 80–130 and was labelled 80 · 0 · 130.
+    The midpoint is now computed, and signs are shown only for scales where a
+    sign means something.
 
     Args:
         colors: List of hex color strings for the gradient.
         vmin: Minimum value for the scale.
         vmax: Maximum value for the scale.
         caption: Legend caption text.
+        diverging: Whether the scale is signed and centred on its midpoint.
 
     Returns:
         HTML string for the legend element.
     """
+    fmt = "+.0f" if diverging else ".0f"
+    low_label = format(vmin, fmt)
+    high_label = format(vmax, fmt)
+    mid_label = format((vmin + vmax) / 2.0, fmt)
     # Build CSS gradient from colors
     gradient_stops = ", ".join(
         f"{c} {i * 100 / (len(colors) - 1):.1f}%"
@@ -471,9 +485,9 @@ def _build_responsive_legend(
             <div class="kss-legend-caption">{caption}</div>
             <div class="kss-legend-bar"></div>
             <div class="kss-legend-labels">
-                <span>{vmin:+.1f}</span>
-                <span>0</span>
-                <span>{vmax:+.1f}</span>
+                <span>{low_label}</span>
+                <span>{mid_label}</span>
+                <span>{high_label}</span>
             </div>
         </div>
     </div>

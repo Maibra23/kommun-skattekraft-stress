@@ -23,6 +23,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest",
+    # Screenshots the dashboard for visual review; see
+    # scripts/screenshot_dashboard.py and docs/screenshots/README.md.
+    "playwright",
 ]
 
 [tool.setuptools.packages.find]

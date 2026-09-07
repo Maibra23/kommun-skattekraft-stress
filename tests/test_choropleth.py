@@ -57,7 +57,7 @@ def test_tile_attribution_is_non_empty() -> None:
 import pytest
 
 from src.ui.choropleth import MAP_LAYERS, resolve_layer
-from src.ui.css import DIVERGING_SCALE
+from src.ui.css import DIVERGING_SCALE, SEQUENTIAL_SCALE
 
 
 class TestMapLayers:
@@ -72,6 +72,15 @@ class TestMapLayers:
         layer = MAP_LAYERS["position"]
         assert not layer.diverging
         assert layer.colors != DIVERGING_SCALE
+        assert layer.colors == SEQUENTIAL_SCALE
+
+    def test_no_layer_uses_a_red_green_ramp(self):
+        """Red-green deficiency affects ~8 % of men, and drift is a headline
+        layer. Every diverging ramp here runs orange to blue instead."""
+        banned = {"#2e7d5b", "#b94a48"}  # the retired green and red
+        for layer in MAP_LAYERS.values():
+            used = {c.lower() for c in layer.colors}
+            assert not (used & banned), f"{layer.key} still uses the red-green ramp"
 
     def test_position_scale_is_clipped_to_the_body_of_the_distribution(self):
         """Median 96.6, p95 127, max 208 — an unclipped scale renders 90 %
@@ -85,11 +94,25 @@ class TestMapLayers:
         assert layer.diverging
         assert layer.vmin == -layer.vmax, "a signed scale must centre on zero"
 
-    def test_vulnerability_layer_is_unchanged(self):
+    def test_vulnerability_layer_keeps_its_column_and_range(self):
         layer = MAP_LAYERS["vulnerability"]
         assert layer.column == "vulnerability_score"
-        assert layer.colors == DIVERGING_SCALE
         assert layer.vmin == -2.5 and layer.vmax == 2.5
+
+    def test_drift_and_vulnerability_run_in_opposite_directions(self):
+        """High drift is good; a high vulnerability score is bad. The two
+        layers therefore cannot share a ramp direction, or one of them would
+        colour its bad end reassuringly."""
+        assert MAP_LAYERS["drift"].colors == DIVERGING_SCALE
+        assert MAP_LAYERS["vulnerability"].colors == list(reversed(DIVERGING_SCALE))
+
+    def test_the_warm_end_always_means_worse(self):
+        """DIVERGING_SCALE runs warm (orange) to cool (blue)."""
+        warm = DIVERGING_SCALE[0]
+        assert MAP_LAYERS["drift"].colors[0] == warm, "falling behind must read warm"
+        assert MAP_LAYERS["vulnerability"].colors[-1] == warm, (
+            "a high vulnerability score must read warm"
+        )
 
     def test_every_layer_carries_a_swedish_label_and_caption(self):
         for layer in MAP_LAYERS.values():

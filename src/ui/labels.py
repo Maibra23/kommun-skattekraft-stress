@@ -76,6 +76,7 @@ SWEDISH_LABELS = {
     "chart_historical": "Historisk skattekraft",
     "chart_decomposition": "Strukturell dekomponering",
     "chart_distribution": "Fördelning av position",
+    "chart_distribution_of": "Fördelning: {quantity}",
 
     # Table headers
     "th_rank": "Rang",
@@ -204,7 +205,7 @@ SWEDISH_LABELS = {
     # Kommunjämförelse
     "chart_national_avg": "Riksgenomsnitt",
     "chart_peers_title": "Jämförbara kommuner",
-    "subtitle_national": "Skattekraftens prognosticerade utveckling 2025, alla 290 kommuner",
+    "subtitle_national": "Alla 290 kommuners läge mot riksgenomsnittet och deras förflyttning",
     "subtitle_kommun": "Strukturell dekomponering för vald kommun",
 
     # Choropleth tooltip
@@ -253,21 +254,27 @@ SWEDISH_LABELS = {
     "map_layer_position": "Nuvarande position",
     "map_layer_drift": "Förflyttning 5 år",
     "map_layer_vulnerability": "Sårbarhetsindex (avvecklas)",
-    "map_legend_position": (
-        "Skattekraft i procent av det oviktade riksgenomsnittet. "
-        "Mörkare = högre. Skalan är beskuren vid 80 och 130."
+    "map_legend_position": "Index mot riket · mörkare = högre",
+    "map_legend_drift": "Indexenheter, 5 år · orange = tappat mark",
+    "map_legend_position_full": (
+        "Kommunens skattekraft i procent av det oviktade riksgenomsnittet. "
+        "Mörkare blå = högre. Skalan är beskuren vid 80 och 130, eftersom "
+        "mediankommunen ligger på 97 och den högsta på 208 — en obeskuren "
+        "skala skulle ge nio kommuner av tio samma färg."
     ),
-    "map_legend_drift": (
-        "Förändring i indexenheter de senaste fem åren. "
-        "Rött = tappat mark mot riket, grönt = vunnit mark."
+    "map_legend_drift_full": (
+        "Förändring i indexenheter de senaste fem åren. Orange = kommunen har "
+        "tappat mark mot riket, blått = vunnit mark. Skalan är centrerad på "
+        "noll och beskuren vid ±4 indexenheter."
     ),
 
     # The two index measures have different denominators (METHODOLOGY §7.13)
     "index_compare_title": "Två mått på samma sak",
     "index_compare_explanation": (
-        "Vårt index delar kommunens skattekraft med det **oviktade** "
+        "Vårt index delar kommunens skattekraft med det <strong>oviktade</strong> "
         "genomsnittet av de 290 kommunerna. SCB:s publicerade index delar med "
-        "**riksmedelvärdet**, som är befolkningsviktat och därför högre — "
+        "<strong>riksmedelvärdet</strong>, som är befolkningsviktat och därför "
+        "högre — "
         "storstadskommuner väger tyngre i det. Därför ligger vårt tal alltid "
         "över SCB:s, i genomsnitt med 7,0 indexenheter och som mest med 17,6. "
         "Ingen av dem är fel; de svarar på olika frågor. Jämför aldrig ett "
@@ -297,11 +304,13 @@ SWEDISH_LABELS = {
 
     # Kommun page lead
     "kommun_position_lead": (
-        "{kommun} ligger på index **{position:.0f}** av riksgenomsnittet, "
-        "en förflyttning på **{drift:+.1f} indexenheter** sedan {since}."
+        "{kommun} ligger på index <strong>{position}</strong> av "
+        "riksgenomsnittet, en förflyttning på <strong>{drift} "
+        "indexenheter</strong> sedan {since}."
     ),
     "kommun_position_lead_no_drift": (
-        "{kommun} ligger på index **{position:.0f}** av riksgenomsnittet."
+        "{kommun} ligger på index <strong>{position}</strong> av "
+        "riksgenomsnittet."
     ),
     "chart_position_history": "Position över tid",
     "axis_index": "Index (riket = 100)",
@@ -339,6 +348,39 @@ SWEDISH_LABELS = {
     "vars_table_identified": "Går att särskilja",
     "identified_yes": "Ja",
     "identified_no": "Nej — intervallet omsluter noll",
+
+    # Data vintage.  The panel is ragged: position runs to the last skattekraft
+    # year, the structural variables stop where unemployment stops.  Numbers of
+    # different vintages sit side by side on these pages, so both the strip and
+    # the column headers name their year.
+    "vintage_note": (
+        "Position och förflyttning till {position_year} · strukturvariabler "
+        "till {analysis_year} (arbetslöshet är den bindande källan)"
+    ),
+    "col_with_year": "{label} ({year})",
+
+    # Shown when the retired score's map layer is selected.
+    "vulnerability_retired_title": "Det här måttet är på väg bort",
+    "vulnerability_retired_text": (
+        "Sårbarhetsindexet bygger på en tillväxtprognos för 2025 som nu går "
+        "att pröva mot utfallet. Den träffade inte: korrelationen med faktisk "
+        "tillväxt blev +0,02 och medelfelet 1,51 procentenheter, mot 0,97 för "
+        "att bara gissa riksgenomsnittet. Riskklasserna skilde sig inte heller "
+        "åt i utfallet — låg 4,74 %, medel 4,52 %, hög 4,68 %. Lagret ligger "
+        "kvar tills det tas bort helt; använd position och förflyttning i "
+        "stället."
+    ),
+
+    # The two index measures, shown rather than only described.
+    "index_scatter_title": "Vårt index mot SCB:s, alla 290 kommuner",
+    "index_scatter_note": (
+        "Varje punkt är en kommun. Den streckade linjen är där måtten skulle "
+        "sammanfalla. Alla 290 ligger ovanför den — skillnaden är systematisk "
+        "och beror på nämnaren, inte på att någon av dem är fel."
+    ),
+    "index_diff": "Skillnad",
+    "axis_our_index": "Vårt index (oviktat)",
+    "axis_scb_index": "SCB:s index (viktat)",
 
     # Within-time inference panel (REMEDIATION_PLAN.md T2.4).
     # The two-way FE model answers a different question than the ranking and
@@ -554,6 +596,7 @@ SWEDISH_LABELS = {
 
     # Kommun comparison (multi-select)
     "compare_label": "Jämför med andra kommuner",
+    "compare_placeholder": "Välj en eller flera kommuner",
     "compare_legend_national_avg": "Riksgenomsnitt",
 
     # Coefficient table — significance label for non-significant results

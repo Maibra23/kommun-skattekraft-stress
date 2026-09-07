@@ -180,19 +180,28 @@ selected_decomp = decomposition_df[
 ].iloc[0]
 
 _drift = selected_row[f"drift_{_DRIFT_WINDOW}y"]
+_position_text = f"{selected_row['relative_position']:.0f}"
 if pd.notna(_drift):
     _lead = SWEDISH_LABELS["kommun_position_lead"].format(
         kommun=selected_row["kommun_name"],
-        position=selected_row["relative_position"],
-        drift=_drift,
+        position=_position_text,
+        drift=format_index_points(_drift),
         since=_POSITION_YEAR - _DRIFT_WINDOW,
     )
 else:
     _lead = SWEDISH_LABELS["kommun_position_lead_no_drift"].format(
         kommun=selected_row["kommun_name"],
-        position=selected_row["relative_position"],
+        position=_position_text,
     )
-st.markdown(f'<div class="shai-summary">{_lead}</div>', unsafe_allow_html=True)
+st.html(f'<div class="shai-summary">{_lead}</div>')
+
+st.html(
+    '<div class="shai-vintage">'
+    + SWEDISH_LABELS["vintage_note"].format(
+        position_year=_POSITION_YEAR, analysis_year=_ANALYSIS_YEAR
+    )
+    + "</div>"
+)
 
 # ---------------------------------------------------------------------------
 # Section 2: KPI row
@@ -299,6 +308,7 @@ with st.container(border=True):
         options=[n for n in _all_names if n != selected_row["kommun_name"]],
         default=[],
         max_selections=4,
+        placeholder=SWEDISH_LABELS["compare_placeholder"],
     )
 
     national_avg = (
@@ -430,7 +440,7 @@ with st.container(border=True):
             y=bar_labels,
             orientation="h",
             marker_color=[
-                COLORS["low_risk"] if v >= 0 else COLORS["high_risk"]
+                COLORS["positive"] if v >= 0 else COLORS["negative"]
                 for v in bar_values
             ],
             text=[format_index_points(v) for v in bar_values],
@@ -525,20 +535,22 @@ with st.container(border=True):
         {
             SWEDISH_LABELS["th_kommun"]: peers["kommun_name"].values,
             SWEDISH_LABELS["th_lan"]: peers["lan_name"].values,
-            SWEDISH_LABELS["position_index_short"]: [
-                f"{v:.1f}".replace(".", ",") for v in peers["relative_position"]
-            ],
+            SWEDISH_LABELS["col_with_year"].format(
+                label=SWEDISH_LABELS["position_index_short"], year=_POSITION_YEAR
+            ): [f"{v:.1f}".replace(".", ",") for v in peers["relative_position"]],
             SWEDISH_LABELS["drift_5y"]: [
                 format_index_points(v) if pd.notna(v) else "–"
                 for v in peers["drift_5y"]
             ],
-            SWEDISH_LABELS["th_unemployment"]: [
+            SWEDISH_LABELS["col_with_year"].format(
+                label=SWEDISH_LABELS["th_unemployment"], year=_ANALYSIS_YEAR
+            ): [
                 format_pct(v) if pd.notna(v) else "–"
                 for v in peers["unemployment_rate"]
             ],
-            SWEDISH_LABELS["th_education"]: [
-                format_pct(v) if pd.notna(v) else "–" for v in peers["edu_share"]
-            ],
+            SWEDISH_LABELS["col_with_year"].format(
+                label=SWEDISH_LABELS["th_education"], year=_ANALYSIS_YEAR
+            ): [format_pct(v) if pd.notna(v) else "–" for v in peers["edu_share"]],
         }
     )
     st.dataframe(peer_display, use_container_width=True, hide_index=True)

@@ -32,16 +32,28 @@ COLORS = {
     "border": "#EEF0F3",
     "grid": "#E5E7EB",
     "hover": "#F9FAFB",
+    # Sign encoding for bars and deltas.  Named for what they mean rather than
+    # for risk: after the cutover the charts show contributions and effects,
+    # not risk classes.  Endpoints of DIVERGING_SCALE.
+    "negative": "#C2670A",
+    "positive": "#2E75A8",
 }
 
+# Diverging scale, orange (low/negative) through neutral to blue (high/positive).
+# Replaced a green-to-red ramp on 2026-09-07: red-green colour deficiency affects
+# roughly 8 % of men, and after the T1.2 cutover this ramp encodes five-year
+# drift, which is a headline layer rather than a decorative one.  Hues are taken
+# from the Okabe-Ito colour-blind-safe set and muted to match the navy/gold
+# brand.  Blue reads as "higher" here and on the sequential position ramp, so
+# the two agree rather than competing.
 DIVERGING_SCALE = [
-    "#2E7D5B",
-    "#5B9E78",
-    "#A8C4A4",
-    "#E5E7EB",
-    "#E8BE7C",
-    "#D4A03C",
-    "#B94A48",
+    "#8C4A02",
+    "#C2670A",
+    "#E8A34A",
+    "#F0F0EF",
+    "#7FB3D5",
+    "#2E75A8",
+    "#12496F",
 ]
 
 # Sequential scale for *levels* — relative position against the national mean.
@@ -208,6 +220,17 @@ html, body, [class*="css"] {
     color: rgba(255, 255, 255, 0.85);
     line-height: 1.6;
     max-width: 720px;
+}
+
+/* ---- Data vintage strip ---- */
+/* The panel is ragged: position runs to a later year than the structural
+   variables, so every page states which year each number comes from. */
+.shai-vintage {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text-tertiary);
+    letter-spacing: 0.2px;
+    margin: 4px 0 12px 0;
 }
 
 /* ---- Page title block ---- */
