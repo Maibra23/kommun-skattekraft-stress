@@ -68,7 +68,9 @@ Since 2026-09-07 the **primary** version of this equation carries the RHS variab
 | `unemployment_rate` | Direct from SCB STATIV, percent |
 | `dependency_ratio` | `(pop_0_19 + pop_65plus) / pop_20_64`, computed from BE0101 |
 | `population_growth_pct` | `(pop_total_t / pop_total_{t-1} - 1) * 100` |
-| `edu_share` | Direct from SCB UF0506 (sum of SUN codes 6+7), percent |
+| `edu_share` | `100 × (SUN 6 + SUN 7) / (all SUN levels)`, ages 25–64, both sexes, from SCB UF0506 |
+
+*The `edu_share` denominator was incomplete here until 2026-09-07 and is stated precisely now, because the choice moves the level materially.* The denominator is **every** person aged 25–64 including SUN level `US` — *uppgift om utbildningsnivå saknas*. Excluding the unknowns instead would raise Danderyd from 61.17 to 63.27 and Filipstad from 11.89 to 12.28 (2024), so the choice shifts levels by roughly 0.4–2.1 points and shifts them *unevenly*, more for high-education kommuner. It barely moves the ranking, but `edu_share` is the dominant cross-sectional driver (β × SD = +10.03), so any figure quoted from it depends on this convention. Verified live against SCB on 2026-09-07: the panel reproduces the with-`US` definition exactly (max abs diff 0.0).
 
 ### 2.3 Sample
 
@@ -582,6 +584,36 @@ The sibling ContentsCode in both tables is Folkökning (population *change*, not
 **Fix applied:** `fetch_population` now probes candidate tables and routes each requested year to whichever table's `Tid` declares it, so a future split needs a new candidate URL rather than new year logic. Every table-specific detail is resolved from that table's own metadata: `_contents_code` matches on the valueText "Folkmängd", `_age_codes` picks whichever open-ended code exists, and `_build_year_query` pins `Civilstand` to its total only when the dimension does not eliminate. `_aggregate_to_age_groups` drops `Civilstand` explicitly.
 
 **Validated:** the 2025 fetch returns 290 kommuner and a national population of 10 605 366, against 10 587 710 for 2024 — a plausible +0.17 %. Age-group totals and per-kommun year-over-year changes are all in range.
+
+> **A fourth incompatibility, found 2026-09-07 by a live review and not caught by the validation above.** That validation compared 2025 against 2024 and asked whether the change was plausible. It never compared 2025 against **SCB's own published total for 2025**, which is what would have caught this. See §12.8.
+
+---
+
+### 12.8 BefolkningCKM's cells are disclosure-protected; its parts no longer sum to its totals
+
+*Found 2026-09-07 during a live review of Phase 0.*
+
+**Symptom:** the project's 2025 population is **10 605 366**. SCB's published total for the same 290 kommuner (`Alder=TotSA`, `Kon=TotSa`, `Civilstand=SC`) is **10 605 520** — 154 people more. The discrepancy is not national rounding: 286 of 290 kommuner differ, in **both directions**, and it is proportionally worst in the smallest kommuner.
+
+| | shortfall as % of published |
+|---|---|
+| Överkalix (3 183 inhabitants) | **+1.005 %** |
+| Hällefors | +0.654 % |
+| median kommun | 0.000 % |
+| most over-counted kommun | −0.723 % |
+
+**Root cause:** `BefolkningCKM` applies cell-level disclosure protection that `BefolkningNy` did not. Its marginal totals exceed the sum of the categories beneath them in *every* dimension — for Stockholm 2025, `Kon=TotSa` exceeds män+kvinnor by 7, `Alder=TotSA` exceeds the sum of single years by 2, and `Civilstand=SC` exceeds the four statuses by 4. Because `fetch_population` builds each kommun's population by summing roughly 200 cells (101 single-year ages × 2 sexes), it accumulates that perturbation. Reading the same year at 5-year bands gives a third answer again, differing from the single-age sum by up to 90 people.
+
+For 2024 and earlier this cannot happen: a live re-fetch of `BefolkningNy` confirms the sum of single ages equals the published `Alder='tot'` aggregate **exactly**, for all 290 kommuner (max abs diff 0.0000).
+
+**Consequences, measured:**
+
+* `population` 2025 — off by up to ±1 % in the smallest kommuner.
+* `population_growth_pct` 2025 — biased by that same amount. At Överkalix that is **1.005 pp against a variable whose SD is 1.013**: one full standard deviation.
+* `dependency_ratio` 2025 — the perturbation partly cancels between numerator and denominator, but not fully: against a 5-year-band computation it differs by up to 0.036 (median 0.0015) on a variable whose SD is 0.101, so ~0.35 SD at worst, again in the smallest kommuner.
+* **No model result is affected today.** `complete_case_max_year` is 2024, so 2025 enters no specification: not the FE panel, not the 2024 cross-section, not the decomposition. Relative position and drift come from skattekraft alone and are untouched.
+
+**Not yet fixed.** The fix is to stop deriving the total by summation: read `population` from the published aggregate and keep the single-age query only for the age groups it is actually needed for, or move the age groups to 5-year bands. This becomes load-bearing the moment SCB publishes 2025 unemployment (expected February 2027), because `complete_case_max_year` then moves to 2025 and these values enter the estimation sample.
 
 ---
 

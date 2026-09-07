@@ -929,4 +929,59 @@ Same sample size, 4.4× the within-kommun explanatory power, and the t-statistic
 
 ---
 
+### 2026-09-07 — Phase 0 and Phase 1 reviewed and re-tested against live SCB
+
+Every figure below was re-fetched from SCB today through **plain `urllib`, not through `src/fetch`**, so a bug in the project's own client could not hide itself — the same independence principle as the T0.3 fixture. Phase 0's four sources and Phase 1's whole spine reproduce; two defects were found, one of them real and previously unrecorded.
+
+**Phase 0 — everything the fetch layer claims, confirmed live.**
+
+| Check | Result |
+|---|---|
+| skattekraft, both metrics, 290 × 2010–2026 | **4 930 rows, max abs diff 0.00e+00** on `tax_base_per_capita` and `tax_base_index_riket` |
+| 2026 spot checks | Danderyd 191, Filipstad 76, Högsby 73 — all reproduce |
+| `OE0101` Tid coverage | 1995–2026; 2026 is still SCB's maximum, so `panel_max_year` is right |
+| AA0003X archive (the withdrawal behind T0.2a) | still **HTTP 400**, both the table and the whole group — the snapshot is still the only source |
+| AA0003B live overlap 2022–2024 | 870 rows, **max abs diff 0.0000000000** vs the panel |
+| snapshot CSV ↔ panel, 2010–2021 | 3 480 rows, **max abs diff 0.0** |
+| AA0003B Tid | still `['2022','2023','2024']` — the 2025 gap is still SCB's, so `complete_case_max_year = 2024` still holds today |
+| population 2024 (`BefolkningNy`) | 290 rows, **max abs diff 0.0000** |
+| education 2024 and 2025 (`UF0506B`) | reproduces **exactly** (max abs diff 0.0), Tid confirmed to 2025 |
+| 2010 growth vs a live 2009 baseline | 290 kommuner, **max abs diff 1e-12** — the one derived value the panel cannot check against itself |
+| panel integrity | 4 930 rows, 290 kommuner, no duplicate kommun-years; growth columns recompute from the levels at max abs diff 0.0; per-column coverage matches `data_provenance.json` exactly |
+| Phase 0 test files | 86 passed |
+
+**Finding 1 — `BefolkningCKM` is disclosure-protected, and the 2025 population is built the noisiest possible way.** Written up as METHODOLOGY §12.8. The project's 2025 national population is 10 605 366; SCB's published total for the same 290 kommuner is **10 605 520**. 286 of 290 kommuner differ, in both directions, worst in the smallest: **Överkalix is short by 1.005 %**, which is one full SD of `population_growth_pct` (SD 1.013). `dependency_ratio` 2025 is off by up to 0.036 against a 5-year-band computation, ~0.35 SD. The cause is that CKM's marginal totals exceed the sum of the categories beneath them in *every* dimension, and `fetch_population` sums ~200 protected cells per kommun. `BefolkningNy` (2024 and earlier) has no such gap: sum of single ages equals the published total exactly, all 290 kommuner.
+
+**No model result is affected today** — `complete_case_max_year` is 2024, so 2025 enters no specification, and position/drift use skattekraft alone. It becomes load-bearing when SCB publishes 2025 unemployment (~February 2027). **Deliberately not fixed in this review**, which was asked to assess rather than change the fetch layer; the fix is one query, recorded in §12.8.
+
+**What let it through is worth more than the bug.** §12.7's validation asked whether 2025 was *plausible* against 2024 (+0.17 %). It never asked whether 2025 matched **SCB's own published total for 2025**. A plausibility check against the previous year cannot detect an error that is small relative to annual growth — and this one is 0.0015 % nationally while being 1 % in one kommun. Any future `_verify` for a new table should compare against that table's own published aggregate, not against last year.
+
+**Finding 2 — `edu_share`'s denominator was undocumented.** METHODOLOGY §2.2 said only "sum of SUN codes 6+7". The denominator is every person aged 25–64 *including* SUN `US`, uppgift saknas. Excluding unknowns instead would move Danderyd 61.17 → 63.27 and Filipstad 11.89 → 12.28. The code is right and reproduces live to 0.0; the documentation was incomplete for the variable that dominates the cross-section (β × SD = +10.03). Corrected in §2.2.
+
+**Phase 1 — T1.1 rebuilt from live data and reproduced exactly.** `relative_position` and all four drift columns were recomputed from the live skattekraft series, from the definitions in the module docstring, with no reference to `position.py`:
+
+| Column | max abs diff vs `position.parquet` |
+|---|---|
+| `relative_position` | 0.00e+00 |
+| `drift_1y` / `3y` / `5y` / `10y` | 0.00e+00 (4 640 / 4 060 / 3 480 / 2 030 non-null) |
+| `tax_base_index_riket` | 0.00e+00 |
+
+The DoD bars hold on the **minimum**, not merely the mean: Spearman(t, t+1) mean 0.9924, **min 0.9850** (bar > 0.98); Spearman(t, t+10) mean 0.9299, **min 0.9161** (bar > 0.90). The unweighted mean of `relative_position` is 100.0000000000 in every year. The §1.2 findings hold live too: between-kommun variance share 98.0 % full / 98.2 % to 2024, and year-demeaned growth persistence −0.050.
+
+**A new data point on why that persistence figure must be year-demeaned.** The demeaned statistic is stable across every window tested — −0.054 (2010–2026), −0.038 (≤2024), −0.050 (2011–2026). The **raw** one is not: it swings **+0.15 → +0.29** on dropping a single year (2010), because that year's pair is dominated by the post-crisis national rebound. The earlier entry argued raw persistence is national wage growth moving all 290 kommuner together; this is that argument with a number on it.
+
+**Finding 3, for T3.2 — drift barely persists, and the naive benchmark is not the one T3.1 specifies.** Measuring whether past drift predicts future drift over non-overlapping windows:
+
+| Window | past → future drift |
+|---|---|
+| 1 year | Pearson **−0.040**, Spearman −0.033 |
+| 3 years | +0.130 / +0.089 |
+| 5 years | **+0.176 / +0.151** |
+
+So "this kommun has been drifting down, expect it to continue" earns Spearman ≈ **0.15** at five years. T3.1 mandates a *constant-mean* naive benchmark; for a drift target the constant-mean benchmark is nearly vacuous and **persistence is the benchmark that bites**. T3.2's gate of Spearman > 0.25 is therefore a real bar but a narrower margin over naive than it looks — roughly 0.15 to beat, not 0. Recommend T3.1 emit both benchmarks.
+
+**Finding 4, for T1.3 — the two position measures diverge by more than users will tolerate seeing side by side.** T1.3 is "show the SCB index alongside". Measured across all 4 930 rows, `relative_position` (unweighted) exceeds `tax_base_index_riket` (population-weighted) for **every single kommun-year**: mean **+7.02** index points, min +4.52, max +17.56. Danderyd 2026 reads **208 on ours and 191 on SCB's**; Lidingö 176 vs 162. The two correlate at Pearson 0.9967 / Spearman 0.9911, so nothing is wrong — the unweighted cross-kommun mean is 230 660 kr for 2024 while SCB's population-weighted riksmedelvärde is higher, which puts the unweighted mean of SCB's own index at **91.7**, not 100. METHODOLOGY §7.13 says never mix the two; "alongside" is the hardest case of mixing them. **T1.3 must label each with its denominator and state the systematic offset**, or every user who checks our number against Regionfakta will conclude the dashboard is wrong.
+
+---
+
 **End of REMEDIATION_PLAN.md**
