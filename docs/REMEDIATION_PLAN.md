@@ -56,8 +56,8 @@ The four theory-driven variables explain **83× more** of the variation the rank
 | F2 — 2025 horizon closed, two releases behind SCB | Phase 0 | Extend to 2026, backtest becomes possible |
 | F1 — SCB's official index `OE0101B0` unused | Phase 0 + 1 | Fetched and made the descriptive spine |
 | **Estimand mismatch (Finding 0, this plan)** | **Phase 2** | Re-point the model at the cross-section |
-| F5 — insignificant `edu_share` drives 25 % of ranking | Phase 2 | Cross-section gives it a real, significant role |
-| F3 — collinearity never checked | Phase 2 | VIF/condition-number diagnostics added and published |
+| F5 — insignificant `edu_share` drives 25 % of ranking | Phase 2 | Cross-section gives it a real, significant role — **measured 2026-09-07: it is not merely significant but dominant**, R² = 0.656 on its own against 0.690 for all four. The inverse also holds: `dependency_ratio`, which the within design ranked first at 59.1 %, is not separately identified between kommuner |
+| F3 — collinearity never checked | Phase 2 | VIF/condition-number diagnostics added and published. **Measured 2026-09-07: the cross-sectional design is clean** (VIF 1.3–2.1); F3's high-correlation pairs are a within-design problem and do not transfer. The diagnostic closes the finding rather than confirming it |
 | F4 — regressors mis-timed vs t−2 income lag | Phase 2 | Lagged spec promoted to primary FE spec |
 | F6 — "vikter" mislabels coefficients | Phase 4 | Relabelled |
 | §7.10 states FE dominate the score (they contribute 8.8 %) | Phase 4 | Corrected in docs and Metod tab |
@@ -99,6 +99,22 @@ Each task carries:
 | 10 | Phase 4 documentation | 5–6 h | Last, when the code is settled |
 
 **Defensible stopping points.** After step 3: current with SCB, official index in the panel, nothing half-finished. After step 7 plus T4.1: the model is fixed and the docs no longer contradict the artifacts — this is the milestone worth aiming for, the point at which the project stops telling users something untrue. Phase 3 is genuinely optional.
+
+### How to run the remaining steps (added 2026-09-07)
+
+Steps 1–3 and the gate are done. The Phase-2 evidence gathered before starting T2.1 changes *what* those tasks deliver but not their order — the sequencing below is the original one, with delegation revised for what each task now contains.
+
+| Step | Task | Run it as | Why this way |
+|---|---|---|---|
+| **4** | T1.1 position/drift | **`[SUBAGENT]`**, unchanged | Genuinely self-contained: skattekraft only, pure functions, one artifact, clear numeric acceptance tests. It needs no Phase-2 context and touches nothing else. The one instruction it must carry: use the ragged panel's full 2010–2026 range, not `complete_case_max_year`. |
+| **5** | T2.1 cross-sectional estimator | **`[SOLO]`** — do not delegate | Was already SOLO, and is now more so. The task is no longer "fit a regression"; it is a series of judgment calls about what may be claimed. A fresh agent reading `METHODOLOGY.md` would reproduce the four-driver framing the evidence block exists to prevent. |
+| **6** | T2.2 + T2.3, **now merged into one pass** | **`[SOLO]`**, immediately after T2.1 | Group B's parallelism assumed two substantial independent tasks. T2.3 shrank to a formality plus the per-variable scale table that T2.2 consumes, and T2.2 now depends on T2.3's `identified` flag to know which bars to draw. Running them concurrently would race on exactly that contract. |
+| **7** | T2.4 demote FE | **`[SOLO]`** | Unchanged. Quote the lagged coefficients from `coefficients.parquet`, not from this plan's prose — the rebuild moved them (see the 2026-09-07 T0.2 entry). |
+| **8** | T1.2, T1.3 dashboard | **`[SOLO]`**, T1.3 may follow as **`[PARALLEL-A]`** | Unchanged, and the deferral is now clearly right: the decomposition chart has changed shape twice since the plan was written. |
+| **9** | Phase 3 | optional | Reassess after step 7. With two identified variables rather than four, the drift forecaster has less to work with than the audit's r = +0.364 suggested; that figure was computed with all four. Its own gate (Spearman > 0.25) still decides. |
+| **10** | Phase 4 | **`[SOLO]`** for T4.1 | T4.1 grew: it now carries the dependency-ratio inversion, which is the most user-visible correction in the plan. |
+
+**One scope question deliberately left open.** Education alone carries R² = 0.656 of 0.690 and correlates +0.810 with the index, so the "why" this phase ships is close to a restatement. Whether that is informative enough to be the product's explanatory layer is a real question — but it is a *new scope* question, not a repair to this plan. Ship the honest version through step 7 first, then decide. Do not let it turn into re-selecting variables mid-phase, which is how the original specification drifted.
 
 ### Keeping this document current
 
@@ -289,28 +305,45 @@ Two hard rules for delegation:
 
 **How:** Two specifications. (a) Single-year OLS on the latest year, HC3 robust SE — the interpretable headline. (b) Pooled across years with year effects and kommun-clustered SE — for stability checking. **Do not add entity effects to either**; that would reintroduce the exact mismatch this task exists to remove. Expected signs from the audit run: dependency −6.08, unemployment −1.41, education +1.28, population growth −0.72.
 
-> **Evidence added 2026-09-07, before this task starts — read before choosing which spec leads.**
+> **Evidence added 2026-09-07, before this task starts. This block changes what the task delivers — read it before writing any code.**
 >
-> The cross-section was run on the rebuilt panel for four consecutive years (`tax_base_index_riket` on the four structural variables, HC3, no entity effects). Two findings:
+> The cross-section was run on the rebuilt panel for 2021–2024 (`tax_base_index_riket` on the four structural variables, HC3, no entity effects), then diagnosed with standard errors, VIF and incremental R².
 >
-> | Year | N | R² | dependency | unemployment | edu_share | pop growth |
-> |---|---|---|---|---|---|---|
-> | 2021 | 290 | 0.702 | −5.17 | −1.25 | 1.05 | +0.20 |
-> | 2022 | 290 | 0.712 | −4.91 | −1.42 | 1.12 | −0.74 |
-> | 2023 | 290 | 0.723 | **−9.88** | −1.52 | 1.16 | −1.21 |
-> | 2024 | 290 | 0.690 | −5.55 | −1.30 | 1.18 | −0.68 |
+> **1. The premise holds in every year, not just the one the audit tested.** R² = 0.702, 0.712, 0.723, 0.690. The Phase-2 gate (R² > 0.60) is safe from four independent directions, so the *fit* claim in this task carries less risk than the plan assumed.
 >
-> **1. The premise holds in every year, not just the one the audit tested.** R² is 0.69–0.72 throughout. The Phase-2 gate (R² > 0.60) is safe from four independent directions, so this task carries less risk than the plan assumed.
+> **2. Only two of the four variables are separately identified.** Standardised to effect-per-SD on the index (whose own SD is 13.2 points), 2024:
 >
-> **2. But single-year coefficients are not stable, and that contradicts this task's design.** `dependency_ratio` swings −4.91 → **−9.88** → −5.55 across adjacent years and `population_growth_pct` changes sign. A headline built on 2023 would tell a materially different story about dependency than one built on 2024 — while R² barely moves, which means fit is no guard against this. The task as written makes single-year OLS "the interpretable headline" and the pooled spec merely a stability check. **On this evidence that ordering should be reversed**, or the single-year headline must publish the year-to-year range beside it. Decide deliberately; do not inherit the ordering by default.
+> | Variable | β × SD | 95 % CI (SD units) | across 2021–24 |
+> |---|---|---|---|
+> | `edu_share` | **+10.03** | [+6.36, +13.70] | always significant, stable |
+> | `unemployment_rate` | −2.69 | [−3.84, −1.53] | always significant, stable |
+> | `dependency_ratio` | −0.64 | **[−2.44, +1.15]** | spans zero every year |
+> | `population_growth_pct` | −0.56 | **[−1.98, +0.85]** | spans zero every year |
+>
+> **3. The two unidentified variables add essentially nothing.** Incremental R² from dropping each: education −0.295, unemployment −0.031, dependency −0.001, population growth −0.001. Nested fits: all four 0.690, the two identified only 0.688, **education alone 0.656**. Education's raw correlation with the index is +0.810.
+>
+> **4. It is not collinearity, and pooling does not rescue it.** VIF is 1.3–2.1 in every year, well inside tolerance — the audit's F3 concern is real for the *within* design but does not bite here. `dependency_ratio` is imprecise because it barely varies (SD = 0.116), so a per-unit coefficient spans 8.6 SDs of the actual data. Pooling 2010–2024 does not help: its SE goes 7.91 → 8.12, because a between-kommun question has effective **N = 290**, not 4 350, and kommun-clustered SEs correctly say so. Pooled, `dependency_ratio` even flips sign (+5.80) while still spanning zero.
+>
+> **Correction to an earlier note.** A previous version of this block called the coefficients "unstable" and pointed at `dependency_ratio` swinging −4.91 → −9.88 → −5.55. That diagnosis was wrong: it was written without checking the standard errors, which are 7–9, so those CIs overlap almost entirely. The variable is not unstable, it is **not identified**. The distinction matters — instability would argue for pooling; non-identification argues for not reporting the number as a driver at all.
+>
+> **What this changes about the task.** The five points below replace the "How" and "Definition of done" as originally written:
+>
+> 1. **Report β × SD as the primary quantity**, keeping raw β for reproducibility. Raw coefficients on incomparable scales are what make `dependency_ratio`'s −5.55 look larger than `edu_share`'s +1.18 when its actual effect is 15× smaller. This is audit finding F6 ("vikter") in another form.
+> 2. **Apply an identification bar, fixed before reading the results.** A variable is presented as a driver only if its CI excludes zero in the primary spec *and* its sign holds across 2021–2024. On current evidence education and unemployment pass; dependency ratio and population growth fail. Failing variables stay in the model as controls, labelled *"ingår i modellen, går inte att särskilja"* — never rendered as decomposition bars.
+> 3. **Report the year range, not one arbitrary year.** Because the CIs overlap across years, the honest headline is "education: +6.4 to +13.7 index points per SD, stable 2021–2024", with the latest year as the point estimate. This dissolves the single-year-versus-pooled question: neither is the headline, the range is.
+> 4. **Do not assert all four signs in the test suite.** The original DoD ("test asserts sign and rough magnitude of all four coefficients") would lock noise into the suite for two variables. Assert instead: R² > 0.60 in every year 2021–2024; education and unemployment CIs exclude zero with the expected signs in every year; and **that dependency ratio and population growth span zero**, so the honest finding is itself regression-tested and someone is told if it ever changes.
+> 5. **Say plainly what the model does not support.** The dashboard currently shows dependency ratio as the largest contributor. Between kommuner it explains essentially nothing. Publishing that correction is worth as much as publishing the positive result.
+>
+> **The interpretive risk is larger than this task's original caution allowed for.** With education carrying 0.656 of 0.690 on its own and correlating +0.810 with the index, "kommuner whose residents are more educated have a higher tax base" is true, robust, and close to a restatement rather than an insight. Strengthen the caution below rather than merely carrying it over. Whether a near-mechanical attribution is informative enough to serve as the product's "why" is a scope question — take it up after this task lands, and do not let it expand into re-selecting variables mid-phase.
 
-**Caution — the central interpretive risk of this whole plan:** R² = 0.69 is partly mechanical. Education share, dependency ratio and unemployment are jointly determined with income levels; this is *association within a cross-section*, not causation. Every coefficient shipped from this module must be labelled descriptive. Carry `METHODOLOGY.md` §7.2 forward and strengthen it. If anyone starts saying "raising education by 1 pp would raise the tax base by 1.28 index points", the plan has failed.
+**Caution — the central interpretive risk of this whole plan, and it is now measured:** R² = 0.69 is not merely "partly mechanical", it is *mostly one near-mechanical relationship*. Education alone gives R² = 0.656 of the 0.690, and correlates +0.810 with the index. Education share, dependency ratio and unemployment are jointly determined with income levels; this is *association within a cross-section*, not causation. Every coefficient shipped from this module must be labelled descriptive. Carry `METHODOLOGY.md` §7.2 forward and strengthen it with these numbers. If anyone starts saying "raising education by 1 pp would raise the tax base by 1.28 index points", the plan has failed.
 
-**Definition of done:**
-- `artifacts/coefficients_cross.parquet` with both specs, coefficients, robust SE, p-values, CIs, R².
-- Latest-year R² > 0.60.
-- Test asserts sign and rough magnitude of all four coefficients.
-- Module docstring states the descriptive-not-causal constraint.
+**Definition of done** *(revised 2026-09-07 — see the evidence block above)*:
+- `artifacts/coefficients_cross.parquet` with both specs: raw β, **β × SD**, robust SE, p-values, CIs (in raw and SD units), R², and a boolean `identified` column applying the bar in point 2.
+- Latest-year R² > 0.60, **and** R² > 0.60 in each of 2021–2024.
+- Test asserts: education and unemployment CIs exclude zero with the expected signs in every year 2021–2024; **dependency ratio and population growth span zero** in the latest year.
+- Artifact records the across-year range for every variable, not only the latest point estimate.
+- Module docstring states the descriptive-not-causal constraint **and** that two of four variables are not separately identified.
 
 ---
 
@@ -325,10 +358,17 @@ Two hard rules for delegation:
 
 **How:** Same additive structure as the existing module (`β_k × (X_ki − X̄_k)`, residual absorbs the rest, exact sum check to 1e-10 — keep that check, it is good). The change is the target and the coefficient source. The residual should shrink dramatically; if it does not, stop and investigate before proceeding.
 
-**Definition of done:**
-- `artifacts/decomposition.parquet` decomposes position gap; components sum exactly.
-- Mean |residual| share of total gap **< 40 %** (currently the residual dominates).
-- Test covers the sum identity and a hand-computed single-kommun case.
+> **Revised 2026-09-07 — this is no longer a four-bar chart.** T2.1's evidence block shows only `edu_share` and `unemployment_rate` are separately identified; `dependency_ratio` and `population_growth_pct` have CIs spanning zero in every year and add 0.001 each to R². A four-component decomposition would render two bars that are indistinguishable from noise, and would do so *confidently*, because the additive identity always sums to 100 % regardless of whether the components mean anything. The sum check cannot catch this.
+>
+> Decompose into **two identified components plus the residual**. Keep the unidentified variables in the fitted model as controls — dropping them changes R² by 0.002 and would misstate the specification — but do not give them bars. Show them in a secondary "included, not separately identified" line with their CIs.
+>
+> The headline finding to publish is an inversion: the dashboard currently shows `dependency_ratio` as the largest contributor, inherited from the within/FE variance decomposition where the audit measured it at 59.1 %. **Between kommuner it explains essentially nothing.** That correction is the most user-visible thing this phase produces.
+
+**Definition of done** *(revised 2026-09-07)*:
+- `artifacts/decomposition.parquet` decomposes the position gap into the **identified** components plus residual; components sum exactly.
+- Unidentified variables appear in the artifact flagged as controls, not as attributed components.
+- Mean |residual| share of total gap **< 40 %**. Two identified variables carry R² = 0.688, so this should hold comfortably; if it does not, the target or the coefficients are wrong.
+- Test covers the sum identity, a hand-computed single-kommun case, and that no unidentified variable is emitted as an attributed component.
 
 ---
 
@@ -343,7 +383,17 @@ Two hard rules for delegation:
 
 **How:** Standard VIF via auxiliary regressions. Flag VIF > 5 as a warning, > 10 as severe. Write `artifacts/diagnostics.parquet`. Diagnostic severity, not blocking (per §11.6 policy).
 
-**Definition of done:** Artifact written for both designs; test asserts VIF is computed for all four variables and that the known high-correlation pairs are flagged.
+> **Reframed 2026-09-07 — the premise above is wrong for the cross-section, and the task is now cheaper and more important than it looks.**
+>
+> This task was written expecting collinearity to be the threat. Measured: **VIF is 1.3–2.1 in every year 2021–2024**, condition number ~510–540, and the strongest cross-sectional pair is education × population growth at +0.567. Collinearity does *not* bite here. The audit's F3 concern was measured on the **within** design (three pairs above |0.65|) and does not transfer.
+>
+> So this diagnostic will **clear** the cross-sectional design rather than condemn it — which is still worth publishing, because F3 is an open audit finding and "we checked and it is fine" closes it honestly. Keep computing it for both designs; the within numbers are the ones that will show the problem.
+>
+> **But the real diagnostic this phase needs is not collinearity — it is identification and scale.** `dependency_ratio` is unusable between kommuner because its SD is 0.116, not because it correlates with anything. Extend this module to emit, per variable: SD, β × SD, the CI in SD units, and the `identified` boolean. That is what T2.2 and the UI must consume to avoid rendering noise as bars.
+>
+> **Consider folding this into T2.1** rather than running it as a separate parallel task. The content shrank (the collinearity half is a formality now) and the half that matters is the same computation T2.1 already needs. Left as a separate task here only so the audit trail against F3 stays legible; merging is a reasonable call for whoever executes it.
+
+**Definition of done** *(revised 2026-09-07)*: Artifact written for both designs; test asserts VIF is computed for all four variables, that the known high-correlation pairs are flagged **in the within design**, and that the cross-sectional design reports VIF below the warning threshold. Per-variable SD, β × SD, CI in SD units and `identified` are emitted for the cross-sectional design.
 
 ---
 
@@ -432,6 +482,8 @@ Two hard rules for delegation:
 | §6.4 | Model fit checks expecting R²(within) > 0.10 | Replace with cross-sectional R² and out-of-sample backtest thresholds. |
 | §7.13 | Unweighted statistics | Expand — the project now carries both SCB's weighted index and its own unweighted mean. |
 | New | — | A §7 limitation on cross-sectional collinearity and the descriptive-not-causal constraint. |
+| §7.10, §9, Metod tab | Dependency ratio presented as the dominant driver (59.1 % of prediction variance) | **Added 2026-09-07 — the largest user-visible correction in this plan.** That 59.1 % is from the *within* design. Between kommuner, `dependency_ratio` has a CI spanning zero in every year 2021–2024 and adds **0.001** to R². The ordering inverts: `edu_share` alone gives R² = 0.656 of 0.690, `unemployment_rate` adds 0.031, and dependency and population growth add 0.001 each. State plainly that two of four variables are not separately identified between kommuner, and why (dependency's SD is 0.116 — it barely varies across kommuner). |
+| New §7 | — | **The attribution is close to a restatement, and must say so.** `edu_share` correlates +0.810 with the index. "Kommuner whose residents are more educated have a higher tax base" is robust and near-mechanical. Users must not read the education bar as a lever. |
 
 **Why:** `METHODOLOGY.md` is described in its own header as the basis for what the dashboard tells users. Until it is corrected, a cold Claude session — or a subagent — reading it will faithfully rebuild the mismatched specification.
 
@@ -474,7 +526,7 @@ Checked for file-disjointness. Tasks in the same group may run as concurrent sub
 | Group | Tasks | Precondition |
 |---|---|---|
 | **A** | T1.3 | after T1.1; disjoint from T1.2 only if T1.2 has not yet touched `02_Kommunjamforelse.py` — **otherwise run sequentially** |
-| **B** | T2.3 | after T2.1; disjoint from T2.2 |
+| ~~**B**~~ | ~~T2.3~~ | **dissolved 2026-09-07.** T2.3 shrank to a formality plus the per-variable scale table that T2.2 must consume to know which components to attribute. They now share a contract, so running them concurrently would race on it. Merged into one sequential `[SOLO]` pass at step 6. |
 | **C** | T3.3 | after T3.2 |
 | **D** | T4.2, T4.3 | after T4.1; disjoint files |
 
@@ -497,8 +549,7 @@ STEP  TASK                                            PHASE  DELEGATION
  [ ] 4   T1.1  Position and drift module                 1    [SUBAGENT]  <- NEXT
  [ ] 5   T2.1  Cross-sectional estimator                 2    [SOLO]
  ---     GATE  Cross-sectional R2 > 0.60
- [ ] 6a  T2.2  Level decomposition                       2    [SUBAGENT]
- [ ] 6b  T2.3  Collinearity diagnostics                  2    [PARALLEL-B]
+ [ ] 6   T2.2 + T2.3  Decomposition + diagnostics        2    [SOLO]  merged 2026-09-07
  [ ] 7   T2.4  Demote FE to inference panel              2    [SOLO]
  [ ] 8a  T1.2  Dashboard leads with position/drift       1    [SOLO]
  [ ] 8b  T1.3  Show SCB index alongside                  1    [PARALLEL-A]
@@ -684,7 +735,9 @@ Recorded so the state of the data is approvable at a glance rather than reconstr
 
 **The cost of waiting is measured, not assumed.** Spearman(position_t, position_t+1) = 0.991; 0.929 at ten years. Moving the cross-section from 2024 to 2025 would move the median kommun **2 rank places out of 290**. Meanwhile the descriptive spine — the part users see — is computed from skattekraft alone and already runs to 2026, so Phase 1 is unaffected by the gap entirely.
 
-**Phase 2 previewed while the question was open, with two results worth carrying forward.** The cross-sectional specification was run for 2021–2024: R² = 0.702, 0.712, 0.723, 0.690. The plan's Phase-2 gate (R² > 0.60) is therefore safe in every recent year, not merely the one the audit tested. But individual coefficients are *not* stable — `dependency_ratio` swings −4.91 → −9.88 → −5.55 across adjacent years while R² barely moves, so goodness of fit gives no warning. T2.1 as written makes single-year OLS the headline and pooling only a robustness check; that ordering should be reconsidered before the task starts. The finding is recorded inside T2.1 itself rather than only here, because whoever executes it may not read this log.
+**Phase 2 previewed while the question was open.** The cross-sectional specification was run for 2021–2024: R² = 0.702, 0.712, 0.723, 0.690. The plan's Phase-2 gate (R² > 0.60) is therefore safe in every recent year, not merely the one the audit tested.
+
+> **Corrected the same day.** This entry first reported that "individual coefficients are not stable", citing `dependency_ratio` swinging −4.91 → −9.88 → −5.55. **That was wrong, and it was wrong because it was written without checking the standard errors.** They are 7–9, so those CIs overlap almost entirely and every year shares a common value. The variable is not unstable — it is **not identified**, in any year, in either specification. The corrected diagnosis and its consequences are in T2.1's evidence block; the mistaken framing is left visible here rather than deleted, because a plan that quietly rewrites its own errors is worth less than one that shows them.
 
 **Net effect on the plan: none of the sequencing changes.** Phase 1 is clear to start, Phase 2's premise is better supported than before, and the one open data gap neither blocks nor materially alters either.
 
