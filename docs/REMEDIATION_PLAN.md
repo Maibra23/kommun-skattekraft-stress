@@ -478,8 +478,8 @@ STEP  TASK                                            PHASE  DELEGATION
  [x] 2   T0.1  Fetch OE0101B0 + skattekraft to 2026      0    [SOLO]  done 2026-09-07 (DoD met at rebuild)
  [x] 2b  T0.2a AA0003X withdrawn — option A snapshot     0    [SOLO]  done 2026-09-07
  [x] 3   T0.2  Extend full panel, handle ragged years    0    [SOLO]  done 2026-09-07
- ---     GATE  Re-run 2025 backtest on real data              <- NEXT
- [ ] 4   T1.1  Position and drift module                 1    [SUBAGENT]
+ [x] --- GATE  Re-run 2025 backtest on real data              PASSED 2026-09-07
+ [ ] 4   T1.1  Position and drift module                 1    [SUBAGENT]  <- NEXT
  [ ] 5   T2.1  Cross-sectional estimator                 2    [SOLO]
  ---     GATE  Cross-sectional R2 > 0.60
  [ ] 6a  T2.2  Level decomposition                       2    [SUBAGENT]
@@ -640,4 +640,17 @@ This is a strengthening of the finding T2.4 rests on, not a contradiction of it 
 
 ---
 
-**End of REMEDIATION_PLAN.md**
+### 2026-09-07 — post-Phase-0 GATE passed · the audit holds on real data
+
+The gate asked whether the 2025 backtest, re-run on data SCB has now actually published, confirms or overturns the audit. **It confirms it.** Realised 2025 skattekraft growth is in the panel, so this run reads committed data only — a third independent path after the audit's ad-hoc scripts and T0.3's fetch-layer reproduction. All three agree to four decimal places.
+
+| Metric | Audit (2026-09-04) | This run | |
+|---|---|---|---|
+| Pearson r | +0.016 | **+0.0156** | match |
+| Spearman ρ | +0.033 | **+0.0333** | match |
+| RMSE, model | 1.512 pp | **1.5117 pp** | match |
+| RMSE, naive constant mean | 0.974 pp | **0.9738 pp** | match |
+
+The shipped forecast still loses to guessing the national mean, by 55 %. Predicted dispersion is 0.33 pp against a realised 0.98 pp — three times too narrow, exactly as the audit found. Risk classes remain unseparated and mis-ordered against realised growth: låg 4.74 %, medel 4.52 %, hög 4.68 %. "Hög risk" did not grow more slowly than "låg risk"; it grew faster.
+
+**Consequence:** the plan's premise stands, nothing needs re-auditing, and Phase 1 is cleared to start. Step 4 (T1.1, the position and drift module) is next, and it now has 2026 skattekraft and the official SCB index available to build on.
