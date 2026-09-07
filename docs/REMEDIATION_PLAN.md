@@ -110,11 +110,13 @@ Steps 1–3 and the gate are done. The Phase-2 evidence gathered before starting
 | **5** | T2.1 cross-sectional estimator | **`[SOLO]`** — do not delegate | Was already SOLO, and is now more so. The task is no longer "fit a regression"; it is a series of judgment calls about what may be claimed. A fresh agent reading `METHODOLOGY.md` would reproduce the four-driver framing the evidence block exists to prevent. |
 | **6** | T2.2 + T2.3, **now merged into one pass** | **`[SOLO]`**, immediately after T2.1 | Group B's parallelism assumed two substantial independent tasks. T2.3 shrank to a formality plus the per-variable scale table that T2.2 consumes, and T2.2 now depends on T2.3's `identified` flag to know which bars to draw. Running them concurrently would race on exactly that contract. |
 | **7** | T2.4 demote FE | **`[SOLO]`** | Unchanged. Quote the lagged coefficients from `coefficients.parquet`, not from this plan's prose — the rebuild moved them (see the 2026-09-07 T0.2 entry). |
-| **8** | T1.2, T1.3 dashboard | **`[SOLO]`**, T1.3 may follow as **`[PARALLEL-A]`** | Unchanged, and the deferral is now clearly right: the decomposition chart has changed shape twice since the plan was written. |
+| **8** | T1.2, T1.3 dashboard | **`[SOLO]`**, T1.3 may follow as **`[PARALLEL-A]`** | Deferral is now clearly right: the decomposition chart has changed shape twice since the plan was written. **This is also the artifact cutover** — the single commit where the deployed pages move from `decomposition.parquet`/`coefficients.parquet` onto the `*_cross.parquet` files. Steps 5–7 deliberately add artifacts without touching the old ones so the live site keeps working; do not cut over piecemeal. |
 | **9** | Phase 3 | optional | Reassess after step 7. With two identified variables rather than four, the drift forecaster has less to work with than the audit's r = +0.364 suggested; that figure was computed with all four. Its own gate (Spearman > 0.25) still decides. |
 | **10** | Phase 4 | **`[SOLO]`** for T4.1 | T4.1 grew: it now carries the dependency-ratio inversion, which is the most user-visible correction in the plan. |
 
 **One scope question deliberately left open.** Education alone carries R² = 0.656 of 0.690 and correlates +0.810 with the index, so the "why" this phase ships is close to a restatement. Whether that is informative enough to be the product's explanatory layer is a real question — but it is a *new scope* question, not a repair to this plan. Ship the honest version through step 7 first, then decide. Do not let it turn into re-selecting variables mid-phase, which is how the original specification drifted.
+
+**The dashboard must work at every commit.** It is deployed on Streamlit Cloud and reads committed artifacts with no build step (METHODOLOGY §11.7). Steps 5–7 therefore only *add* artifacts (`coefficients_cross.parquet`, `decomposition_cross.parquet`, `diagnostics.parquet`); step 8 is the one commit that repoints the pages. This preserves the plan's own "defensible stopping points" principle — stopping after step 7 leaves a working site showing the old model, not a broken one.
 
 ### Keeping this document current
 
@@ -273,7 +275,19 @@ Two hard rules for delegation:
 
 **Caution:** The colour semantics differ between layers and must not be shared. Position is a *level* (sequential scale). Drift is *signed* (diverging scale, zero at white). Reusing the vulnerability palette for drift will mislead.
 
-**Definition of done:** All three pages render; no Swedish literals outside `labels.py`; choropleth toggle works; existing `tests/test_choropleth.py` passes or is updated.
+> **This task also owns the artifact cutover and the chart corrections (added 2026-09-07).** As originally written it covers page *hierarchy* only. But Phase 2 changes what the charts should contain, and nothing in the UI follows the artifacts automatically — every chart hardcodes variable names and reads the `main` spec by name. This is the step where the deployed site moves onto the new artifacts, so the following must land here, together, in one commit:
+>
+> | Location | Now | Must become |
+> |---|---|---|
+> | `pages/02_Kommunjamforelse.py:341-346` | five hardcoded decomposition bars (unemployment, dependency, population, education, residual) | read `decomposition_cross.parquet`; draw bars only for **identified** components plus residual; show the others in a secondary "ingår i modellen, går inte att särskilja" line with their CIs |
+> | `app.py:223-330` "Variabler & vikter" | bar chart + table of **raw β**, sorted by coefficient | **β × SD** with CIs, from `coefficients_cross.parquet`. Raw β on incomparable scales renders −5.55 as a longer bar than +1.18 when the real effect is 15× smaller — the same misreading as F6 |
+> | `app.py:136-156` | hand-drawn SVG of four variables feeding a regression box | must not depict four equal drivers; two are not separately identified |
+> | `app.py:237` | reads the `main` coefficient spec | `lagged` is primary after T2.4 |
+> | `pages/01_Riksoversikt.py:100`, `02_Kommunjamforelse.py:175,407`, and the model-layer three | hardcoded `year == 2024` | read `complete_case_max_year` from `artifacts/data_provenance.json`; 2024 is correct today and silently becomes wrong when SCB publishes 2025 unemployment |
+>
+> **Sequencing constraint:** the site is deployed on Streamlit Cloud reading committed artifacts, so it must work at every commit (METHODOLOGY §11.7). T2.1 and T2.2 add `*_cross.parquet` files without touching the old ones precisely so that this task is the single point where the pages switch over. Do not cut over piecemeal.
+
+**Definition of done** *(extended 2026-09-07)*: All three pages render; no Swedish literals outside `labels.py`; choropleth toggle works; existing `tests/test_choropleth.py` passes or is updated; every row of the table above is addressed; no page reads a hardcoded analysis year; the deployed app works against the committed artifacts at this commit.
 
 ---
 
@@ -364,8 +378,10 @@ Two hard rules for delegation:
 >
 > The headline finding to publish is an inversion: the dashboard currently shows `dependency_ratio` as the largest contributor, inherited from the within/FE variance decomposition where the audit measured it at 59.1 %. **Between kommuner it explains essentially nothing.** That correction is the most user-visible thing this phase produces.
 
+> **Write a new artifact; do not overwrite `decomposition.parquet` (added 2026-09-07).** The dashboard is deployed on Streamlit Cloud and reads committed artifacts directly — `pipeline.py` never runs there. `pages/02_Kommunjamforelse.py` names its five decomposition columns literally, so replacing the file at step 6 would break or silently mislabel the live site until the UI is fixed at step 8, several hours of work later. Write **`artifacts/decomposition_cross.parquet`** instead, mirroring T2.1's `coefficients_cross.parquet`, and leave the old artifact in place until T1.2 cuts the pages over in one deliberate change. See METHODOLOGY §11.7.
+
 **Definition of done** *(revised 2026-09-07)*:
-- `artifacts/decomposition.parquet` decomposes the position gap into the **identified** components plus residual; components sum exactly.
+- `artifacts/decomposition_cross.parquet` decomposes the position gap into the **identified** components plus residual; components sum exactly. The pre-existing `decomposition.parquet` is left untouched for the deployed UI until step 8.
 - Unidentified variables appear in the artifact flagged as controls, not as attributed components.
 - Mean |residual| share of total gap **< 40 %**. Two identified variables carry R² = 0.688, so this should hold comfortably; if it does not, the target or the coefficients are wrong.
 - Test covers the sum identity, a hand-computed single-kommun case, and that no unidentified variable is emitted as an attributed component.
@@ -502,7 +518,16 @@ Two hard rules for delegation:
 2. **README** — drop *"förväntad skattekraftsutveckling fram till 2025"*. The horizon has closed; SCB published it. Replace with the position/drift framing, and state the model is descriptive.
 3. **Risk-class labels** — the quintile cut is *relative*: exactly 58 kommuner are always "hög risk", even in a year when every tax base grows healthily. `METHODOLOGY.md` §9 says this; the red map colouring implies otherwise. Label as *"lägsta femtedelen"*, not fiscal distress.
 
-**Definition of done:** All three changed; no forecast language survives that the backtest does not support.
+> **Four more strings, found 2026-09-07 by reading the UI rather than the plan.** Each is currently shown to users and each becomes false during Phase 2. They are label text, so they belong here rather than in T1.2:
+>
+> 4. **`method_model_name`** — `"Tvåvägs fixed effects panelmodell"`, rendered as the model tag on the landing page (`app.py:126`). After T2.4 the FE model is the within-time inference panel, not the headline. The primary is the cross-sectional specification.
+> 5. **`kpi_r2_tooltip`** — explains R²(within) and reassures that *"Lågt värde är förväntat"*. That metric is demoted in Phase 2; the headline fit becomes cross-sectional R² ≈ 0.69. Keeping a tooltip that explains away a low number, next to a high one, is worse than no tooltip.
+> 6. **`decomp_explanation` and `explain_decomp_text`** — both describe contributions to *growth* (`"bidrar med 0,3 procentenheter lägre skattekraftstillväxt"`). T2.2 changes the target to **position**, so these are wrong on the quantity, independently of the identification question. The worked example needs rewriting in index points.
+> 7. **`landing_model_explanation`** — describes four structural variables feeding a model that produces *"en tillväxtprognos för 2025"*. The 2025 horizon has closed, the forecast scored r = 0.016 against it, and two of the four variables are not separately identified.
+>
+> **Do not soften item 6 into vagueness.** The honest replacement states what the decomposition now attributes and what it cannot: education and unemployment separate kommuner; dependency ratio and population growth do not, between kommuner, however large their bars used to look.
+
+**Definition of done** *(extended 2026-09-07)*: All seven changed; no forecast language survives that the backtest does not support; no user-facing string describes a metric or model that Phase 2 demoted.
 
 ---
 
@@ -740,6 +765,22 @@ Recorded so the state of the data is approvable at a glance rather than reconstr
 > **Corrected the same day.** This entry first reported that "individual coefficients are not stable", citing `dependency_ratio` swinging −4.91 → −9.88 → −5.55. **That was wrong, and it was wrong because it was written without checking the standard errors.** They are 7–9, so those CIs overlap almost entirely and every year shares a common value. The variable is not unstable — it is **not identified**, in any year, in either specification. The corrected diagnosis and its consequences are in T2.1's evidence block; the mistaken framing is left visible here rather than deleted, because a plan that quietly rewrites its own errors is worth less than one that shows them.
 
 **Net effect on the plan: none of the sequencing changes.** Phase 1 is clear to start, Phase 2's premise is better supported than before, and the one open data gap neither blocks nor materially alters either.
+
+---
+
+### 2026-09-07 — UI consequences traced · artifact contract made additive
+
+Phase 2's redesign was specified against the model layer. Reading the UI afterwards showed the plan had no owner for the changes it forces there, and one sequencing trap that would have taken the live site down.
+
+**Nothing in the UI follows the artifacts.** Every chart hardcodes variable names and reads specs by name: `pages/02_Kommunjamforelse.py:341-346` lists its five decomposition bars literally, `app.py:237` reads the `main` coefficient spec, `app.py:136-156` hand-draws an SVG of four variables feeding a regression box. Changing the model changes none of these automatically. T1.2 was written as a page-*hierarchy* task and T4.2 as three label fixes; neither covered the chart contents. Both now carry explicit inventories.
+
+**The trap: this dashboard is deployed and reads committed artifacts.** `pipeline.py` runs locally only, `artifacts/*.parquet` are tracked in git, and Streamlit Cloud serves whatever is on the branch with no build step. T2.2's original DoD said it would write `artifacts/decomposition.parquet` — overwriting the live file at step 6, while the pages that read it are not fixed until step 8. Between those commits the deployed site would crash on missing columns or, worse, keep rendering bars under the wrong labels.
+
+**Fix: make the staging additive.** T2.1 already wrote to a new file (`coefficients_cross.parquet`); T2.2 was inconsistent with its own sibling and now writes `decomposition_cross.parquet`. Steps 5–7 add artifacts and touch nothing the live site reads; **step 8 is the single cutover commit**. This also protects the plan's "defensible stopping points" principle — stopping after step 7 now leaves a working dashboard showing the old model, rather than a broken one. Recorded as METHODOLOGY §11.7, because the constraint outlives this plan.
+
+**Four more user-facing strings found, added to T4.2.** `method_model_name` still calls the model "Tvåvägs fixed effects panelmodell" (demoted by T2.4); `kpi_r2_tooltip` explains away a low R²(within) that Phase 2 replaces with a high cross-sectional one; `decomp_explanation` and `explain_decomp_text` describe contributions to *growth* when T2.2 changes the target to *position*; and `landing_model_explanation` still advertises a 2025 forecast that has since scored r = 0.016 against realised data.
+
+**One latent bug promoted to T1.2's DoD.** Six call sites hardcode `year == 2024` rather than reading `complete_case_max_year`. Correct today, silently wrong the moment SCB publishes 2025 unemployment.
 
 ---
 

@@ -446,6 +446,16 @@ All fetcher verification checks follow a consistent severity policy:
 * **Hard checks** (raise `ValueError`): missing kommuner, implausible value ranges, structural data integrity failures (e.g. Danderyd not highest skattekraft, national mean outside expected range). These indicate a data integrity problem that would corrupt downstream artifacts.
 * **Soft checks** (log warning): unexpected but non-fatal observations (e.g. Stockholm not the largest kommune, unemployment mean outside the narrow 3-8 % historical range but within the wider 1-15 % plausible range). These may indicate data quality issues worth investigating but do not block the pipeline.
 
+### 11.7 Artifacts are a published contract, not build output
+
+`pipeline.py` runs locally, never on Streamlit Cloud, and every artifact in `artifacts/` is committed to git. The deployed dashboard therefore reads whatever artifact files are on the branch — it does not regenerate them. Three consequences that are easy to miss:
+
+1. **Committing a changed artifact changes the live site immediately.** There is no build step between the parquet and the user.
+2. **Changing an artifact's *schema* breaks the live site**, because the pages hardcode column names. `pages/02_Kommunjamforelse.py` names its five decomposition columns literally, and `app.py` reads the `main` coefficient spec by name. A renamed or dropped column surfaces as a crash or, worse, a silently mislabelled chart.
+3. **Artifact and UI changes must therefore land together, or the artifact must be additive.** When a model change is being staged over several commits, write the new result to a *new* file (`*_cross.parquet`) and leave the existing one untouched until the UI cuts over in one deliberate change. This is why `coefficients_cross.parquet` and `decomposition_cross.parquet` exist alongside their predecessors rather than replacing them.
+
+The same rule applies to `data/processed/panel.parquet`: adding the ragged 2025–2026 rows was safe only because every page filters to `year == 2024` explicitly rather than taking `max(year)`.
+
 ---
 
 ## 12. SCB API Structural Changes Discovered During Implementation
