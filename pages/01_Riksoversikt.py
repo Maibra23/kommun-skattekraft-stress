@@ -46,6 +46,7 @@ from src.ui.components import (  # noqa: E402
     render_kpi_row,
 )
 from src.ui.css import COLORS, inject_css  # noqa: E402
+from src.ui.filters import apply_kommun_filter  # noqa: E402
 from src.ui.labels import (  # noqa: E402
     POSITION_BANDS,
     SWEDISH_LABELS,
@@ -460,6 +461,9 @@ if not forecast_df.empty:
             f'<div class="shai-explanation">{SWEDISH_LABELS["backtest_caveat"]}</div>'
         )
 
+        with st.expander(SWEDISH_LABELS["forecast_guide_expander"]):
+            st.markdown(SWEDISH_LABELS["forecast_guide"])
+
 # ---------------------------------------------------------------------------
 # Section 6: Table of all kommuner
 # ---------------------------------------------------------------------------
@@ -477,7 +481,27 @@ with st.container(border=True):
     _scb = SWEDISH_LABELS["col_with_year"].format(
         label=SWEDISH_LABELS["index_compare_scb"], year=_POSITION_YEAR
     )
-    table_df = filtered_df.sort_values("relative_position", ascending=False)
+
+    # Pick kommuner by name. Composes with the sidebar's band pills: the pills
+    # narrow to a kind of kommun, this narrows to named ones.
+    _chosen = st.multiselect(
+        SWEDISH_LABELS["kommun_filter_label"],
+        options=sorted(filtered_df["kommun_name"].dropna().unique()),
+        default=[],
+        placeholder=SWEDISH_LABELS["kommun_filter_placeholder"],
+        help=SWEDISH_LABELS["kommun_filter_help"],
+    )
+
+    table_df = apply_kommun_filter(filtered_df, _chosen)
+    table_df = table_df.sort_values("relative_position", ascending=False)
+    if _chosen:
+        st.html(
+            f'<div class="shai-explanation">'
+            + SWEDISH_LABELS["kommun_filter_active"].format(
+                shown=len(table_df), total=len(filtered_df)
+            )
+            + "</div>"
+        )
     if not forecast_df.empty:
         table_df = table_df.merge(
             forecast_df[["kommun_kod", "drift_forecast", "lower", "upper"]],

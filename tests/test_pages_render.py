@@ -218,3 +218,42 @@ class TestBacktestPanelIsPublished:
         columns = list(riks.dataframe[0].value.columns)
         assert SWEDISH_LABELS["forecast_interval_col"] in columns
         assert any("Prognos" in c for c in columns)
+
+
+class TestKommunFilter:
+    """Picking kommuner by name narrows the ranking table.
+
+    The band pills answer "show me kommuner like this one"; this answers
+    "show me these kommuner". The default must stay all 290, because an
+    empty selection is also what Streamlit reports before the user has
+    touched the widget.
+    """
+
+    def test_the_filter_offers_every_kommun(self, riks):
+        from src.ui.labels import SWEDISH_LABELS
+
+        widget = riks.multiselect[0]
+        assert widget.label == SWEDISH_LABELS["kommun_filter_label"]
+        assert len(widget.options) == 290
+
+    def test_it_shows_all_kommuner_before_anything_is_chosen(self, riks):
+        assert len(riks.dataframe[0].value) == 290
+
+    def test_choosing_kommuner_narrows_the_table_to_exactly_those(self):
+        app = _page(_PAGES[0])
+        app.multiselect[0].select("Filipstad").select("Danderyd")
+        app.run()
+
+        assert not app.exception, [str(e.value) for e in app.exception]
+        table = app.dataframe[0].value
+        assert len(table) == 2
+        assert set(table.iloc[:, 0]) == {"Filipstad", "Danderyd"}
+
+    def test_clearing_the_choice_restores_every_kommun(self):
+        app = _page(_PAGES[0])
+        app.multiselect[0].select("Filipstad")
+        app.run()
+        app.multiselect[0].unselect("Filipstad")
+        app.run()
+
+        assert len(app.dataframe[0].value) == 290

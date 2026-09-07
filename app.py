@@ -477,6 +477,9 @@ with st.container(border=True):
     )
     st.html(f'<div class="shai-explanation">{SWEDISH_LABELS["within_section_caveat"]}</div>')
 
+    with st.expander(SWEDISH_LABELS["within_section_guide_expander"]):
+        st.markdown(SWEDISH_LABELS["within_section_guide"])
+
 # ---------------------------------------------------------------------------
 # Section 5: Pipeline steps
 # ---------------------------------------------------------------------------

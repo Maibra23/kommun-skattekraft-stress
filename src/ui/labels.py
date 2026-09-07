@@ -323,17 +323,25 @@ SWEDISH_LABELS = {
     # The two index measures have different denominators (METHODOLOGY §7.13)
     "index_compare_title": "Två mått på samma sak",
     "index_compare_explanation": (
-        "Vårt index delar kommunens skattekraft med det "
-        "<strong>oviktade</strong> genomsnittet av de 290 kommunerna. SCB:s "
-        "publicerade index delar med <strong>riksmedelvärdet</strong>, som är "
-        "befolkningsviktat och därför högre, eftersom storstadskommuner väger "
-        "tyngre i det. Därför ligger vårt tal alltid över SCB:s, i genomsnitt "
-        "med 7,0 indexenheter och som mest med 17,6. Ingen av dem är fel; de "
-        "svarar på olika frågor. Jämför aldrig ett tal från det ena måttet "
-        "med ett tal från det andra."
+        "Vi jämför med ett snitt där alla 290 kommuner väger lika mycket. "
+        "SCB jämför med ett snitt där stora kommuner väger tyngre. Därför "
+        "ligger vårt tal alltid lite högre, i snitt 7 indexenheter. Båda är "
+        "rätt, de svarar bara på olika frågor. <strong>Jämför aldrig ett tal "
+        "från det ena måttet med ett tal från det andra.</strong>"
     ),
     "index_compare_ours": "Vårt index (oviktat)",
     "index_compare_scb": "SCB:s index (viktat)",
+
+    # Pick specific kommuner by name, alongside the sidebar's band pills
+    "kommun_filter_label": "Välj kommuner",
+    "kommun_filter_placeholder": "Alla kommuner",
+    "kommun_filter_help": (
+        "Sök och välj en eller flera kommuner för att visa bara dem i "
+        "tabellen. Lämna tomt för att visa alla."
+    ),
+    "kommun_filter_active": (
+        "Visar {shown} av {total} kommuner. Rensa valet för att se alla."
+    ),
 
     # Riksöversikt KPI row after the cutover
     "kpi_index_spread": "Högsta / lägsta index",
@@ -464,6 +472,148 @@ SWEDISH_LABELS = {
         "utfall. När den till slut testades hamnade korrelationen på 0,02 och "
         "den förlorade mot att gissa riksgenomsnittet. Därför står den här "
         "rutan kvar permanent: om prognosen försämras syns det här."
+    ),
+
+    "within_section_guide_expander": "Hur läser jag tabellen? Med exempel",
+    "within_section_guide": (
+        "**Ett scenario**"
+        "\n\n"
+        "Du är controller och har sett att kommunens öppna arbetslöshet steg "
+        "med en procentenhet förra året. Frågan du får är vad det betyder för "
+        "skattekraften. Tabellen här svarar på den frågan, och det är en "
+        "annan fråga än den som resten av sidan svarar på."
+        "\n\n"
+        "**Så läser du tabellen**"
+        "\n\n"
+        "Koefficienten säger hur skattekraftstillväxten förändras när "
+        "variabeln ändras med en enhet i just den här kommunen, jämfört med "
+        "kommunens egen normalnivå. Variablerna mäts året före tillväxten, "
+        "eftersom sambandet är starkast med ett års fördröjning."
+        "\n\n"
+        "**Vad tabellen säger just nu**"
+        "\n\n"
+        "Arbetslösheten har koefficienten -0,106. En procentenhets högre "
+        "arbetslöshet ett år hänger alltså ihop med ungefär 0,11 "
+        "procentenheters lägre skattekraftstillväxt året därpå, inom samma "
+        "kommun. Det är det starkaste och mest tillförlitliga sambandet i "
+        "tabellen."
+        "\n\n"
+        "Försörjningskvoten har koefficienten -3,80, men den mäts som en kvot "
+        "och inte i procent. En förändring på 0,1 motsvarar därför ungefär "
+        "0,38 procentenheters lägre tillväxt, inte 3,8."
+        "\n\n"
+        "**Varför den här tabellen inte kan rangordna kommuner**"
+        "\n\n"
+        "Modellen räknar bort allt som ligger fast för en kommun: geografi, "
+        "näringsliv, historia. Kvar blir hur kommunen avviker från sig själv "
+        "över tid. Eftersom 98 procent av skillnaderna i skattekraft ligger "
+        "mellan kommuner och inte inom dem, är det just den variation som "
+        "räknas bort här. Rangordningen kommer i stället från "
+        "tvärsnittsmodellen högre upp på sidan."
+        "\n\n"
+        "Modellen förklarar 3,6 procent av variationen inom kommuner. Det "
+        "låter lite och är förväntat: det mesta som händer med en kommuns "
+        "skattekraft ett enskilt år är nationell konjunktur, och även den är "
+        "borträknad."
+    ),
+    "decomp_guide_expander": "Hur läser jag diagrammet? Med exempel",
+    "decomp_guide": (
+        "**Ett scenario**"
+        "\n\n"
+        "Din kommun ligger under riksgenomsnittet och nämnden vill veta "
+        "varför. Diagrammet delar upp avståndet i de delar modellen kan "
+        "hänföra till en orsak, och redovisar öppet hur stor del den inte kan "
+        "förklara."
+        "\n\n"
+        "**Så läser du diagrammet**"
+        "\n\n"
+        "Staplarna mäts i indexenheter, samma enhet som kommunens läge. Lägg "
+        "ihop dem och du får hela avståndet till riksgenomsnittet. Den grå "
+        "stapeln är residualen: den del som de fyra variablerna inte "
+        "förklarar."
+        "\n\n"
+        "**En färdig uträkning**"
+        "\n\n"
+        "Östra Göinge ligger 12,7 indexenheter under riksgenomsnittet. "
+        "Modellen hänför 8,4 av dem till utbildningsnivån och 4,4 till "
+        "arbetslösheten, och lämnar 0,03 oförklarat. Nästan hela avståndet "
+        "går alltså att peka på."
+        "\n\n"
+        "**Vad du inte kan läsa ut**"
+        "\n\n"
+        "Att utbildningsstapeln är lång betyder inte att en "
+        "utbildningssatsning ger motsvarande skattekraft. Utbildningsnivå och "
+        "skattekraft är till stor del två mätningar av samma sak."
+        "\n\n"
+        "Modellen är dessutom linjär och träffar sämst i toppen av "
+        "fördelningen. För de allra rikaste kommunerna är en stor del av "
+        "avvikelsen residual, och då säger uppdelningen mindre."
+    ),
+    "forecast_guide_expander": "Vad betyder prognosen för min kommun?",
+    "forecast_guide": (
+        "**Ett scenario**"
+        "\n\n"
+        "Du planerar på fem års sikt och vill veta om kommunen är på väg att "
+        "tappa mark mot riket. Prognosen ger ett svar, och lika viktigt ger "
+        "den ett intervall som säger hur säkert svaret är."
+        "\n\n"
+        "**Så läser du prognosen**"
+        "\n\n"
+        "Talet är hur många indexenheter kommunen väntas flytta sig på fem "
+        "år. Intervallet rymmer utfallet i ungefär fyra fall av fem, och det "
+        "bygger på hur fel prognosen faktiskt haft tidigare, inte på en "
+        "teoretisk formel."
+        "\n\n"
+        "**Två kommuner som skiljer sig åt**"
+        "\n\n"
+        "Solna har prognosen +5,0 med intervallet +2,5 till +7,3. Hela "
+        "intervallet ligger över noll, så riktningen är tydlig."
+        "\n\n"
+        "Högsby har prognosen +0,2 med intervallet -2,3 till +2,5. "
+        "Intervallet omsluter noll. Den ärliga slutsatsen är att vi inte vet "
+        "åt vilket håll Högsby är på väg, och det är värt att veta innan man "
+        "planerar som om man visste."
+        "\n\n"
+        "**Hur bra är prognosen?**"
+        "\n\n"
+        "Rangkorrelationen 0,33 betyder att den får ordningen ungefär rätt, "
+        "men långt ifrån helt rätt. Den slår båda jämförelserna: medelfelet "
+        "är 2,1 mot 2,4 för att gissa genomsnittet och 3,0 för att anta att "
+        "trenden fortsätter. Använd den som en av flera ingångar, inte som "
+        "ett facit."
+    ),
+    "peers_guide_expander": "Vad visar kolumnerna?",
+    "peers_guide": (
+        "**Vad tabellen visar**"
+        "\n\n"
+        "De fem kommuner som ligger närmast din i skattekraft mot "
+        "riksgenomsnittet. Urvalet görs enbart på läge, inte på storlek, "
+        "geografi eller näringsliv. Poängen är att se hur kommuner på samma "
+        "nivå kan ha hamnat där av olika skäl."
+        "\n\n"
+        "**Kolumnerna**"
+        "\n\n"
+        "**Kommun** och **Län** anger vilken kommun raden gäller."
+        "\n\n"
+        "**Index ({position_year})** är kommunens skattekraft i procent av "
+        "det oviktade riksgenomsnittet, där 100 är genomsnittet. Talet är "
+        "från {position_year}, det senaste år skattekraften finns."
+        "\n\n"
+        "**Förflyttning 5 år** är hur många indexenheter kommunen flyttat sig "
+        "de senaste fem åren. Plus betyder vunnen mark mot riket, minus "
+        "förlorad."
+        "\n\n"
+        "**Arbetslöshet ({analysis_year})** och **Utbildning "
+        "({analysis_year})** är två av de strukturvariabler som förklarar "
+        "läget. De är från {analysis_year} därför att "
+        "arbetslöshetsstatistiken inte finns för senare år, medan "
+        "skattekraften gör det."
+        "\n\n"
+        "**Så använder du tabellen**"
+        "\n\n"
+        "Om grannarna har samma index men klart högre utbildningsandel står "
+        "din kommun på samma nivå av andra skäl än de gör. Det är en bra "
+        "öppning för en jämförelse, inte ett svar i sig."
     ),
 
     # Within-time inference panel (REMEDIATION_PLAN.md T2.4).
@@ -635,24 +785,6 @@ SWEDISH_LABELS = {
         "stärks kommunens relativa position."
     ),
 
-    "explain_decomp_expander": "Hur läser jag dekomponeringen?",
-    "explain_decomp_text": (
-        "Staplarna delar upp kommunens avvikelse från riksgenomsnittet i "
-        "indexenheter, inte i procentenheters tillväxt. Blå staplar drar "
-        "uppåt, orange nedåt, och den grå stapeln är residualen: den del av "
-        "avvikelsen som modellen inte förklarar."
-        "\n\n"
-        "Bara två variabler går att särskilja mellan kommuner och ritas som "
-        "staplar. Försörjningskvot och befolkningstillväxt redovisas under "
-        "diagrammet som siffror med sina konfidensintervall, eftersom en "
-        "stapel skulle påstå en precision som inte finns."
-        "\n\n"
-        "Exempel: Filipstad ligger 16,7 indexenheter under genomsnittet. "
-        "Modellen hänför 12,9 till utbildningsnivån och 4,0 till "
-        "arbetslösheten och lämnar 0,1 oförklarat. Danderyd ligger 99,3 över. "
-        "Där är nästan halva avvikelsen residual. Modellen är linjär och "
-        "träffar sämst i toppen."
-    ),
     "explain_ranking_expander": "Hur läser jag tabellen?",
     "explain_ranking_text": (
         "Tabellen listar alla 290 kommuner sorterade efter position, högst "
@@ -665,16 +797,6 @@ SWEDISH_LABELS = {
         "åren. En kommun med index 88 och +1,1 ligger lika lågt men rör sig "
         "uppåt. Samma nivå, olika riktning, och det är skillnaden tabellen "
         "finns för att visa. Klicka på en kolumnrubrik för att sortera om."
-    ),
-    "explain_peers_expander": "Hur läser jag jämförelsetabellen?",
-    "explain_peers_text": (
-        "Tabellen visar de fem kommuner som ligger närmast den valda kommunen "
-        "i position mot riksgenomsnittet, alltså kommuner med ungefär samma "
-        "skattekraft, inte nödvändigtvis kommuner som liknar den i övrigt."
-        "\n\n"
-        "Exempel: om grannarna i tabellen har samma index men klart högre "
-        "utbildningsandel står din kommun på samma nivå av andra skäl än de "
-        "gör. Det är en användbar öppning för en jämförelse, inte ett svar."
     ),
     "compare_label": "Jämför med andra kommuner",
     "compare_placeholder": "Välj en eller flera kommuner",
@@ -776,7 +898,7 @@ def format_effect(value: float) -> str:
     Returns:
         Formatted string like '+10,0'.
     """
-    return f"{value:+.{DISPLAY_DECIMALS['effect']}f}".replace(".", ",")
+    return _signed(value, DISPLAY_DECIMALS["effect"])
 
 
 def format_interval(low: float, high: float) -> str:
@@ -806,7 +928,26 @@ def format_index_points(value: float, decimals: int = 1) -> str:
     Returns:
         Formatted string like '+1,2' or '-0,4'.
     """
-    return f"{value:+.{decimals}f}".replace(".", ",")
+    return _signed(value, decimals)
+
+
+def _signed(value: float, decimals: int) -> str:
+    """Format a signed number, without producing a negative zero.
+
+    A movement that rounds to nothing rendered as "-0,0", which reads as a
+    fall that is not there. Zero carries no direction, so it carries no sign.
+
+    Args:
+        value: The number to format.
+        decimals: Digits after the comma.
+
+    Returns:
+        Formatted string like '+1,3', '-0,4' or '0,0'.
+    """
+    rounded = round(value, decimals)
+    if rounded == 0:
+        return f"{0:.{decimals}f}".replace(".", ",")
+    return f"{rounded:+.{decimals}f}".replace(".", ",")
 
 
 # ---------------------------------------------------------------------------

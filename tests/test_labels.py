@@ -184,10 +184,15 @@ def test_the_allowlist_does_not_hide_a_stale_string():
 def test_decomposition_copy_talks_about_index_points_not_growth():
     """T4.2 item 6 by name: the decomposition target changed from growth to
     position, so copy describing 'procentenheter lägre tillväxt' is wrong on
-    the quantity, independently of anything else."""
-    text = SWEDISH_LABELS["explain_decomp_text"].lower()
-    assert "indexenheter" in text
-    assert "skattekraftstillväxt" not in text
+    the quantity, independently of anything else.
+
+    Checks every string that explains the decomposition, so consolidating them
+    into one guide cannot quietly drop the guarantee.
+    """
+    for key in ("decomp_position_explanation", "decomp_guide"):
+        text = SWEDISH_LABELS[key].lower()
+        assert "indexenheter" in text, key
+        assert "skattekraftstillväxt" not in text, key
 
 
 # ---------------------------------------------------------------------------
@@ -282,3 +287,16 @@ class TestNumberFormatting:
 
         for rendered in (format_effect(1.25), format_index_points(-1.25), format_pct(9.2)):
             assert "." not in rendered, rendered
+
+
+def test_a_movement_that_rounds_to_nothing_has_no_sign():
+    """A drift of -0.04 rendered as "-0,0", which reads as a fall that is not
+    there. Zero has no direction, so it carries no sign."""
+    from src.ui.labels import format_effect, format_index_points
+
+    assert format_index_points(-0.04) == "0,0"
+    assert format_index_points(0.04) == "0,0"
+    assert format_effect(-0.001) == "0,0"
+    # Real movements keep theirs.
+    assert format_index_points(-0.4) == "-0,4"
+    assert format_index_points(0.4) == "+0,4"

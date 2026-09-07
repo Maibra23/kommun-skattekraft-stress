@@ -511,8 +511,10 @@ with st.container(border=True):
         pd.DataFrame(control_rows), use_container_width=True, hide_index=True
     )
 
-    with st.expander(SWEDISH_LABELS["explain_decomp_expander"]):
-        st.markdown(SWEDISH_LABELS["explain_decomp_text"])
+    # One guide, matching the coefficient chart on the start page: scenario,
+    # how to read it, a worked calculation, then what it cannot tell you.
+    with st.expander(SWEDISH_LABELS["decomp_guide_expander"]):
+        st.markdown(SWEDISH_LABELS["decomp_guide"])
 
 # ---------------------------------------------------------------------------
 # Section 6: Peer comparison — nearest by position
@@ -561,6 +563,15 @@ with st.container(border=True):
         }
     )
     st.dataframe(peer_display, use_container_width=True, hide_index=True)
+
+    # The peer table had no explanation of any kind, and it is the one table
+    # that puts two data vintages side by side in a single row.
+    with st.expander(SWEDISH_LABELS["peers_guide_expander"]):
+        st.markdown(
+            SWEDISH_LABELS["peers_guide"].format(
+                position_year=_POSITION_YEAR, analysis_year=_ANALYSIS_YEAR
+            )
+        )
 
 # ---------------------------------------------------------------------------
 # Section 7: Footer
