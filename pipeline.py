@@ -38,7 +38,17 @@ _PREDICTION_ARTIFACTS = [
 _DECOMPOSITION_ARTIFACTS = [
     ARTIFACTS_DIR / "decomposition.parquet",
 ]
-_ALL_ARTIFACTS = _MODEL_ARTIFACTS + _PREDICTION_ARTIFACTS + _DECOMPOSITION_ARTIFACTS
+# Descriptive spine (REMEDIATION_PLAN.md T1.1). Depends on the panel only, not
+# on the model, so it is regenerated with the panel rather than with steps 5-7.
+_POSITION_ARTIFACTS = [
+    ARTIFACTS_DIR / "position.parquet",
+]
+_ALL_ARTIFACTS = (
+    _MODEL_ARTIFACTS
+    + _PREDICTION_ARTIFACTS
+    + _DECOMPOSITION_ARTIFACTS
+    + _POSITION_ARTIFACTS
+)
 
 logger = logging.getLogger("pipeline")
 
@@ -141,6 +151,16 @@ def main() -> None:
             build_panel,
             force_refresh=args.force_refresh,
         )
+
+        # ---------------------------------------------------------------
+        # Step 4b: Position and drift (descriptive spine, no model)
+        # ---------------------------------------------------------------
+        # Runs unconditionally with the panel: it depends on skattekraft alone,
+        # is cheap, and must stay in step with the panel's full 2010-2026 range
+        # rather than with the model artifacts.
+        from src.model.position import run_position
+
+        _run_step(4, "Compute relative position and drift", run_position)
 
         # ---------------------------------------------------------------
         # Steps 5-7: Estimate, predict, decompose

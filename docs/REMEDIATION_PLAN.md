@@ -27,7 +27,7 @@ Measured from SCB OE0101 (2005–2026, all 290 kommuner) and the committed artif
 |---|---|---|
 | Share of variance in relative position that is **between** kommuner | **98.3 %** | Entity FE deletes almost all usable signal |
 | Rank stability of relative position, 1 year | **0.992** | The cross-section is near-frozen |
-| Rank stability of relative position, 10 years | **0.915** | Filipstad: index 75 (2010) → 76 (2026) |
+| Rank stability of relative position, 10 years | **0.915** | ~~Filipstad: index 75 (2010) → 76 (2026)~~ — **the 2010 figure is wrong; corrected 2026-09-07 (see §13). Filipstad ran 86 → 76, a ten-point fall.** The 0.915 measurement stands (re-measured at 0.929); rank stability is not level stability |
 | Year-to-year persistence of growth rate | **−0.06** | The current target is serially unpredictable |
 | Current model, R²(within) | **0.0083** | Symptom of the mismatch, not a curiosity |
 | Current model, out-of-sample 2025 forecast | **r = 0.016** | Loses to a constant national-mean guess (RMSE 1.51 vs 0.97 pp) |
@@ -571,8 +571,8 @@ STEP  TASK                                            PHASE  DELEGATION
  [x] 2b  T0.2a AA0003X withdrawn — option A snapshot     0    [SOLO]  done 2026-09-07
  [x] 3   T0.2  Extend full panel, handle ragged years    0    [SOLO]  done 2026-09-07
  [x] --- GATE  Re-run 2025 backtest on real data              PASSED 2026-09-07
- [ ] 4   T1.1  Position and drift module                 1    [SUBAGENT]  <- NEXT
- [ ] 5   T2.1  Cross-sectional estimator                 2    [SOLO]
+ [x] 4   T1.1  Position and drift module                 1    [SOLO]  done 2026-09-07
+ [ ] 5   T2.1  Cross-sectional estimator                 2    [SOLO]  <- NEXT
  ---     GATE  Cross-sectional R2 > 0.60
  [ ] 6   T2.2 + T2.3  Decomposition + diagnostics        2    [SOLO]  merged 2026-09-07
  [ ] 7   T2.4  Demote FE to inference panel              2    [SOLO]
@@ -781,6 +781,22 @@ Phase 2's redesign was specified against the model layer. Reading the UI afterwa
 **Four more user-facing strings found, added to T4.2.** `method_model_name` still calls the model "Tvåvägs fixed effects panelmodell" (demoted by T2.4); `kpi_r2_tooltip` explains away a low R²(within) that Phase 2 replaces with a high cross-sectional one; `decomp_explanation` and `explain_decomp_text` describe contributions to *growth* when T2.2 changes the target to *position*; and `landing_model_explanation` still advertises a 2025 forecast that has since scored r = 0.016 against realised data.
 
 **One latent bug promoted to T1.2's DoD.** Six call sites hardcode `year == 2024` rather than reading `complete_case_max_year`. Correct today, silently wrong the moment SCB publishes 2025 unemployment.
+
+---
+
+### 2026-09-07 — T1.1 complete · the spine exists · one audit illustration corrected
+
+**Done.** `src/model/position.py` writes `artifacts/position.parquet` — 4 930 rows, 2010–2026, carrying both position measures and drift over 1, 3, 5 and 10 years. `tests/test_position.py` adds 14 tests; suite is **171 passed**. Wired into `pipeline.py` as step 4, running with the panel rather than with the model artifacts, since it depends on skattekraft alone.
+
+**The DoD's stability claims hold on real data.** Spearman(position_t, position_t+1) = 0.991 (bar: > 0.98) and 0.929 at ten years (bar: > 0.90). The unweighted mean of `relative_position` is exactly 100 in every year, by construction.
+
+**Drift is computed by joining each kommun-year to itself *n* years earlier, not by a positional shift.** A shift silently compares against the wrong year if a kommun's coverage has a gap; the join yields a null instead. The panel is currently gap-free, so this costs nothing today and prevents a class of silent error later.
+
+**Face validity is good.** Largest ten-year falls: Oskarshamn (−8.1), Oxelösund (−6.9), Hällefors (−5.9), Malå (−5.8), Fagersta (−5.3) — all industrial towns with declining employers. Largest rises: Danderyd (+17.3), Lidingö (+14.0), Sundbyberg (+13.8), Ekerö (+13.1), Solna (+12.0) — Stockholm suburbs. Nothing here needed a model to find.
+
+**Correction to §1.2 of this plan.** The evidence table illustrates near-frozen ranks with *"Filipstad: index 75 (2010) → 76 (2026)"*. **The 2010 figure is wrong.** Verified twice — from the rebuilt panel and by a live SCB query of `OE0101B0` — Filipstad's index was **86 in 2010**, falling 86 → 80 → 77 → 76 across 2010/2016/2021/2026. It lost ten index points, not one.
+
+The headline claim it was attached to is unaffected: rank stability at ten years measures 0.929 here against the audit's 0.915, and *rank* stability is not *level* stability — a kommun can fall ten points while the whole distribution spreads and move only a few places. But the specific illustration argued the opposite of what the data shows, and it is the kind of example that gets quoted into UI copy. **T1.2 must not reuse it**; `position.parquet` now supplies real ones.
 
 ---
 
