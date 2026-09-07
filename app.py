@@ -121,6 +121,11 @@ with st.expander(SWEDISH_LABELS["concept_skattekraft_expander"]):
 with st.expander(SWEDISH_LABELS["guide_expander"]):
     st.markdown(SWEDISH_LABELS["guide_text"])
 
+# Every term the dashboard uses, in one place. Without it a reader met
+# "indexenheter", "tappa mark" and "konfidensintervall" as things to infer.
+with st.expander(SWEDISH_LABELS["glossary_expander"]):
+    st.markdown(SWEDISH_LABELS["glossary_text"])
+
 # ---------------------------------------------------------------------------
 # Section 2: Stat strip
 # ---------------------------------------------------------------------------

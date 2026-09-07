@@ -300,3 +300,47 @@ def test_a_movement_that_rounds_to_nothing_has_no_sign():
     # Real movements keep theirs.
     assert format_index_points(-0.4) == "-0,4"
     assert format_index_points(0.4) == "+0,4"
+
+
+def test_no_label_contains_mojibake():
+    """A script that read its own source with the platform default encoding
+    instead of UTF-8 wrote "Ã–ppen" into the glossary. The dash test caught it
+    only by accident, because one mangled byte happened to be a dash."""
+    suspects = ("Ã", " Â", "â€", "Ã¥", "Ã¤", "Ã¶")
+    offenders = {
+        key: text[:60]
+        for key, text in SWEDISH_LABELS.items()
+        if isinstance(text, str) and any(s in text for s in suspects)
+    }
+    assert not offenders, f"mis-encoded Swedish characters: {offenders}"
+
+
+def test_the_glossary_defines_the_terms_the_app_actually_uses():
+    """Every term a reader meets without introduction should be defined in one
+    place. "Tappa mark" is the one users ask about, because it sounds like the
+    tax base shrank and it does not mean that."""
+    glossary = SWEDISH_LABELS["glossary_text"].lower()
+    for term in (
+        "skattekraft",
+        "indexenheter",
+        "tappa mark",
+        "riksmedelvärdet",
+        "öppen arbetslöshet",
+        "försörjningskvot",
+        "befolkningstillväxt",
+        "eftergymnasialt",
+        "standardavvikelse",
+        "konfidensintervall",
+        "kontrollvariabel",
+        "residual",
+        "träffsäkerhet",
+    ):
+        assert term in glossary, f"undefined in the glossary: {term}"
+
+
+def test_the_glossary_says_what_tappa_mark_does_not_mean():
+    """The distinction that matters: a kommun can grow every year in kronor and
+    still lose ground. Stating only the positive definition invites the wrong
+    reading."""
+    glossary = SWEDISH_LABELS["glossary_text"]
+    assert "Det betyder inte att skattekraften har minskat" in glossary

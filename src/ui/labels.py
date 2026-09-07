@@ -24,13 +24,13 @@ SWEDISH_LABELS = {
     # Brand and navigation
     "brand_mark": "KSS",
     "brand_title": "Skattekraft Stress",
-    "brand_sub": "Kommunal panelmodell",
+    "brand_sub": "Läge och förflyttning",
     "nav_landing": "Startsida",
     "nav_national": "Riksöversikt",
     "nav_kommun": "Kommunjämförelse",
 
     # Page eyebrows and titles
-    "eyebrow_landing": "KOMMUNAL SKATTEKRAFT STRESS MONITOR",
+    "eyebrow_landing": "SKATTEKRAFT I SVERIGES KOMMUNER",
     "eyebrow_national": "NATIONELL VY",
     "eyebrow_kommun": "KOMMUNDETALJ",
     "title_landing": "Skattekraftens utveckling i Sveriges 290 kommuner",
@@ -58,7 +58,7 @@ SWEDISH_LABELS = {
     # year, including years when every kommun's tax base grew. "Hög risk" said
     # fiscal distress; the data only ever said "lowest fifth of this ranking".
     "risk_low": "Översta femtedelen",
-    "risk_medium": "Mittersta tre femtedelar",
+    "risk_medium": "De mittersta tre femtedelarna",
     "risk_high": "Nedersta femtedelen",
 
     # KPI labels (national)
@@ -131,7 +131,7 @@ SWEDISH_LABELS = {
     "footer_method_link": "Metodologi",
 
     # Methodology callouts
-    "method_model_name": "Tvärsnittsmodell + panelmodell för samband över tid",
+    "method_model_name": "Två modeller, två olika frågor",
     "method_period": (
         "Period: 2010 till 2026 (modellen skattas på 2010 till 2024)"
     ),
@@ -146,10 +146,10 @@ SWEDISH_LABELS = {
         "Modellen förklarar dem, den förutsäger dem inte."
     ),
     "landing_stat_kommuner": "KOMMUNER",
-    "landing_stat_panel": "ÅR PANEL",
+    "landing_stat_panel": "ÅR MED DATA",
     "landing_stat_vars": "STRUKTURVARIABLER",
     "landing_stat_fe": "FIXED EFFECTS",
-    "landing_stat_identified": "IDENTIFIERADE DRIVKRAFTER",
+    "landing_stat_identified": "MÄTBARA DRIVKRAFTER",
     "landing_model_title": "Modellöversikt",
     "landing_vars_title": "Variabler & koefficienter",
     "landing_pipeline_title": "Pipelinesteg",
@@ -272,10 +272,8 @@ SWEDISH_LABELS = {
     "svg_decomposition": "Dekomponering av läget",
     # The flow diagram must not draw four equal drivers: two of the four are
     # not separately identified between kommuner (T1.2).
-    "svg_identified_heading": "GÅR ATT SÄRSKILJA",
-    "svg_controls_heading": (
-        "KONTROLLER: EFFEKT EJ SKILD FRÅN NOLL"
-    ),
+    "svg_identified_heading": "TYDLIG EFFEKT",
+    "svg_controls_heading": "KONTROLLER: EFFEKTEN KAN VARA NOLL",
     "svg_cross_section": "Tvärsnittsmodell",
     "svg_position": "Kommunens läge mot riket",
 
@@ -315,12 +313,13 @@ SWEDISH_LABELS = {
         "skala skulle ge nio kommuner av tio samma färg."
     ),
     "map_legend_drift_full": (
-        "Förändring i indexenheter de senaste fem åren. Orange = kommunen har "
-        "tappat mark mot riket, blått = vunnit mark. Skalan är centrerad på "
-        "noll och beskuren vid ±4 indexenheter."
+        "Förändring i indexenheter de senaste fem åren. Orange betyder att "
+        "kommunen tappat mark mot riket, alltså vuxit långsammare än övriga "
+        "kommuner. Det betyder inte att skattekraften minskat: en kommun kan "
+        "växa i kronor varje år och ändå tappa mark. Blått betyder vunnen "
+        "mark. Skalan är centrerad på noll och beskuren vid fyra indexenheter "
+        "åt vardera hållet."
     ),
-
-    # The two index measures have different denominators (METHODOLOGY §7.13)
     "index_compare_title": "Två mått på samma sak",
     "index_compare_explanation": (
         "Vi jämför med ett snitt där alla 290 kommuner väger lika mycket. "
@@ -410,6 +409,94 @@ SWEDISH_LABELS = {
     "identified_no": (
         "Nej, intervallet omsluter noll"
     ),
+    # A plain-language glossary. Terms like indexenheter, tappa mark,
+    # forsorjningskvot and konfidensintervall appear dozens of times across
+    # the app and were defined nowhere, so a reader had to infer them.
+    # A plain-language glossary. Terms like indexenheter, tappa mark,
+    # forsorjningskvot and konfidensintervall appear dozens of times across
+    # the app and were defined nowhere, so a reader had to infer them.
+    "glossary_expander": "Ord och begrepp: vad betyder orden?",
+    "glossary_text": (
+        "Alla ord som används i dashboarden, förklarade utan fackspråk."
+        "\n\n"
+        "**Skattekraft** är den beskattningsbara inkomsten per invånare i "
+        "kommunen. Det är summan som kommunen tar ut sin kommunalskatt på, "
+        "och därmed grunden för vad den har råd med."
+        "\n\n"
+        "**Index och indexenheter.** För att kunna jämföra kommuner räknas "
+        "skattekraften om till ett index där genomsnittet är 100. En kommun "
+        "med index 80 har alltså 80 procent av genomsnittets skattekraft. "
+        "Skillnaden mellan två indextal mäts i indexenheter: från 80 till 84 "
+        "är fyra indexenheter."
+        "\n\n"
+        "**Att tappa mark.** Förflyttning är hur mycket kommunens index har "
+        "ändrats under en period. Att tappa mark betyder att indexet har "
+        "sjunkit, alltså att kommunen vuxit långsammare än riket. Det betyder "
+        "inte att skattekraften har minskat. En kommun kan öka sin "
+        "skattekraft i kronor varje år och ändå tappa mark, om övriga "
+        "kommuner ökar mer. Att vinna mark är samma sak omvänt: kommunen har "
+        "vuxit snabbare än riket, oavsett om det gick fort eller långsamt i "
+        "kronor."
+        "\n\n"
+        "**Två genomsnitt som inte är samma sak.** Vårt index jämför med "
+        "genomsnittet av de 290 kommunerna, där varje kommun väger lika "
+        "mycket. SCB:s publicerade index jämför med riksmedelvärdet, där "
+        "varje invånare väger lika mycket, så folkrika kommuner drar upp det. "
+        "Därför ligger vårt tal alltid något högre än SCB:s. Båda är rätt, "
+        "men de svarar på olika frågor, och ett tal från det ena måttet ska "
+        "aldrig jämföras med ett tal från det andra."
+        "\n\n"
+        "**De fyra variablerna.**"
+        "\n\n"
+        "**Öppen arbetslöshet** är andelen av invånarna i arbetsför ålder som "
+        "är inskrivna som arbetslösa utan att delta i något program. Ordet "
+        "öppen betyder just att program inte räknas med."
+        "\n\n"
+        "**Försörjningskvot** är antalet invånare under 20 år plus antalet "
+        "över 64 år, delat med antalet mellan 20 och 64. Kvoten 1,0 betyder "
+        "att det går en person utanför arbetsför ålder på varje person i "
+        "arbetsför ålder. Ju högre kvot, desto färre i arbetsför ålder att "
+        "bära försörjningen."
+        "\n\n"
+        "**Befolkningstillväxt** är hur många procent folkmängden ändrats "
+        "sedan året innan."
+        "\n\n"
+        "**Andel eftergymnasialt utbildade** är andelen av invånarna 25 till "
+        "64 år som har minst tre års utbildning efter gymnasiet."
+        "\n\n"
+        "**Statistiken, i vardagliga ord.**"
+        "\n\n"
+        "**Standardavvikelse** är ett mått på hur mycket kommunerna skiljer "
+        "sig åt i en variabel. När en effekt anges per standardavvikelse "
+        "betyder det: så här mycket skiljer sig indexet om man jämför en "
+        "kommun med en annan som ligger ett normalt kliv högre i just den "
+        "variabeln. Måttet behövs för att variabler som mäts i olika enheter "
+        "ska gå att jämföra med varandra."
+        "\n\n"
+        "**Konfidensintervall** är det spann som det sanna värdet rimligen "
+        "ligger inom. Vi visar 95-procentiga intervall, vilket betyder att "
+        "fem gånger av hundra hamnar det sanna värdet utanför. Innehåller "
+        "intervallet noll kan vi inte påstå att effekten finns alls."
+        "\n\n"
+        "**Kontrollvariabel** är en variabel som finns med i modellen men "
+        "vars effekt inte går att skilja från noll. Den redovisas som en "
+        "siffra i stället för som en stapel, eftersom en stapel skulle se "
+        "säkrare ut än den är."
+        "\n\n"
+        "**Residual** är den del av kommunens avvikelse som modellen inte "
+        "förklarar. En stor residual betyder att något annat än de fyra "
+        "variablerna avgör läget."
+        "\n\n"
+        "**Prognos och intervall.** Prognosen är hur många indexenheter "
+        "kommunen väntas flytta sig på fem år. Intervallet visar hur osäker "
+        "den siffran är, och bygger på hur fel prognosen faktiskt haft när "
+        "den testats mot verkliga utfall."
+        "\n\n"
+        "**Träffsäkerhet** är hur väl prognosen träffat historiskt. Den mäts "
+        "på två sätt: hur väl den får ordningen mellan kommuner rätt, och hur "
+        "stort medelfelet är jämfört med att bara gissa genomsnittet."
+    ),
+
     "vintage_note": (
         "Position och förflyttning till {position_year} · strukturvariabler "
         "till {analysis_year} (arbetslöshet är den bindande källan)"
@@ -457,7 +544,7 @@ SWEDISH_LABELS = {
         "om vid varje startår och jämförs med vad som faktiskt hände "
         "{horizon} år senare. {origins} startår, {n} kommunår."
     ),
-    "backtest_spearman": "Rangkorrelation (Spearman)",
+    "backtest_spearman": "Hur väl ordningen stämmer",
     "backtest_rmse": "Medelfel (RMSE)",
     "backtest_naive": "Jämförelse: gissa genomsnittet",
     "backtest_persistence": "Jämförelse: anta att trenden fortsätter",
