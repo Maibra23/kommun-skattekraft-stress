@@ -78,8 +78,13 @@ def capture(port: int, viewports: dict[str, tuple[int, int]]) -> list[Path]:
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
+        # Swedish locale: the tables use Streamlit's "localized" number format,
+        # so a screenshot taken in en-US would show decimal points that no
+        # Swedish reader will ever see.
         for vp_name, (width, height) in viewports.items():
-            page = browser.new_page(viewport={"width": width, "height": height})
+            page = browser.new_page(
+                viewport={"width": width, "height": height}, locale="sv-SE"
+            )
             for page_name, path in PAGES.items():
                 page.goto(f"http://localhost:{port}{path}", wait_until="networkidle")
                 # Streamlit renders over a websocket after load; the skeleton is

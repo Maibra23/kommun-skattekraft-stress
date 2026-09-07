@@ -48,7 +48,9 @@ from src.ui.labels import (  # noqa: E402
     POSITION_BANDS,
     SWEDISH_LABELS,
     classify_position,
+    format_index,
     format_index_points,
+    format_interval,
     format_pct,
     format_sek,
     format_signed_pct,
@@ -156,7 +158,7 @@ def _shorten_lan(lan_name: str) -> str:
 sorted_kommuner = _filtered.sort_values("relative_position")
 kommun_options = [
     f"{row['kommun_name']} ({_shorten_lan(row['lan_name'])}) "
-    f"— index {row['relative_position']:.0f}"
+    f"index {row['relative_position']:.0f}"
     for _, row in sorted_kommuner.iterrows()
 ]
 kommun_koder = sorted_kommuner["kommun_kod"].tolist()
@@ -217,7 +219,7 @@ _skattekraft = (
 kpi_cards = [
     kpi_card(
         SWEDISH_LABELS["index_compare_ours"],
-        value=f"{selected_row['relative_position']:.1f}".replace(".", ","),
+        value=format_index(selected_row["relative_position"]),
         variant="default",
     ),
     kpi_card(
@@ -230,7 +232,7 @@ kpi_cards = [
         value=(
             format_index_points(selected_row["drift_5y"])
             if pd.notna(selected_row["drift_5y"])
-            else "–"
+            else ""
         ),
         variant="danger" if selected_row["drift_5y"] < 0 else "default",
     ),
@@ -239,7 +241,7 @@ kpi_cards = [
         value=(
             format_index_points(selected_row["drift_10y"])
             if pd.notna(selected_row["drift_10y"])
-            else "–"
+            else ""
         ),
         variant="danger" if selected_row["drift_10y"] < 0 else "default",
     ),
@@ -490,9 +492,9 @@ with st.container(border=True):
         coef_row = coef_cross[coef_cross["variable"] == var]
         ci = ""
         if not coef_row.empty:
-            low = coef_row["lower_ci_sd"].iloc[0]
-            high = coef_row["upper_ci_sd"].iloc[0]
-            ci = f"[{low:+.2f}, {high:+.2f}]".replace(".", ",")
+            ci = format_interval(
+                coef_row["lower_ci_sd"].iloc[0], coef_row["upper_ci_sd"].iloc[0]
+            )
         control_rows.append(
             {
                 SWEDISH_LABELS["vars_table_variable"]: _VAR_LABELS.get(var, var),
@@ -542,20 +544,20 @@ with st.container(border=True):
             SWEDISH_LABELS["th_lan"]: peers["lan_name"].values,
             SWEDISH_LABELS["col_with_year"].format(
                 label=SWEDISH_LABELS["position_index_short"], year=_POSITION_YEAR
-            ): [f"{v:.1f}".replace(".", ",") for v in peers["relative_position"]],
+            ): [format_index(v) for v in peers["relative_position"]],
             SWEDISH_LABELS["drift_5y"]: [
-                format_index_points(v) if pd.notna(v) else "–"
+                format_index_points(v) if pd.notna(v) else ""
                 for v in peers["drift_5y"]
             ],
             SWEDISH_LABELS["col_with_year"].format(
                 label=SWEDISH_LABELS["th_unemployment"], year=_ANALYSIS_YEAR
             ): [
-                format_pct(v) if pd.notna(v) else "–"
+                format_pct(v) if pd.notna(v) else ""
                 for v in peers["unemployment_rate"]
             ],
             SWEDISH_LABELS["col_with_year"].format(
                 label=SWEDISH_LABELS["th_education"], year=_ANALYSIS_YEAR
-            ): [format_pct(v) if pd.notna(v) else "–" for v in peers["edu_share"]],
+            ): [format_pct(v) if pd.notna(v) else "" for v in peers["edu_share"]],
         }
     )
     st.dataframe(peer_display, use_container_width=True, hide_index=True)

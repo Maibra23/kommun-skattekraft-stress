@@ -50,7 +50,9 @@ from src.ui.labels import (  # noqa: E402
     POSITION_BANDS,
     SWEDISH_LABELS,
     classify_position,
+    format_index,
     format_index_points,
+    format_interval,
     format_pct,
 )
 from src.ui.sidebar import render_sidebar  # noqa: E402
@@ -175,8 +177,8 @@ kpi_cards = [
     kpi_card(
         SWEDISH_LABELS["kpi_index_spread"],
         value=(
-            f"{_highest['relative_position']:.0f} / "
-            f"{_lowest['relative_position']:.0f}"
+            f"{format_index(_highest['relative_position'])} / "
+            f"{format_index(_lowest['relative_position'])}"
         ),
         variant="default",
     ),
@@ -268,7 +270,7 @@ with col_map:
         render_choropleth(map_df, layer=active_layer)
         if active_layer.key == "vulnerability":
             st.warning(
-                f"**{SWEDISH_LABELS['vulnerability_retired_title']}** — "
+                f"**{SWEDISH_LABELS['vulnerability_retired_title']}.** "
                 + SWEDISH_LABELS["vulnerability_retired_text"]
             )
         else:
@@ -367,7 +369,7 @@ with st.container(border=True):
             hovertemplate=(
                 "<b>%{customdata[0]}</b><br>"
                 + SWEDISH_LABELS["axis_scb_index"] + ": %{x:.0f}<br>"
-                + SWEDISH_LABELS["axis_our_index"] + ": %{y:.1f}<extra></extra>"
+                + SWEDISH_LABELS["axis_our_index"] + ": %{y:.0f}<extra></extra>"
             ),
             showlegend=False,
         )
@@ -428,17 +430,17 @@ if not forecast_df.empty:
                 ),
                 kpi_card(
                     SWEDISH_LABELS["backtest_rmse"],
-                    value=f"{_f['backtest_rmse']:.2f}".replace(".", ","),
+                    value=f"{_f['backtest_rmse']:.1f}".replace(".", ","),
                     variant="default",
                 ),
                 kpi_card(
                     SWEDISH_LABELS["backtest_naive"],
-                    value=f"{_f['backtest_naive_rmse']:.2f}".replace(".", ","),
+                    value=f"{_f['backtest_naive_rmse']:.1f}".replace(".", ","),
                     variant="default",
                 ),
                 kpi_card(
                     SWEDISH_LABELS["backtest_persistence"],
-                    value=f"{_f['backtest_persistence_rmse']:.2f}".replace(".", ","),
+                    value=f"{_f['backtest_persistence_rmse']:.1f}".replace(".", ","),
                     variant="default",
                 ),
             ]
@@ -486,27 +488,39 @@ with st.container(border=True):
         {
             SWEDISH_LABELS["th_kommun"]: table_df["kommun_name"].values,
             SWEDISH_LABELS["th_lan"]: table_df["lan_name"].values,
-            _ours: table_df["relative_position"].round(1).values,
+            _ours: table_df["relative_position"].round(0).values,
             _scb: table_df["tax_base_index_riket"].values,
             SWEDISH_LABELS["index_diff"]: (
                 table_df["relative_position"] - table_df["tax_base_index_riket"]
-            ).round(1).values,
-            SWEDISH_LABELS["drift_5y"]: table_df["drift_5y"].round(1).values,
-            SWEDISH_LABELS["drift_10y"]: table_df["drift_10y"].round(1).values,
+            ).round(0).values,
+            # Movements are pre-formatted rather than left numeric. Streamlit's
+            # numeric columns cannot show a Swedish decimal comma with a fixed
+            # number of decimals: printf formats are C-locale, and "localized"
+            # drops trailing zeros and the sign, so 17,3 sat beside a bare 14.
+            # The explicit sign is what tells a reader the direction at a
+            # glance, so it is worth the loss of numeric sorting on columns
+            # that were never the sort key.
+            SWEDISH_LABELS["drift_5y"]: [
+                format_index_points(v) if pd.notna(v) else ""
+                for v in table_df["drift_5y"]
+            ],
+            SWEDISH_LABELS["drift_10y"]: [
+                format_index_points(v) if pd.notna(v) else ""
+                for v in table_df["drift_10y"]
+            ],
         }
     )
 
     if not forecast_df.empty:
         _horizon = int(forecast_df.iloc[0]["horizon"])
-        display_df[SWEDISH_LABELS["forecast_col"].format(horizon=_horizon)] = (
-            table_df["drift_forecast"].round(1).values
-        )
+        display_df[SWEDISH_LABELS["forecast_col"].format(horizon=_horizon)] = [
+            format_index_points(v) if pd.notna(v) else ""
+            for v in table_df["drift_forecast"]
+        ]
         # The interval is shown as text beside the point forecast: a bare
         # number invites more confidence than a backtest at rho 0.33 supports.
         display_df[SWEDISH_LABELS["forecast_interval_col"]] = [
-            f"{lo:+.1f} … {hi:+.1f}".replace(".", ",")
-            if pd.notna(lo)
-            else "–"
+            format_interval(lo, hi) if pd.notna(lo) else ""
             for lo, hi in zip(table_df["lower"], table_df["upper"])
         ]
 
@@ -515,11 +529,9 @@ with st.container(border=True):
         use_container_width=True,
         hide_index=True,
         column_config={
-            _ours: st.column_config.NumberColumn(format="%.1f"),
+            _ours: st.column_config.NumberColumn(format="%.0f"),
             _scb: st.column_config.NumberColumn(format="%.0f"),
-            SWEDISH_LABELS["index_diff"]: st.column_config.NumberColumn(format="%+.1f"),
-            SWEDISH_LABELS["drift_5y"]: st.column_config.NumberColumn(format="%+.1f"),
-            SWEDISH_LABELS["drift_10y"]: st.column_config.NumberColumn(format="%+.1f"),
+            SWEDISH_LABELS["index_diff"]: st.column_config.NumberColumn(format="%+.0f"),
         },
     )
 

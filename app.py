@@ -41,7 +41,11 @@ from src.ui.components import (  # noqa: E402
     footer_note,
 )
 from src.ui.css import COLORS, inject_css  # noqa: E402
-from src.ui.labels import SWEDISH_LABELS  # noqa: E402
+from src.ui.labels import (  # noqa: E402
+    SWEDISH_LABELS,
+    format_effect,
+    format_interval,
+)
 from src.ui.sidebar import render_sidebar  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -334,9 +338,10 @@ for _, row in plot_df.iterrows():
             },
             hovertemplate=(
                 f"<b>{row['label']}</b><br>"
-                + f"{row['beta_sd']:+.2f} ".replace(".", ",")
+                + format_effect(row["beta_sd"]) + " "
                 + SWEDISH_LABELS["unit_index_points"]
-                + f"<br>95 % KI [{row['lower_ci_sd']:+.2f}, {row['upper_ci_sd']:+.2f}]".replace(".", ",")
+                + "<br>95 % KI "
+                + format_interval(row["lower_ci_sd"], row["upper_ci_sd"])
                 + "<extra></extra>"
             ),
             showlegend=False,
@@ -353,7 +358,7 @@ fig_coefs.add_trace(
         x=[_label_x] * len(plot_df),
         y=plot_df["label"],
         mode="text",
-        text=[f"{v:+.1f}".replace(".", ",") for v in plot_df["beta_sd"]],
+        text=[format_effect(v) for v in plot_df["beta_sd"]],
         textposition="middle right",
         textfont={
             "family": "IBM Plex Mono",
@@ -411,10 +416,10 @@ with st.container(border=True):
         {
             SWEDISH_LABELS["vars_table_variable"]: plot_df["label"].values,
             SWEDISH_LABELS["vars_table_effect_sd"]: [
-                f"{v:+.2f}".replace(".", ",") for v in plot_df["beta_sd"]
+                format_effect(v) for v in plot_df["beta_sd"]
             ],
             SWEDISH_LABELS["vars_table_ci"]: [
-                f"[{lo:+.2f}, {hi:+.2f}]".replace(".", ",")
+                format_interval(lo, hi)
                 for lo, hi in zip(plot_df["lower_ci_sd"], plot_df["upper_ci_sd"])
             ],
             SWEDISH_LABELS["vars_table_identified"]: [
@@ -461,7 +466,7 @@ with st.container(border=True):
             {
                 SWEDISH_LABELS["vars_table_variable"]: within_table["label"].values,
                 SWEDISH_LABELS["vars_table_coef"]: [
-                    f"{v:+.4f}".replace(".", ",") for v in within_table["coefficient"]
+                    f"{v:+.3f}".replace(".", ",") for v in within_table["coefficient"]
                 ],
                 SWEDISH_LABELS["vars_table_sig"]: [
                     _sig_label(p) for p in within_table["p_value"]

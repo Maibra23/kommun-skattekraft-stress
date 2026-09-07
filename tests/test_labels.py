@@ -188,3 +188,97 @@ def test_decomposition_copy_talks_about_index_points_not_growth():
     text = SWEDISH_LABELS["explain_decomp_text"].lower()
     assert "indexenheter" in text
     assert "skattekraftstillväxt" not in text
+
+
+# ---------------------------------------------------------------------------
+# No dashes in user-facing text.
+#
+# Em and en dashes read as a machine-writing tell, so the Swedish copy uses
+# ordinary punctuation instead: a full stop where the clause stands alone, a
+# comma where it qualifies, a colon where it introduces.
+#
+# Two things that look like dashes are deliberately kept, because removing them
+# would be wrong rather than tidy:
+#   * hyphens inside Swedish compounds ("95-procentigt", "GeoJSON-fil"), which
+#     are required spelling;
+#   * the minus sign on a negative number, normalised to ASCII so that prose
+#     and rendered figures match.
+# ---------------------------------------------------------------------------
+
+_TYPOGRAPHIC_DASHES = {
+    "\u2014": "em dash",
+    "\u2013": "en dash",
+    "\u2212": "minus sign (use ASCII '-')",
+    "\u2012": "figure dash",
+    "\u2015": "horizontal bar",
+}
+
+
+def test_no_label_contains_a_typographic_dash():
+    offenders = {}
+    for key, text in SWEDISH_LABELS.items():
+        if not isinstance(text, str):
+            continue
+        for char, name in _TYPOGRAPHIC_DASHES.items():
+            if char in text:
+                offenders.setdefault(key, []).append(name)
+    assert not offenders, f"typographic dashes in user-facing text: {offenders}"
+
+
+@pytest.mark.parametrize("source", _UI_SOURCES, ids=lambda p: p.name)
+def test_no_dash_is_rendered_from_the_page_code(source):
+    """Dashes in a docstring or comment are fine; a dash inside a string that
+    reaches the page is not."""
+    offenders = []
+    for line in source.read_text(encoding="utf-8").split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("#") or stripped.startswith('"""'):
+            continue
+        for match in re.finditer(r'["\']([^"\']*[\u2014\u2013\u2212][^"\']*)["\']', line):
+            offenders.append(match.group(1)[:60])
+    assert not offenders, f"{source.name} renders dashes: {offenders}"
+
+
+def test_swedish_compound_hyphens_are_untouched():
+    """The de-dashing must not have broken required spelling."""
+    assert "95-procentig" in SWEDISH_LABELS["landing_vars_explanation"]
+    assert "GeoJSON-fil" in SWEDISH_LABELS["choropleth_missing_geojson"]
+
+
+# ---------------------------------------------------------------------------
+# One display policy for numbers.
+# ---------------------------------------------------------------------------
+
+
+class TestNumberFormatting:
+    def test_index_is_shown_as_a_whole_number(self):
+        from src.ui.labels import format_index
+
+        assert format_index(208.07) == "208"
+        assert format_index(79.94) == "80"
+
+    def test_effects_carry_one_decimal_and_a_sign(self):
+        from src.ui.labels import format_effect
+
+        assert format_effect(10.033) == "+10,0"
+        assert format_effect(-2.688) == "-2,7"
+
+    def test_intervals_read_without_a_dash(self):
+        from src.ui.labels import format_interval
+
+        rendered = format_interval(6.36, 13.70)
+        assert rendered == "+6,4 till +13,7"
+        assert "\u2013" not in rendered and "\u2014" not in rendered
+
+    def test_the_chart_and_the_table_agree_to_the_last_digit(self):
+        """The chart used to print -2,7 beside a table printing -2,69."""
+        from src.ui.labels import format_effect, format_interval
+
+        value = -2.688112
+        assert format_effect(value) in format_interval(value, value)
+
+    def test_swedish_decimal_comma_everywhere(self):
+        from src.ui.labels import format_effect, format_index_points, format_pct
+
+        for rendered in (format_effect(1.25), format_index_points(-1.25), format_pct(9.2)):
+            assert "." not in rendered, rendered

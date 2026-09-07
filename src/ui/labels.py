@@ -44,7 +44,9 @@ SWEDISH_LABELS = {
 
     # Position bands (replaced the risk-class quintiles at the T1.2 cutover)
     "band_low": "Under 90",
-    "band_mid": "90–110",
+    "band_mid": (
+        "90 till 110"
+    ),
     "band_high": "Över 110",
     "band_legend_note": (
         "Kommunens skattekraft i procent av det oviktade riksgenomsnittet."
@@ -130,18 +132,18 @@ SWEDISH_LABELS = {
 
     # Methodology callouts
     "method_model_name": "Tvärsnittsmodell + panelmodell för samband över tid",
-    "method_period": "Period: 2010 till 2026 (modellen skattas på 2010–2024)",
+    "method_period": (
+        "Period: 2010 till 2026 (modellen skattas på 2010 till 2024)"
+    ),
     "method_units": (
         "290 kommuner, 17 år, 4 930 observationer. Skattekraft finns till och "
         "med 2026, befolkning och utbildning till 2025 och arbetslöshet till "
-        "2024 — modellen använder de år där alla variabler finns."
+        "2024. Modellen använder de år där alla variabler finns."
     ),
-
-    # Landing page
     "landing_lead": (
         "Var står din kommun mot riksgenomsnittet, och åt vilket håll rör den "
-        "sig? Skillnaderna mellan kommuner är stora, trögrörliga och mätbara — "
-        "modellen förklarar dem, den förutsäger dem inte."
+        "sig? Skillnaderna mellan kommuner är stora, trögrörliga och mätbara. "
+        "Modellen förklarar dem, den förutsäger dem inte."
     ),
     "landing_stat_kommuner": "KOMMUNER",
     "landing_stat_panel": "ÅR PANEL",
@@ -159,17 +161,17 @@ SWEDISH_LABELS = {
         "Fyra strukturvariabler matas in i modellen, men de bär inte lika "
         "mycket. Mellan kommuner går bara två av dem att särskilja: "
         "utbildningsnivå, som är den klart starkaste, och öppen arbetslöshet. "
-        "Försörjningskvot och befolkningstillväxt ingår som kontroller — deras "
+        "Försörjningskvot och befolkningstillväxt ingår som kontroller. Deras "
         "effekt går inte att skilja från noll när kommuner jämförs med "
         "varandra. Resultatet är en förklaring av kommunens läge, inte en "
         "prognos för nästa år."
     ),
     "landing_model_example": (
         "Filipstad ligger 16,7 indexenheter under riksgenomsnittet. Modellen "
-        "hänför 12,9 av dem till utbildningsnivån och 4,0 till arbetslösheten, "
-        "och lämnar 0,1 oförklarat. Danderyd ligger 99,3 enheter över — där "
-        "förklarar samma modell knappt hälften. Sambandet är starkast i mitten "
-        "av fördelningen och svagast i toppen."
+        "hänför 12,9 av dem till utbildningsnivån och 4,0 till "
+        "arbetslösheten, och lämnar 0,1 oförklarat. Danderyd ligger 99,3 "
+        "enheter över. Där förklarar samma modell knappt hälften. Sambandet "
+        "är starkast i mitten av fördelningen och svagast i toppen."
     ),
     "landing_model_expander": "Hur läser jag diagrammet?",
     "landing_vars_explanation": (
@@ -180,11 +182,11 @@ SWEDISH_LABELS = {
         "kontroll snarare än som drivkraft."
     ),
     "landing_vars_example": (
-        "Exempel: utbildningsnivån ligger på +10,0 indexenheter. En kommun vars "
-        "andel eftergymnasialt utbildade är en standardavvikelse högre än en "
-        "annans ligger alltså ungefär 10 indexenheter högre i skattekraft. "
-        "Det är ett starkt och robust samband — men det ligger nära en "
-        "omskrivning av samma sak, inte en knapp att trycka på."
+        "Exempel: utbildningsnivån ligger på +10,0 indexenheter. En kommun "
+        "vars andel eftergymnasialt utbildade är en standardavvikelse högre "
+        "än en annans ligger alltså ungefär 10 indexenheter högre i "
+        "skattekraft. Det är ett starkt och robust samband, men det ligger "
+        "nära en omskrivning av samma sak, inte en knapp att trycka på."
     ),
     "landing_vars_expander": "Hur tolkar jag koefficienterna?",
     "landing_nav_explanation": (
@@ -227,7 +229,9 @@ SWEDISH_LABELS = {
     # The flow diagram must not draw four equal drivers: two of the four are
     # not separately identified between kommuner (T1.2).
     "svg_identified_heading": "GÅR ATT SÄRSKILJA",
-    "svg_controls_heading": "KONTROLLER — EFFEKT EJ SKILD FRÅN NOLL",
+    "svg_controls_heading": (
+        "KONTROLLER: EFFEKT EJ SKILD FRÅN NOLL"
+    ),
     "svg_cross_section": "Tvärsnittsmodell",
     "svg_position": "Kommunens läge mot riket",
 
@@ -263,7 +267,7 @@ SWEDISH_LABELS = {
     "map_legend_position_full": (
         "Kommunens skattekraft i procent av det oviktade riksgenomsnittet. "
         "Mörkare blå = högre. Skalan är beskuren vid 80 och 130, eftersom "
-        "mediankommunen ligger på 97 och den högsta på 208 — en obeskuren "
+        "mediankommunen ligger på 97 och den högsta på 208. En obeskuren "
         "skala skulle ge nio kommuner av tio samma färg."
     ),
     "map_legend_drift_full": (
@@ -275,14 +279,14 @@ SWEDISH_LABELS = {
     # The two index measures have different denominators (METHODOLOGY §7.13)
     "index_compare_title": "Två mått på samma sak",
     "index_compare_explanation": (
-        "Vårt index delar kommunens skattekraft med det <strong>oviktade</strong> "
-        "genomsnittet av de 290 kommunerna. SCB:s publicerade index delar med "
-        "<strong>riksmedelvärdet</strong>, som är befolkningsviktat och därför "
-        "högre — "
-        "storstadskommuner väger tyngre i det. Därför ligger vårt tal alltid "
-        "över SCB:s, i genomsnitt med 7,0 indexenheter och som mest med 17,6. "
-        "Ingen av dem är fel; de svarar på olika frågor. Jämför aldrig ett "
-        "tal från det ena måttet med ett tal från det andra."
+        "Vårt index delar kommunens skattekraft med det "
+        "<strong>oviktade</strong> genomsnittet av de 290 kommunerna. SCB:s "
+        "publicerade index delar med <strong>riksmedelvärdet</strong>, som är "
+        "befolkningsviktat och därför högre, eftersom storstadskommuner väger "
+        "tyngre i det. Därför ligger vårt tal alltid över SCB:s, i genomsnitt "
+        "med 7,0 indexenheter och som mest med 17,6. Ingen av dem är fel; de "
+        "svarar på olika frågor. Jämför aldrig ett tal från det ena måttet "
+        "med ett tal från det andra."
     ),
     "index_compare_ours": "Vårt index (oviktat)",
     "index_compare_scb": "SCB:s index (viktat)",
@@ -300,13 +304,12 @@ SWEDISH_LABELS = {
     ),
     "national_position_summary": (
         "Skillnaderna mellan kommuner är stora och trögrörliga. {high_name} "
-        "ligger på index {high:.0f} och {low_name} på {low:.0f}. Rangordningen "
-        "är i praktiken låst: sambandet mellan ett års position och nästa års "
-        "är 0,99, och över tio år 0,93. Det som rör sig gör det långsamt — "
-        "därför visas förflyttning över fem och tio år, inte över ett."
+        "ligger på index {high:.0f} och {low_name} på {low:.0f}. "
+        "Rangordningen är i praktiken låst: sambandet mellan ett års position "
+        "och nästa års är 0,99, och över tio år 0,93. Det som rör sig gör det "
+        "långsamt. Därför visas förflyttning över fem och tio år, inte över "
+        "ett."
     ),
-
-    # Kommun page lead
     "kommun_position_lead": (
         "{kommun} ligger på index <strong>{position}</strong> av "
         "riksgenomsnittet, en förflyttning på <strong>{drift} "
@@ -330,8 +333,8 @@ SWEDISH_LABELS = {
     "decomp_controls_explanation": (
         "Försörjningskvot och befolkningstillväxt ingår i modellen som "
         "kontrollvariabler, men mellan kommuner går deras effekt inte att "
-        "skilja från noll: konfidensintervallen omsluter noll i varje år "
-        "2021–{year}. De visas därför som siffror, inte som staplar — en "
+        "skilja från noll: konfidensintervallen omsluter noll i varje år 2021 "
+        "till {year}. De visas därför som siffror, inte som staplar. En "
         "stapel skulle påstå en säkerhet som inte finns."
     ),
     "decomp_residual_note": (
@@ -343,7 +346,7 @@ SWEDISH_LABELS = {
     "landing_vars_scale_note": (
         "Effekterna visas per standardavvikelse, inte per enhet. Råa "
         "koefficienter går inte att jämföra med varandra när variablerna mäts "
-        "i olika enheter — en försörjningskvot rör sig mellan 0,5 och 1,2 "
+        "i olika enheter. En försörjningskvot rör sig mellan 0,5 och 1,2 "
         "medan utbildningsandelen rör sig mellan 6 och 61 procent."
     ),
     "axis_beta_sd": "Effekt i indexenheter per standardavvikelse",
@@ -352,12 +355,9 @@ SWEDISH_LABELS = {
     "decomp_contribution_col": "Bidrag för kommunen (indexenheter)",
     "vars_table_identified": "Går att särskilja",
     "identified_yes": "Ja",
-    "identified_no": "Nej — intervallet omsluter noll",
-
-    # Data vintage.  The panel is ragged: position runs to the last skattekraft
-    # year, the structural variables stop where unemployment stops.  Numbers of
-    # different vintages sit side by side on these pages, so both the strip and
-    # the column headers name their year.
+    "identified_no": (
+        "Nej, intervallet omsluter noll"
+    ),
     "vintage_note": (
         "Position och förflyttning till {position_year} · strukturvariabler "
         "till {analysis_year} (arbetslöshet är den bindande källan)"
@@ -370,17 +370,15 @@ SWEDISH_LABELS = {
         "Sårbarhetsindexet bygger på en tillväxtprognos för 2025 som nu går "
         "att pröva mot utfallet. Den träffade inte: korrelationen med faktisk "
         "tillväxt blev +0,02 och medelfelet 1,51 procentenheter, mot 0,97 för "
-        "att bara gissa riksgenomsnittet. Riskklasserna skilde sig inte heller "
-        "åt i utfallet — låg 4,74 %, medel 4,52 %, hög 4,68 %. Lagret ligger "
-        "kvar tills det tas bort helt; använd position och förflyttning i "
-        "stället."
+        "att bara gissa riksgenomsnittet. Riskklasserna skilde sig inte "
+        "heller åt i utfallet: låg 4,74 %, medel 4,52 %, hög 4,68 %. Lagret "
+        "ligger kvar tills det tas bort helt; använd position och "
+        "förflyttning i stället."
     ),
-
-    # The two index measures, shown rather than only described.
     "index_scatter_title": "Vårt index mot SCB:s, alla 290 kommuner",
     "index_scatter_note": (
         "Varje punkt är en kommun. Den streckade linjen är där måtten skulle "
-        "sammanfalla. Alla 290 ligger ovanför den — skillnaden är systematisk "
+        "sammanfalla. Alla 290 ligger ovanför den. Skillnaden är systematisk "
         "och beror på nämnaren, inte på att någon av dem är fel."
     ),
     "index_diff": "Skillnad",
@@ -394,10 +392,10 @@ SWEDISH_LABELS = {
     "forecast_title": "Prognos: förflyttning {horizon} år framåt",
     "forecast_lead": (
         "Modellen skattar hur långt en kommun rör sig mot riksgenomsnittet de "
-        "kommande {horizon} åren, utifrån strukturvariablerna i dag. Intervallet "
-        "är {coverage} % och kommer från prognosens egna träffar i "
-        "efterhandstestet — inte från regressionens nominella standardfel, som "
-        "beskriver osäkerheten om linjen snarare än om en enskild kommun."
+        "kommande {horizon} åren, utifrån strukturvariablerna i dag. "
+        "Intervallet är {coverage} % och kommer från prognosens egna träffar "
+        "i efterhandstestet, inte från regressionens nominella standardfel, "
+        "som beskriver osäkerheten om linjen snarare än om en enskild kommun."
     ),
     "forecast_col": "Prognos {horizon} år",
     "forecast_interval_col": "Intervall",
@@ -437,29 +435,25 @@ SWEDISH_LABELS = {
         "alla nationella konjunktursvängningar är borträknade."
     ),
     "within_section_spec": (
-        "Primär specifikation: variablerna mäts året före tillväxten (t−1). "
-        "Sambandet är genomgående starkare med ett års fördröjning — för "
-        "arbetslöshet −0,50 mot −0,18 samtidigt — vilket följer av att "
+        "Primär specifikation: variablerna mäts året före tillväxten (t-1). "
+        "Sambandet är genomgående starkare med ett års fördröjning. För "
+        "arbetslöshet -0,50 mot -0,18 samtidigt, vilket följer av att "
         "skattekraften publiceras med två års eftersläpning. Den samtida "
         "specifikationen redovisas som robusthetskontroll."
     ),
     "within_section_caveat": (
         "Koefficienterna jämför varje kommun med sig själv över tid. De kan "
         "inte rangordna kommuner och förklarar inte varför en kommun ligger "
-        "högre än en annan — 98 % av skillnaderna i skattekraft finns mellan "
+        "högre än en annan. 98 % av skillnaderna i skattekraft finns mellan "
         "kommuner, och just den variationen räknar den här modellen bort."
     ),
-
-    # R² KPI tooltip
     "kpi_r2_tooltip": (
         "R2(within) mäter hur mycket av variationen inom kommuner som "
         "förklaras av strukturvariablerna, efter att kommun- och årseffekter "
         "absorberats. Ett lågt värde är förväntat och säger inget om hur väl "
-        "modellen förklarar skillnader mellan kommuner — det måttet är "
+        "modellen förklarar skillnader mellan kommuner. Det måttet är "
         "tvärsnittets R2, som redovisas separat och ligger på 0,69."
     ),
-
-    # Footer data freshness
     "footer_updated": "Senast uppdaterad",
 
     # Choropleth tooltip label for vulnerability score
@@ -477,42 +471,47 @@ SWEDISH_LABELS = {
     # Concept explanation (landing page, collapsible)
     "concept_skattekraft_expander": "Vad är Skattekraft och varför är det viktigt?",
     "concept_skattekraft_text": (
-        "**Skattekraft** (beskattningsbar förvärvsinkomst per invånare) är det "
-        "centrala måttet på en kommuns skattemässiga kapacitet. Det anger hur "
-        "mycket inkomstskatt kommunen kan ta in per person, och avgör i praktiken "
-        "vilka tjänster kommunen har råd att erbjuda sina invånare.\n\n"
-        "Skillnaderna är enorma: 2024 hade Danderyd ca 481 000 kr per invånare "
-        "medan flera Norrlandskommuner låg under 180 000 kr. Det innebär att "
-        "vissa kommuner har mer än dubbelt så stor skattebas per invånare.\n\n"
+        "**Skattekraft** (beskattningsbar förvärvsinkomst per invånare) är "
+        "det centrala måttet på en kommuns skattemässiga kapacitet. Det anger "
+        "hur mycket inkomstskatt kommunen kan ta in per person, och avgör i "
+        "praktiken vilka tjänster kommunen har råd att erbjuda sina invånare."
+        "\n\n"
+        "Skillnaderna är enorma: 2024 hade Danderyd ca 481 000 kr per "
+        "invånare medan flera Norrlandskommuner låg under 180 000 kr. Det "
+        "innebär att vissa kommuner har mer än dubbelt så stor skattebas per "
+        "invånare."
+        "\n\n"
         "Sverige har ett utjämningssystem som delvis kompenserar för dessa "
         "skillnader, men den underliggande skattekraften förblir en avgörande "
-        "faktor för kommunens ekonomiska handlingsutrymme.\n\n"
-        "### Varför är det viktigt att följa skattekraftens utveckling?\n\n"
-        "**Scenario 1: Kreditanalytiker på en bank**\n"
-        "Du bedömer en kommuns kreditvärdighet inför ett obligationslån. "
-        "Dashboarden visar att kommunen har sjunkande skattekraftstillväxt och "
-        "hög försörjningskvot. Det signalerar ökad risk och påverkar din "
-        "kreditbedömning.\n\n"
-        "**Scenario 2: Kommunal controller**\n"
-        "Du planerar nästa års budget. Dashboarden visar att er kommun ligger "
-        "12 indexenheter under riksgenomsnittet, och att modellen hänför "
-        "merparten till utbildningsnivån snarare än till arbetslösheten. Det "
-        "är en förklaring av läget, inte en prognos för nästa år — och "
+        "faktor för kommunens ekonomiska handlingsutrymme."
+        "\n\n"
+        "### Varför är det viktigt att följa skattekraftens utveckling?"
+        "\n\n"
+        "**Scenario 1: Kreditanalytiker på en bank** Du bedömer en kommuns "
+        "kreditvärdighet inför ett obligationslån. Dashboarden visar att "
+        "kommunen har sjunkande skattekraftstillväxt och hög "
+        "försörjningskvot. Det signalerar ökad risk och påverkar din "
+        "kreditbedömning."
+        "\n\n"
+        "**Scenario 2: Kommunal controller** Du planerar nästa års budget. "
+        "Dashboarden visar att er kommun ligger 12 indexenheter under "
+        "riksgenomsnittet, och att modellen hänför merparten till "
+        "utbildningsnivån snarare än till arbetslösheten. Det är en "
+        "förklaring av läget, inte en prognos för nästa år, och "
         "utbildningsstapeln är inte en spak att dra i, utan till stor del en "
-        "omskrivning av samma sak.\n\n"
-        "**Scenario 3: Regional beslutsfattare (SKR/länsstyrelse)**\n"
-        "Du vill se vilka kommuner i ditt län som halkar efter riket. "
-        "Riksöversiktens förflyttningslager visar det direkt, över fem år, "
-        "utan att du behöver samla in data manuellt. Ettårsrörelser visas "
-        "inte, eftersom de nästan uteslutande är brus.\n\n"
-        "**Scenario 4: Forskare eller student**\n"
-        "Du studerar kommunal ekonomi och vill förstå vilka strukturella "
-        "faktorer som driver skillnaderna. Dekomponeringen bryter ner exakt "
-        "hur mycket arbetslöshet, demografi, befolkning och utbildning "
-        "bidrar för varje kommun."
+        "omskrivning av samma sak."
+        "\n\n"
+        "**Scenario 3: Regional beslutsfattare (SKR/länsstyrelse)** Du vill "
+        "se vilka kommuner i ditt län som halkar efter riket. Riksöversiktens "
+        "förflyttningslager visar det direkt, över fem år, utan att du "
+        "behöver samla in data manuellt. Ettårsrörelser visas inte, eftersom "
+        "de nästan uteslutande är brus."
+        "\n\n"
+        "**Scenario 4: Forskare eller student** Du studerar kommunal ekonomi "
+        "och vill förstå vilka strukturella faktorer som driver skillnaderna. "
+        "Dekomponeringen bryter ner exakt hur mycket arbetslöshet, demografi, "
+        "befolkning och utbildning bidrar för varje kommun."
     ),
-
-    # Usage guide (landing page, collapsible)
     "guide_expander": "Hur använder jag dashboarden?",
     "guide_text": (
         "### Sidorna"
@@ -532,10 +531,10 @@ SWEDISH_LABELS = {
         "### Positionsfiltret i sidopanelen"
         "\n\n"
         "Filtret Position mot riket låter dig begränsa vyn till ett intervall "
-        "av indexvärden: under 90, 90–110, eller över 110. Till skillnad från "
-        "den riskklassindelning som fanns här tidigare är detta ett mått på "
-        "ett observerat läge, inte på en prognos — och antalet kommuner i "
-        "varje band ändras när verkligheten gör det."
+        "av indexvärden: under 90, mellan 90 och 110, eller över 110. Till "
+        "skillnad från den riskklassindelning som fanns här tidigare är detta "
+        "ett mått på ett observerat läge, inte på en prognos, och antalet "
+        "kommuner i varje band ändras när verkligheten gör det."
         "\n\n"
         "### Vad dashboarden inte gör"
         "\n\n"
@@ -562,12 +561,12 @@ SWEDISH_LABELS = {
         "konfidensintervall. Nollinjen är det som avgör: rör strecket den, "
         "går effekten inte att skilja från noll, och punkten ritas grå. En "
         "stapel från noll skulle dölja halva intervallet bakom sin egen "
-        "fyllning — därför punkt och streck i stället."
+        "fyllning. Därför punkt och streck i stället."
         "\n\n"
         "Exempel: utbildningsandelen ligger på +10,0 indexenheter per "
-        "standardavvikelse med intervallet [+6,4, +13,7] — hela strecket "
-        "ligger klart över noll. Försörjningskvoten ligger på −0,6 med "
-        "intervallet [−2,4, +1,2], som omsluter noll. Räknat i råa "
+        "standardavvikelse med intervallet [+6,4, +13,7], och hela strecket "
+        "ligger klart över noll. Försörjningskvoten ligger på -0,6 med "
+        "intervallet [-2,4, +1,2], som omsluter noll. Räknat i råa "
         "koefficienter ser försörjningskvoten störst ut av alla fyra; räknat "
         "i verklig effekt går den inte att skilja från ingenting."
     ),
@@ -583,7 +582,7 @@ SWEDISH_LABELS = {
         "skalan är centrerad på noll."
         "\n\n"
         "Exempel: i positionslagret framträder Stockholmsregionen mörk och "
-        "delar av inlandet ljusa — nivåskillnader som ligger fast över "
+        "delar av inlandet ljusa, nivåskillnader som ligger fast över "
         "decennier. I förflyttningslagret ser samma karta helt annorlunda ut, "
         "eftersom en kommun kan ligga lågt och ändå vinna mark. Håll "
         "muspekaren över en kommun för att se båda talen."
@@ -593,12 +592,12 @@ SWEDISH_LABELS = {
         "Histogrammet visar samma storhet som kartan och byter när du byter "
         "lager. Varje stapel är ett intervall, och höjden anger hur många av "
         "de 290 kommunerna som hamnar där. Den streckade linjen markerar "
-        "riksgenomsnittet — index 100 för en nivå, noll för en förflyttning."
+        "riksgenomsnittet: index 100 för en nivå, noll för en förflyttning."
         "\n\n"
         "Exempel: i positionslagret är fördelningen kraftigt högerskev. De "
         "flesta kommuner ligger tätt mellan 85 och 110, och en tunn svans "
         "sträcker sig upp mot 208. Det är därför kartans färgskala är "
-        "beskuren — utan beskärning skulle nio kommuner av tio få samma färg."
+        "beskuren. Utan beskärning skulle nio kommuner av tio få samma färg."
     ),
     "explain_trend_expander": "Hur läser jag trenddiagrammet?",
     "explain_trend_text": (
@@ -615,7 +614,7 @@ SWEDISH_LABELS = {
     "explain_decomp_expander": "Hur läser jag dekomponeringen?",
     "explain_decomp_text": (
         "Staplarna delar upp kommunens avvikelse från riksgenomsnittet i "
-        "indexenheter — inte i procentenheters tillväxt. Blå staplar drar "
+        "indexenheter, inte i procentenheters tillväxt. Blå staplar drar "
         "uppåt, orange nedåt, och den grå stapeln är residualen: den del av "
         "avvikelsen som modellen inte förklarar."
         "\n\n"
@@ -626,8 +625,8 @@ SWEDISH_LABELS = {
         "\n\n"
         "Exempel: Filipstad ligger 16,7 indexenheter under genomsnittet. "
         "Modellen hänför 12,9 till utbildningsnivån och 4,0 till "
-        "arbetslösheten och lämnar 0,1 oförklarat. Danderyd ligger 99,3 över "
-        "— där är nästan halva avvikelsen residual. Modellen är linjär och "
+        "arbetslösheten och lämnar 0,1 oförklarat. Danderyd ligger 99,3 över. "
+        "Där är nästan halva avvikelsen residual. Modellen är linjär och "
         "träffar sämst i toppen."
     ),
     "explain_ranking_expander": "Hur läser jag tabellen?",
@@ -637,16 +636,16 @@ SWEDISH_LABELS = {
         "förflyttningen över fem och tio år samt femårsprognosen med sitt "
         "intervall."
         "\n\n"
-        "Exempel: en kommun med index 88 och förflyttning −2,4 ligger under "
+        "Exempel: en kommun med index 88 och förflyttning -2,4 ligger under "
         "riksgenomsnittet och har tappat ytterligare mark de senaste fem "
         "åren. En kommun med index 88 och +1,1 ligger lika lågt men rör sig "
-        "uppåt. Samma nivå, olika riktning — och det är skillnaden tabellen "
+        "uppåt. Samma nivå, olika riktning, och det är skillnaden tabellen "
         "finns för att visa. Klicka på en kolumnrubrik för att sortera om."
     ),
     "explain_peers_expander": "Hur läser jag jämförelsetabellen?",
     "explain_peers_text": (
         "Tabellen visar de fem kommuner som ligger närmast den valda kommunen "
-        "i position mot riksgenomsnittet — alltså kommuner med ungefär samma "
+        "i position mot riksgenomsnittet, alltså kommuner med ungefär samma "
         "skattekraft, inte nödvändigtvis kommuner som liknar den i övrigt."
         "\n\n"
         "Exempel: om grannarna i tabellen har samma index men klart högre "
@@ -714,6 +713,59 @@ def format_signed_pct(value: float, decimals: int = 1) -> str:
         Formatted string like '+2,3 %' or '-1,8 %'.
     """
     return f"{value:+.{decimals}f}".replace(".", ",") + " %"
+
+
+#: How many decimals each displayed quantity carries.  Collected here because
+#: the same number was previously shown three different ways: relative position
+#: appeared as "79,9" on one card, "80" in a selector and "208.1" in a table,
+#: and the effect chart said "-2,7" where the table beside it said "-2,69".
+#: More decimals than the measurement supports reads as false precision.
+DISPLAY_DECIMALS = {
+    "index": 0,         # an index point is the meaningful unit; SCB rounds too
+    "index_points": 1,  # movements are small, so the first decimal is signal
+    "effect": 1,        # same unit as the index; the interval denies more
+    "rate": 1,          # unemployment, education share
+    "correlation": 2,   # 0,33 against 0,3 matters at this scale
+    "error": 1,         # RMSE; 2,11 implies precision the backtest lacks
+    "share": 0,         # R2 and coverage, shown as whole percent
+}
+
+
+def format_index(value: float) -> str:
+    """Format a position index for display: whole numbers, no sign.
+
+    Args:
+        value: Index where the unweighted national mean is 100.
+
+    Returns:
+        Formatted string like '208'.
+    """
+    return f"{value:.{DISPLAY_DECIMALS['index']}f}"
+
+
+def format_effect(value: float) -> str:
+    """Format an effect per standard deviation, signed.
+
+    Args:
+        value: Effect in index points.
+
+    Returns:
+        Formatted string like '+10,0'.
+    """
+    return f"{value:+.{DISPLAY_DECIMALS['effect']}f}".replace(".", ",")
+
+
+def format_interval(low: float, high: float) -> str:
+    """Format a confidence interval, with no dash between the bounds.
+
+    Args:
+        low: Lower bound.
+        high: Upper bound.
+
+    Returns:
+        Formatted string like '+6,4 till +13,7'.
+    """
+    return f"{format_effect(low)} till {format_effect(high)}"
 
 
 def format_index_points(value: float, decimals: int = 1) -> str:
