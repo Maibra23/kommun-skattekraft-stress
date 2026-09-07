@@ -8,10 +8,28 @@ Standardizes predictions to vulnerability_score (z-score, sign-flipped so
 high = more vulnerable), assigns vulnerability_rank and risk_class (quintile
 labels: 'hog', 'medel', 'lag').  Writes artifacts/predictions.parquet and
 artifacts/ranking.parquet.
+
+DEPRECATED as the headline ranking (REMEDIATION_PLAN.md T2.4)
+-------------------------------------------------------------
+The 2025 horizon has closed and this forecast has been scored against it:
+Pearson r = +0.016, Spearman = +0.033, RMSE 1.512 pp against a naive
+constant-mean benchmark of 0.974 pp — the forecast loses to guessing the
+national mean by 55 %.  Its risk classes do not separate and are not monotone:
+realised 2025 growth averaged 4.74 % (låg), 4.52 % (medel), 4.68 % (hög), a
+0.22 pp spread against a cross-kommun SD of 0.98 pp.  The FE model is a
+within-time inference panel, not a ranking engine; 98.2 % of the variation in
+relative position is between kommuner, which the entity effects absorb.
+
+Both artifacts are still written, unchanged, because the deployed dashboard
+reads them straight from git (METHODOLOGY §11.7) and the UI cutover is a later
+single commit.  ``compute_vulnerability`` raises a ``DeprecationWarning`` so no
+new caller adopts it silently.  Its replacement is the position and drift
+measures in ``src/model/position.py``; its final removal is T3.x's call.
 """
 
 import logging
 import pickle
+import warnings
 from pathlib import Path
 
 import pandas as pd
@@ -129,6 +147,12 @@ def compute_vulnerability(predictions: pd.DataFrame) -> pd.DataFrame:
     Applies METHODOLOGY §3.2 (z-score, sign-flipped) and §3.3 (quintile
     risk classes).
 
+    .. deprecated::
+        This ranking is not supported by the model that produces it — see the
+        module docstring for the scored result.  It is retained only until the
+        dashboard is cut over to the position and drift measures.  Emits a
+        ``DeprecationWarning`` on every call.
+
     Args:
         predictions: DataFrame with columns kommun_kod, kommun_name,
             lan_name, predicted_growth_2025.
@@ -138,6 +162,16 @@ def compute_vulnerability(predictions: pd.DataFrame) -> pd.DataFrame:
         predicted_growth_2025, vulnerability_score, vulnerability_rank,
         risk_class.  Exactly 290 rows.
     """
+    warnings.warn(
+        "compute_vulnerability is deprecated: the two-way FE model is a "
+        "within-time inference panel, not a ranking engine, and this ranking "
+        "scored r=+0.016 against realised 2025 growth (naive benchmark wins by "
+        "55 %). Retained only until the dashboard reads position and drift "
+        "instead. See REMEDIATION_PLAN.md T2.4.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     df = predictions.copy()
 
     # §3.2: vulnerability_score = -1 * z-score of predicted growth

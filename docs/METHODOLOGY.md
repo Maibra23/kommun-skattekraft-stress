@@ -58,6 +58,8 @@ Where:
 * `beta_1, beta_2, beta_3, beta_4` = structural coefficients
 * `epsilon_it` = idiosyncratic error
 
+Since 2026-09-07 the **primary** version of this equation carries the RHS variables at *t−1*, not *t*. See §2.6 for the evidence and §2.7 for what this model is and is not used for.
+
 ### 2.2 Variable construction
 
 | Variable | Construction |
@@ -131,16 +133,56 @@ Truncating every source to the shortest would discard the newest skattekraft, wh
 
 This is the standard specification in modern applied micro for panel data. It is not the only specification (random effects, between estimator, dynamic panel) but it is the most defensible default when both kommun and year heterogeneity matter.
 
-### 2.6 Robustness specifications (run, report in Methodology tab)
+### 2.6 Specifications: which one is primary
 
-| Robustness | Specification | Why |
+*Revised 2026-09-07 by REMEDIATION_PLAN.md T2.4. The full rewrite of this document is T4.1; this section is corrected early because it is what tells a reader which numbers to quote.*
+
+The **lagged specification is primary**. `X_it` is replaced by `X_{i,t-1}` on the RHS; the contemporaneous specification is retained as a robustness check.
+
+**Why the lag is primary, not a robustness check.** Within-kommun correlation between `tax_base_growth_pct` and each regressor, by lag, on the 2010–2026 panel (entity-demeaned, N = 4 350 at lags 0–2):
+
+| Lag | `unemployment_rate` | `dependency_ratio` | `population_growth_pct` | `edu_share` |
+|---|---|---|---|---|
+| t (contemporaneous) | −0.180 | +0.151 | −0.132 | +0.217 |
+| **t−1** | **−0.500** | **+0.376** | −0.087 | **+0.481** |
+| t−2 | −0.405 | +0.288 | **−0.287** | +0.380 |
+| t−3 | −0.152 | +0.235 | +0.115 | +0.323 |
+
+Every regressor's association peaks at t−1 or later — three of four at t−1, population growth at t−2. This is what the two-year publication lag on skattekraft (§7.6) implies: the income year underlying a given skattekraft figure precedes it, so pairing `X_it` with `Y_it` pairs each regressor with an outcome partly determined before it was measured. Closes audit finding F4.
+
+The estimated specifications agree. Values below are from `artifacts/coefficients.parquet`, which now carries a `role` column (`primary` / `robustness`) plus `n_obs` and `r_squared_within` per spec:
+
+| | contemporaneous (`main`) | **lagged (primary)** |
 |---|---|---|
-| Lagged independents | Replace `X_it` with `X_{i,t-1}` on RHS | Mitigates simultaneity |
+| `unemployment_rate` | −0.0586 (t = −3.77) | **−0.1063 (t = −7.32)** |
+| `dependency_ratio` | −3.746 (t = −4.63) | −3.805 (t = −4.88) |
+| `population_growth_pct` | −0.0798 (t = −2.64) | −0.0792 (t = −2.57) |
+| `edu_share` | +0.0187 (t = +0.65) | −0.0071 (t = −0.29) |
+| R²(within) | 0.0083 | **0.0364** |
+| N | 4 350 | 4 350 |
+
+The lagged spec is better identified on the variable that carries the signal and explains 4.4× more of the within-kommun variation. It is also the only version usable for forecasting, since it needs no contemporaneous data. `edu_share` is insignificant in both (|t| < 0.7) and its sign flip between them is noise, not a finding — education is a between-kommun variable, and the entity effects absorb it (§7.7).
+
+**A naming caveat.** The `spec` values in `coefficients.parquet` are unchanged: the demoted contemporaneous spec is still called `main`, because the deployed dashboard filters on that literal string and artifacts are a published contract (§11.7). Primacy is carried by the `role` column. The rename belongs to the UI cutover commit.
+
+| Remaining robustness spec | Specification | Why |
+|---|---|---|
+| Contemporaneous | `X_it` on RHS | The pre-2026-09 primary; retained to show the lag is what changes the result |
 | Drop COVID | Exclude 2020 and 2021 | COVID may dominate year FE |
 | Larger kommuner only | Subsample with 2024 population > 10 000 | Small kommuner have noisier growth |
 | Without education | Drop beta_4 | Education stock varies slowly; check if it materially changes other betas |
 
-If the main coefficients are stable across these specifications, the model is robust. If they flip sign or change magnitude dramatically, document and discuss.
+If the primary coefficients are stable across these specifications, the model is robust. If they flip sign or change magnitude dramatically, document and discuss.
+
+### 2.7 What this model is for, after the 2026-09 remediation
+
+*Added 2026-09-07 (T2.4).*
+
+The two-way FE model is the **within-time inference panel**: it answers "within a kommun over time, how do its structural conditions move with its tax base growth?" It is not the ranking engine and never was one. 98.2 % of the variation in relative position is *between* kommuner (§1.2 of the remediation plan), and `alpha_i` absorbs exactly that variation. Ranking and the position decomposition come from the cross-sectional estimator (`src/model/estimate_cross.py`, `artifacts/coefficients_cross.parquet`).
+
+The two models must be presented as separate findings under separate headings. The FE panel's heading is *"Samband inom kommuner över tid"* (`SWEDISH_LABELS["within_section_title"]`), and its accompanying caveat states that these coefficients cannot rank kommuner.
+
+The vulnerability score and risk classes in `predictions.parquet` / `ranking.parquet` are **deprecated** as of T2.4: `compute_vulnerability` emits a `DeprecationWarning`, and both artifacts are written only until the dashboard reads position and drift instead. The 2025 horizon has since closed and the forecast has been scored against it — Pearson r = +0.016, Spearman = +0.033, RMSE 1.512 pp against a naive constant-mean benchmark of 0.974 pp, and risk classes that do not separate (realised growth 4.74 % låg, 4.52 % medel, 4.68 % hög). §3.4 still argues that predictive validity is the right standard; the model failed the standard it set. Replacing that section is T4.1's job.
 
 ---
 

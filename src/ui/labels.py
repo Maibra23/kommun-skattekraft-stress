@@ -215,6 +215,32 @@ SWEDISH_LABELS = {
         "uppåt, negativa (röda) drar nedåt."
     ),
 
+    # Within-time inference panel (REMEDIATION_PLAN.md T2.4).
+    # The two-way FE model answers a different question than the ranking and
+    # must be shown under its own heading, physically separated from it.
+    # Added ahead of the UI cutover; no page renders these yet (T1.2 does).
+    "within_section_title": "Samband inom kommuner över tid",
+    "within_section_lead": (
+        "Panelmodellen med kommun- och årseffekter svarar på en annan fråga än "
+        "jämförelsen mellan kommuner: när förhållandena i en enskild kommun "
+        "förändras över tid, hur hänger det samman med kommunens "
+        "skattekraftstillväxt? Kommunens egna, tidsoberoende egenskaper och "
+        "alla nationella konjunktursvängningar är borträknade."
+    ),
+    "within_section_spec": (
+        "Primär specifikation: variablerna mäts året före tillväxten (t−1). "
+        "Sambandet är genomgående starkare med ett års fördröjning — för "
+        "arbetslöshet −0,50 mot −0,18 samtidigt — vilket följer av att "
+        "skattekraften publiceras med två års eftersläpning. Den samtida "
+        "specifikationen redovisas som robusthetskontroll."
+    ),
+    "within_section_caveat": (
+        "Koefficienterna jämför varje kommun med sig själv över tid. De kan "
+        "inte rangordna kommuner och förklarar inte varför en kommun ligger "
+        "högre än en annan — 98 % av skillnaderna i skattekraft finns mellan "
+        "kommuner, och just den variationen räknar den här modellen bort."
+    ),
+
     # R² KPI tooltip
     "kpi_r2_tooltip": (
         "R2(within) mäter hur mycket av variationen inom kommuner "

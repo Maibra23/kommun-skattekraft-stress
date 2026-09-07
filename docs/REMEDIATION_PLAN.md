@@ -428,6 +428,13 @@ Two hard rules for delegation:
 
 **Definition of done:** Lagged spec is primary in `coefficients.parquet`; UI separates the within-time finding from the cross-sectional ranking; `METHODOLOGY.md` §2.6 updated to reflect the promotion (full doc rewrite is T4.1).
 
+> **Executed 2026-09-07 with two staging deviations, both forced by §11.7.**
+>
+> 1. **Primacy is carried by a `role` column, not by renaming the specs.** "Swap which spec is labelled `main`" would have renamed a string the deployed dashboard filters on (`app.py:226`) three commits before the UI is fixed — the exact failure §11.7 was written to prevent. `coefficients.parquet` gains `role` (`primary` on `lagged`, `robustness` on the other four), `n_obs` and `r_squared_within`; every pre-existing value is unchanged to **max abs diff 0.00e+00**, so the live site renders exactly what it rendered before. The rename of `main` → `contemporaneous` belongs to step 8.
+> 2. **The UI separation is staged, not rendered.** `SWEDISH_LABELS` gains `within_section_title` / `_lead` / `_spec` / `_caveat`; no page reads them yet, because rendering them is a page edit and step 8 is the single cutover commit. **Step 8a must place the FE panel under `within_section_title`, physically separated from the ranking, or this half of the DoD is not met.**
+>
+> `compute_vulnerability` is gated rather than deleted: it now raises a `DeprecationWarning` naming its scored performance, and still writes `predictions.parquet` / `ranking.parquet` because the deployed pages read them until step 8. Deletion remains T3.x's call.
+
 ---
 
 ## 7. PHASE 3 — Forecasting, If Retained
@@ -577,8 +584,9 @@ STEP  TASK                                            PHASE  DELEGATION
  [x] 5   T2.1  Cross-sectional estimator                 2    [SOLO]  done 2026-09-07
  [x] --- GATE  Cross-sectional R2 > 0.60                       PASSED 2026-09-07 (0.690-0.723)
  [x] 6   T2.2 + T2.3  Decomposition + diagnostics        2    [SOLO]  done 2026-09-07
- [ ] 7   T2.4  Demote FE to inference panel              2    [SOLO]  <- NEXT
- [ ] 8a  T1.2  Dashboard leads with position/drift       1    [SOLO]
+ [x] 7   T2.4  Demote FE to inference panel              2    [SOLO]  done 2026-09-07
+ [x] --- GATE  Phase 2 complete (R2, residual, VIF)            PASSED 2026-09-07
+ [ ] 8a  T1.2  Dashboard leads with position/drift       1    [SOLO]  <- NEXT (the cutover)
  [ ] 8b  T1.3  Show SCB index alongside                  1    [PARALLEL-A]
  [ ] 9a  T3.1  Rolling-origin backtest harness           3    [SUBAGENT]   optional
  [ ] 9b  T3.2  5-year drift forecaster                   3    [SOLO]       optional
@@ -874,6 +882,50 @@ The DoD's *intent* — the residual must not dominate — is now tested as the r
 **Face validity, and one honest limitation.** Filipstad sits −16.7 index points from the average: education −12.9, unemployment −4.0, residual **+0.1**. Explained almost exactly. Danderyd sits +99.3: education +45.2, unemployment +4.2, residual **+49.9** — half unexplained. The linear model does not capture the extreme tail, where tax base concentrates far faster than education share rises. **T1.2 should not present a decomposition for the top handful of kommuner without saying so**, and T4.1 should record it as a limitation: the attribution is trustworthy in the body of the distribution and weak at the top.
 
 **Controls are reported, never attributed.** `dependency_ratio` and `population_growth_pct` appear as `control_*` columns with their implied contributions, so a reader can see they are small (−0.68 and +1.65 for Filipstad) without being invited to read them as findings. The module reads the `identified` flag from `coefficients_cross.parquet` rather than hardcoding names — a test flips the flag and asserts the attributed set changes, so the judgement lives in one place.
+
+---
+
+### 2026-09-07 — T2.4 complete · Phase 2 closed · F4 closed and stronger than the audit measured
+
+**Done.** The lagged specification is the FE panel's primary spec, carried by a new `role` column in `coefficients.parquet` alongside `n_obs` and `r_squared_within`. `compute_vulnerability` is gated with a `DeprecationWarning`. `labels.py` gains the four strings for the separated within-time section. METHODOLOGY §2.6 is rewritten and §2.7 added. 18 new tests; suite is **250 passed**, and `pytest -m "not baseline"` still runs cleanly at 234, so the pre-remediation suite remains excludable.
+
+**F4 re-measured before it was quoted, per this plan's own note, and it has strengthened twice over.** Within-kommun correlation of growth with each regressor, by lag, entity-demeaned on the rebuilt 2010–2026 panel:
+
+| Lag | `unemployment_rate` | `dependency_ratio` | `population_growth_pct` | `edu_share` | N |
+|---|---|---|---|---|---|
+| t | −0.180 | +0.151 | −0.132 | +0.217 | 4 350 |
+| **t−1** | **−0.500** | **+0.376** | −0.087 | **+0.481** | 4 350 |
+| t−2 | −0.405 | +0.288 | **−0.287** | +0.380 | 4 350 |
+| t−3 | −0.152 | +0.235 | +0.115 | +0.323 | 4 060 |
+
+The audit measured −0.179 contemporaneous and −0.450 at t−1 for unemployment. The contemporaneous figure reproduces exactly; the t−1 figure is now **−0.500**, for the same reason the lagged coefficients moved at the rebuild — 2025's realised growth can now be paired with 2024's regressors. The plan's §1 claim that "every regressor peaks at t−1 or later" holds, with the precision that three of four peak at t−1 and population growth at t−2.
+
+**The estimated specs agree, and the gap is wider than T2.4's written figures.** Quoted from the artifact, as this plan's step-7 note required:
+
+| | contemporaneous (`main`, demoted) | **lagged (primary)** |
+|---|---|---|
+| `unemployment_rate` | −0.0586 (t = −3.77) | **−0.1063 (t = −7.32)** |
+| R²(within) | 0.0083 | **0.0364** |
+| N | 4 350 | 4 350 |
+
+Same sample size, 4.4× the within-kommun explanatory power, and the t-statistic on the variable that carries the signal roughly doubles. T2.4's prose ("−0.059 to −0.099, t from −3.8 to −6.1") is superseded.
+
+**Two staging deviations, both recorded against T2.4 above.** Primacy is a `role` column rather than a rename, because `app.py:226` filters on the literal string `"main"`; and the new section labels are added but not yet rendered, because step 8 is the single cutover commit. **The UI half of T2.4's DoD is therefore carried into step 8a and is not yet met.** Stating that plainly is better than marking a task done on a definition it half satisfies.
+
+**Verified the promotion changed no value anyone is currently reading.** `coefficients.parquet` was regenerated and compared row-by-row against the committed version on `spec` × `variable`: **max abs diff 0.00e+00** across coefficient, SE, t, p and both CI bounds. Three columns added, nothing altered. The other seven artifacts are byte-identical, and `model_results.pkl` was restored from git after confirming the re-pickled object carries identical params, `nobs` and `rsquared_within` — the content was unchanged, so there was no reason to commit a new binary blob.
+
+**One DoD assertion was written wrong and caught by the data.** A test asserted `0 ≤ R²(within) ≤ 1` for every spec. `no_education` scores **−0.0043**: `linearmodels` measures within-R² against the within-transformed model, and a spec that drops a regressor can fall below zero. The test now bounds it above only, and asserts separately that the primary spec beats the demoted one. The artifact was right; the assertion was not.
+
+**Phase-2 gate re-verified from the artifacts rather than from earlier entries.** Cross-sectional R² = 0.7023 / 0.7115 / 0.7228 / 0.6900 for 2021–2024 (bar: > 0.60); decomposition residual **variance** share 31.2 % (bar: < 40 %, on the corrected metric from step 6); VIF computed for both designs, max 2.55 within and 1.95 cross. All three hold. Phase 2 is closed.
+
+**Notes for step 8a, which now owns the rest of this task.**
+- Render the FE panel under `within_section_title` — *"Samband inom kommuner över tid"* — with `within_section_caveat` visible, not behind an expander. The caveat is the part that stops a reader treating within-kommun coefficients as a ranking.
+- Read the FE panel from `role == "primary"`, not `spec == "main"`, and only then rename `main` → `contemporaneous`. Both in the same commit.
+- `pages/01_Riksoversikt.py:87` unpickles `model_results.pkl` for one number, the within-R². That number is now in `coefficients.parquet`, so the cutover can drop the unpickle and with it `linearmodels` from the deployed dependency path.
+- The R² KPI will move from 0.83 % to 3.64 % when it starts reading the primary spec. T4.2 item 5 assumed `kpi_r2_tooltip` becomes wrong because the headline fit turns into the cross-sectional 0.69; in fact both numbers survive, on different panels, and each needs its own tooltip. "Lågt värde är förväntat" stays true of the within panel.
+- `compute_vulnerability` now warns on every call. When the pages stop reading `ranking.parquet`, the pipeline step can go with them.
+
+**A note on the `β` logging annoyance, which was investigated rather than assumed.** The per-coefficient log line was rewritten as `b=` while the logging was being refactored, and the estimation step now runs to completion with no `PYTHONIOENCODING` set. But the T0.2 entry's diagnosis does not reproduce on this machine: with `sys.stdout` at cp1252, `logging` escapes `β` to the literal text `β` rather than raising, and `pipeline.py`'s file handler is already opened `encoding="utf-8"` (`pipeline.py:77`). So the recorded crash comes from something else — a different console, or a handler configured elsewhere — and removing one `β` from one module has not fixed it. `estimate_cross.py:264` and two docstrings still carry the character deliberately. Whoever hits the crash again should capture the traceback before changing more strings.
 
 ---
 

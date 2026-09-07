@@ -104,6 +104,16 @@ def test_predict_2025_mean_near_historical():
 # ---------------------------------------------------------------------------
 
 
+def test_compute_vulnerability_warns_that_it_is_not_a_ranking_engine():
+    """T2.4 gates this function: the FE model must stop producing the headline
+    ranking.  The artifact is still written for the pre-cutover dashboard, but
+    no new caller should adopt it silently."""
+    panel = _make_synthetic_panel()
+    predictions = predict_2025(estimate_main(panel), panel)
+    with pytest.warns(DeprecationWarning, match="not a ranking engine"):
+        compute_vulnerability(predictions)
+
+
 def test_compute_vulnerability_columns():
     panel = _make_synthetic_panel()
     results = estimate_main(panel)

@@ -209,3 +209,59 @@ def test_save_model_artifacts_coef_table_row_count(tmp_path):
     coef_df = pd.read_parquet(tmp_path / "coefficients.parquet")
     # main: 4 vars, lagged: 4, no_covid: 4, large_only: 4, no_education: 3
     assert len(coef_df) == 4 + 4 + 4 + 4 + 3
+
+
+# ---------------------------------------------------------------------------
+# Spec roles — REMEDIATION_PLAN.md T2.4 (the lagged spec is promoted to primary)
+# ---------------------------------------------------------------------------
+
+
+def _coef_table(tmp_path) -> pd.DataFrame:
+    panel = _make_synthetic_panel()
+    save_model_artifacts(
+        estimate_main(panel), estimate_robustness(panel), tmp_path
+    )
+    return pd.read_parquet(tmp_path / "coefficients.parquet")
+
+
+def test_lagged_spec_is_the_only_primary_spec(tmp_path):
+    coef_df = _coef_table(tmp_path)
+    primary = set(coef_df.loc[coef_df["role"] == "primary", "spec"])
+    assert primary == {"lagged"}
+
+
+def test_every_other_spec_is_labelled_robustness(tmp_path):
+    coef_df = _coef_table(tmp_path)
+    robustness = set(coef_df.loc[coef_df["role"] == "robustness", "spec"])
+    assert robustness == {"main", "no_covid", "large_only", "no_education"}
+
+
+def test_contemporaneous_spec_keeps_its_legacy_name(tmp_path):
+    """The deployed dashboard filters ``spec == "main"`` (app.py:226).
+
+    T2.4 demotes that spec but must not rename it: artifacts are a published
+    contract (METHODOLOGY §11.7) and the UI cutover is a later, single commit.
+    """
+    coef_df = _coef_table(tmp_path)
+    assert (coef_df["spec"] == "main").sum() == len(X_VARS)
+
+
+def test_coef_table_carries_sample_and_fit_per_spec(tmp_path):
+    """Each spec self-describes, so the within-time panel can be rendered
+    without unpickling model_results.pkl."""
+    coef_df = _coef_table(tmp_path)
+    assert {"n_obs", "r_squared_within"}.issubset(coef_df.columns)
+
+    lagged = coef_df[coef_df["spec"] == "lagged"]
+    assert lagged["n_obs"].nunique() == 1
+    assert lagged["n_obs"].iloc[0] > 0
+    assert lagged["r_squared_within"].iloc[0] <= 1.0
+
+
+def test_n_obs_is_recorded_per_spec_not_broadcast_from_main(tmp_path):
+    """On a balanced panel the lag and the COVID exclusion each cost rows, so
+    a per-spec n_obs must differ from the contemporaneous one."""
+    coef_df = _coef_table(tmp_path)
+    n = coef_df.groupby("spec")["n_obs"].first()
+    assert n["lagged"] < n["main"]
+    assert n["no_covid"] < n["main"]
