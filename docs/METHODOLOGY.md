@@ -66,8 +66,8 @@ Since 2026-09-07 the **primary** version of this equation carries the RHS variab
 |---|---|
 | `tax_base_growth_pct` | `(skattekraft_t / skattekraft_{t-1} - 1) * 100` |
 | `unemployment_rate` | Direct from SCB STATIV, percent |
-| `dependency_ratio` | `(pop_0_19 + pop_65plus) / pop_20_64`, computed from BE0101 |
-| `population_growth_pct` | `(pop_total_t / pop_total_{t-1} - 1) * 100` |
+| `dependency_ratio` | `(pop_0_19 + pop_65plus) / pop_20_64`, from BE0101 age cells — 5-year bands where the table offers them, single years otherwise |
+| `population_growth_pct` | `(pop_total_t / pop_total_{t-1} - 1) * 100`, where `pop_total` is **SCB's published all-ages total**, not a sum of the age cells (§12.8) |
 | `edu_share` | `100 × (SUN 6 + SUN 7) / (all SUN levels)`, ages 25–64, both sexes, from SCB UF0506 |
 
 *The `edu_share` denominator was incomplete here until 2026-09-07 and is stated precisely now, because the choice moves the level materially.* The denominator is **every** person aged 25–64 including SUN level `US` — *uppgift om utbildningsnivå saknas*. Excluding the unknowns instead would raise Danderyd from 61.17 to 63.27 and Filipstad from 11.89 to 12.28 (2024), so the choice shifts levels by roughly 0.4–2.1 points and shifts them *unevenly*, more for high-education kommuner. It barely moves the ranking, but `edu_share` is the dominant cross-sectional driver (β × SD = +10.03), so any figure quoted from it depends on this convention. Verified live against SCB on 2026-09-07: the panel reproduces the with-`US` definition exactly (max abs diff 0.0).

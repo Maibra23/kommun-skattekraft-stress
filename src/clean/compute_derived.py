@@ -5,8 +5,11 @@ Three functions cover all derived variables needed by the regression model:
   - compute_dependency_ratio: pivots long-format population to wide and
     computes (pop_0_19 + pop_65plus) / pop_20_64 per (kommun, year).
 
-  - compute_population_growth: sums population across age groups and computes
-    year-over-year percent change per kommun.
+  - compute_population_growth: takes SCB's published population totals and
+    computes year-over-year percent change per kommun.  It falls back to
+    summing the age groups only when no totals are supplied, which is exact
+    for BefolkningNy but not for the disclosure-protected BefolkningCKM —
+    see METHODOLOGY §12.8.
 
   - compute_tax_base_growth: computes year-over-year percent change in
     tax_base_per_capita per kommun.

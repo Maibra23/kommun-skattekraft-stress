@@ -1,23 +1,38 @@
 """Fetch municipal population data from SCB table BE0101.
 
-Downloads folkmängd by single-year age and sex for all 290 kommuner for the
-years 2009–2024 (16 years; 2009 required to compute 2010 growth) using the
-generic pxweb_client.  Queries are chunked one year at a time to stay under
-the PxWeb cell limit (~150 000 cells per request).
+Covers 2009–2025 for all 290 kommuner (2009 is required only to compute 2010
+growth) using the generic pxweb_client.  Queries are chunked one year at a
+time to stay under the PxWeb cell limit (~150 000 cells per request).
 
-Raw per-year responses are cached to data/raw/population_{year}.json.
-Returns a tidy long-format DataFrame with columns:
-    [kommun_kod, year, age_group, population]
-where age_group is one of '0-19', '20-64', '65+'.
+**Two functions, because two different numbers are needed and only one of
+them can be assembled here** (METHODOLOGY §12.8):
 
-These columns feed:
-  - dependency_ratio = (pop_0_19 + pop_65plus) / pop_20_64
-  - population_growth_pct = year-over-year percent change in total population
+  * ``fetch_population`` returns the age-group breakdown, long-format:
+    [kommun_kod, year, age_group, population] with age_group in
+    '0-19', '20-64', '65+'.  It feeds ``dependency_ratio``.
+  * ``fetch_population_total`` returns SCB's **own published** all-ages total
+    per kommun.  It feeds ``population`` and ``population_growth_pct``.
+
+The split is not tidiness.  SCB published 2025 in ``BefolkningCKM``, whose
+cells are disclosure-protected: its published totals exceed the sum of the
+categories beneath them in every dimension, so no client-side sum reproduces
+them.  Summing ~200 single-year cells per kommun left the smallest kommuner
+1 % short — one full SD of ``population_growth_pct``.  ``BefolkningNy``
+(2010–2024) has no such gap and its parts sum to its total exactly.
+
+Age codes are therefore requested as the coarsest aligned set each table
+offers: 5-year bands for CKM, single years for BefolkningNy, which declares
+no bands.  Fewer summed cells means less accumulated perturbation.  Every
+fetch is checked against the published totals and raises on disagreement.
+
+Raw per-year responses are cached to data/raw/population_{year}.json and
+data/raw/population_total_{year}.json.  A cache is rejected when it was
+fetched with different age codes than the current query requests: changing
+the query shape leaves a cache fresh by age but wrong in content.
 
 Note: this module implements its own per-year loop with per-year caching
-rather than using chunk_query_by_year from pxweb_client.  The per-year cache
-files (data/raw/population_{year}.json) enable incremental re-fetching of
-individual years without re-downloading the full 16-year series.
+rather than using chunk_query_by_year from pxweb_client, so individual years
+can be re-fetched without re-downloading the whole series.
 """
 
 import logging
@@ -110,15 +125,20 @@ def fetch_population(
 ) -> pd.DataFrame:
     """Fetch population data for all 290 kommuner from SCB BE0101.
 
-    Queries single-year age data for both sexes, then aggregates to three
-    broad age groups (0-19, 20-64, 65+).  Each year is fetched as a separate
-    PxWeb POST to stay under the cell limit (290 x 101 ages x 2 sexes = 58 580
-    cells per year, well under the 150 000-cell limit).
+    Queries whichever age codes the year's table offers — 5-year bands where
+    they exist, single years otherwise — for both sexes, then aggregates to
+    three broad age groups (0-19, 20-64, 65+).  Each year is a separate PxWeb
+    POST, well under the 150 000-cell limit either way: 290 x 101 ages x 2
+    sexes = 58 580 cells, or 290 x 21 bands x 1 = 6 090.
+
+    The result is then checked against SCB's own published totals, which are
+    fetched by ``fetch_population_total``; see METHODOLOGY §12.8 for why the
+    sum cannot be trusted to reproduce them.
 
     Per-year raw JSON is cached at data/raw/population_{year}.json.
 
     Args:
-        years: List of integer years to include.  Defaults to 2009–2024.
+        years: List of integer years to include.  Defaults to 2009–2025.
         force_refresh: If True, ignore per-year caches and re-fetch from API.
 
     Returns:
@@ -126,7 +146,9 @@ def fetch_population(
         population].  Exactly 290 x len(years) x 3 rows.
 
     Raises:
-        ValueError: If API calls fail after retries, or shape / sanity checks fail.
+        ValueError: If API calls fail after retries, if shape or sanity checks
+            fail, or if the summed age groups disagree with SCB's published
+            totals beyond the tolerances in METHODOLOGY §6.2.
     """
     if years is None:
         years = _DEFAULT_YEARS

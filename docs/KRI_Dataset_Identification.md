@@ -142,6 +142,7 @@ After fetching, verify:
 * Exactly 290 unique `kommun_kod` values per year
 * `Danderyd` (kod 0162) has the highest 2024 value (observed: 481 069 SEK)
 * Unweighted mean of 2024 values within 200 000-350 000 SEK range (observed: 230 660 SEK). Note: SCB's published "riksmedelvärde" (~271 000 SEK) is population-weighted and therefore higher than the unweighted municipality mean
+* **The two ContentsCodes must agree with each other** *(added 2026-09-07)*: `OE0101B0` must equal `100 x kommun / riket` to within SCB's own rounding of the index to whole percent. Riket is not fetched — it is implied by the 290 kommuner, estimated as the median of `100 x per_capita / index`, which reproduced SCB's published riksmedelvärde to within 0.008 % (251 418 against 251 437 for 2024). Observed worst deviation 0.495-0.550 across 2009-2026, against a limit of 0.75. The implied riket is also bounded to 100 000-500 000 SEK, because the ratio test alone is scale-invariant and would not notice a fraction-vs-percent index. Catches a positionally-read ContentsCode, a rescaled index, or a changed index base
 
 ---
 
@@ -239,7 +240,12 @@ Annual, published mid-year for previous reference year.
 * **API endpoint base:** `https://api.scb.se/OV0104/v1/doris/sv/ssd/START/BE/BE0101/BE0101A/`
 
 ### Definition
-Folkmängd by kommun, single-year age, sex. We aggregate to age groups for our derived variables.
+Folkmängd by kommun, age, sex. Two different figures are taken from this table and they are **not** the same number computed two ways:
+
+* the **age breakdown**, aggregated to `0-19` / `20-64` / `65+`, which feeds `dependency_ratio`;
+* SCB's **published all-ages total** per kommun, which feeds `population` and `population_growth_pct`.
+
+The total is read, never summed. See known issue 4 and METHODOLOGY 12.8.
 
 ### Coverage
 * **Time:** 1968 onwards (we use 2009-2025 to compute population_growth_pct for 2010-2025). **Two tables:** `BefolkningNy` is frozen at 2024 and `BefolkningCKM` carries 2025, with different ContentsCodes, age codes and elimination behaviour. Years are routed by each table's declared `Tid`. See METHODOLOGY 12.7.
@@ -256,30 +262,51 @@ region_codes = sorted(
     if len(c) == 4 and c.isdigit()
 )
 
-# Step 2: POST one query per year (chunked to stay under cell limit)
+# Step 2: POST one query per year (chunked to stay under cell limit).
+# Every code below is resolved from that table's own metadata, never hardcoded:
+# ContentsCode is matched on the valueText "Folkmängd" (its sibling is
+# Folkökning, population *change*); Alder prefers a complete 5-year band set
+# and falls back to single years; Civilstand is pinned only when the dimension
+# does not eliminate.
 query_body = {
     "query": [
         {"code": "Region", "selection": {"filter": "item", "values": region_codes}},
-        {"code": "Alder", "selection": {"filter": "item", "values": [
-            *[str(a) for a in range(0, 100)], "100+"
-        ]}},
+        {"code": "Alder", "selection": {"filter": "item", "values": _age_codes(meta)}},
         {"code": "Kon", "selection": {"filter": "item", "values": ["1", "2"]}},
-        {"code": "ContentsCode", "selection": {"filter": "item", "values": ["BE0101N1"]}},
+        # BefolkningCKM only — BefolkningNy eliminates this dimension:
+        {"code": "Civilstand", "selection": {"filter": "item", "values": ["SC"]}},
+        {"code": "ContentsCode", "selection": {"filter": "item", "values": [_contents_code(meta)]}},
         {"code": "Tid", "selection": {"filter": "item", "values": [str(year)]}}  # one year at a time
+    ],
+    "response": {"format": "json"}
+}
+
+# Step 3: POST a second, tiny query per year for SCB's published total.
+# This is the authoritative population; it is never derived by summing step 2.
+total_body = {
+    "query": [
+        {"code": "Region", "selection": {"filter": "item", "values": region_codes}},
+        {"code": "Alder", "selection": {"filter": "item", "values": ["TotSA"]}},   # 'tot' on BefolkningNy
+        {"code": "Kon", "selection": {"filter": "item", "values": ["TotSa"]}},     # ['1','2'] on BefolkningNy
+        {"code": "Civilstand", "selection": {"filter": "item", "values": ["SC"]}},
+        {"code": "ContentsCode", "selection": {"filter": "item", "values": [_contents_code(meta)]}},
+        {"code": "Tid", "selection": {"filter": "item", "values": [str(year)]}}
     ],
     "response": {"format": "json"}
 }
 ```
 
 ### Expected row count and chunking
-* 290 kommuner x 101 ages x 2 sexes x 16 years = **937 280 cells total**
+* Single years: 290 kommuner x 101 ages x 2 sexes x 17 years = **995 540 cells total**
 * **Exceeds pxweb cell limit (~150 000).** Chunked by year.
-* **Chunking strategy:** One year per POST to 290 x 101 x 2 = 58 580 cells per query. Well under limit. 16 sequential queries with per-year caching (`data/raw/population_{year}.json`).
-* After fetching, single-year ages are aggregated to three broad age groups: `0-19`, `20-64`, `65+` (summing across both sexes). This produces 290 x 3 age groups per year.
+* **Chunking strategy:** One year per POST — 290 x 101 x 2 = 58 580 cells on `BefolkningNy`, or 290 x 21 bands x 1 = 6 090 on `BefolkningCKM`, which offers 5-year bands. Both are well under the limit. Per-year caching (`data/raw/population_{year}.json`); a cache fetched with different age codes than the current query requests is rejected rather than reused.
+* **The coarsest aligned age codes the table offers are preferred**, because every summed cell adds disclosure noise (known issue 4). Bands are all-or-nothing — a partial set would leave a hole — and no band spanning 20 or 65 is ever selected: a 10-year band such as `60-69` would put 65-69 year-olds in the working-age denominator.
+* After fetching, ages are aggregated to three broad groups: `0-19`, `20-64`, `65+` (summing across both sexes where the table has no sex total). This produces 290 x 3 age groups per year.
+* **Plus one small query per year for the published total** (`data/raw/population_total_{year}.json`): `Alder=TotSA, Kon=TotSa, Civilstand=SC` on `BefolkningCKM`, `Alder='tot'` summed over both sexes on `BefolkningNy`, which declares no sex total. 290 or 580 cells.
 
 ### Derived variables
 * `dependency_ratio_t = (pop_aged_0_19_t + pop_aged_65plus_t) / pop_aged_20_64_t`
-* `population_total_t = sum over all ages`
+* `population_total_t` = **SCB's published all-ages total**, not a sum over ages
 * `population_growth_pct_t = (population_total_t / population_total_{t-1} - 1) * 100`
 
 ### Join key
@@ -292,9 +319,11 @@ Annual, published February for previous year-end.
 1. **Value-set filter deprecated:** `vs:RegionKommun07EjAggr` returns HTTP 400. Pipeline uses explicit codes from metadata. See METHODOLOGY 12.1.
 2. **Table URL may change:** Primary table `BefolkningNy` has a fallback to `FolkmangdNov`. The fetcher tries both.
 3. **Long-format output:** The aggregated DataFrame has 3 rows per (municipality, year) - one per age group. The `validate_and_harmonize` step in `build_panel.py` uses a deduplicated slice to avoid false duplicate errors.
+4. **`BefolkningCKM`'s cells are disclosure-protected; its parts do not sum to its totals.** *(Found 2026-09-07.)* Its published marginal totals exceed the sum of the categories beneath them in every dimension — for Stockholm 2025, `Kon=TotSa` exceeds män+kvinnor by 7, `Alder=TotSA` exceeds the sum of single years by 2, `Civilstand=SC` exceeds the four statuses by 4. Summing ~200 cells per kommun therefore ran **1.005 % short in Överkalix**, one full SD of `population_growth_pct`. `BefolkningNy` has no such gap: its single ages sum to its published `tot` exactly, all 290 kommuner. Hence the split in the Definition above — read the total, sum only what has to be summed, and prefer bands over single years. See METHODOLOGY 12.8.
 
-### Verification check (Day 1)
-* National total approximately matches SCB published 10.55 million (observed 2024: 10 587 710)
+### Verification check
+* **Summed age groups against SCB's published total for the same kommun**: within 1.5 % per kommun and 0.05 % nationally, hard-checked on every fetch. Observed 2026-09-07: 0.0000 % for every year 2009-2024; 0.0015 % national and 0.4662 % worst kommun for 2025.
+* National total matches SCB exactly (observed 2025: 10 605 520; 2024: 10 587 710)
 * Stockholm kommun (kod 0180) is largest by population (observed: 995 574)
 * Bjurholm (kod 2403) or similar small Norrland kommun is among smallest
 * `dependency_ratio` range approximately 0.5-1.25 nationally (observed: 0.508-1.241), with rural kommuner higher
@@ -372,6 +401,8 @@ Annual, typically published April-May.
 * Lund kommun (kod 1281) and Stockholm should have highest values
 * Rural Norrland kommuner should have lowest
 * National mean approximately 19-20 % for SUN codes 6+7 only (observed: 19.5 %). Note: the broader "all post-secondary" figure (~30 %) includes SUN code 5 (eftergymnasial <3 år), which we exclude
+* **The denominator includes SUN `US`, uppgift saknas** *(documented 2026-09-07)*. Excluding unknowns instead would raise Danderyd from 61.17 to 63.27 and Filipstad from 11.89 to 12.28 for 2024, so any quoted level depends on this convention. See METHODOLOGY 2.2
+* **Disclosure-protection probe** *(added 2026-09-07)*: `edu_share` sums roughly 640 cells per kommun (40 ages x 8 levels x 2 sexes), which makes it the most exposed variable if SCB ever protects UF0506 the way it protects `BefolkningCKM` (section 4, known issue 4). Each cold fetch sums single ages 16-74 for a sample of kommuner and requires exact equality with the published `tot16-74`. Observed 2026-09-07: exact for all 290 kommuner in both 2024 and 2025 — the table is not protected, and this check is what will say so if that changes
 
 ---
 
@@ -492,7 +523,7 @@ Save log to `data/raw/pipeline.log` for traceability.
 
 `python pipeline.py` should be:
 * **Idempotent:** Running twice produces the same artifacts
-* **Cached:** If `data/raw/` files exist and were fetched within 7 days, reuse them. CLI flag `--force-refresh` to override.
+* **Cached:** If `data/raw/` files exist and were fetched within 7 days, reuse them. CLI flag `--force-refresh` to override. **Age alone is not sufficient**: skattekraft rejects a cache that predates a needed column or year (`_cache_shortfall`), and population rejects one fetched with different age codes than the current query requests (`_cache_matches_query`). A cache can be fresh and still wrong in shape.
 * **Fast on cached:** Under 30 seconds when all raw data is cached
 * **Slow on fresh:** 2-5 minutes including pxweb calls (depends on SCB API responsiveness)
 
