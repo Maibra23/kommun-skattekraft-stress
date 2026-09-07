@@ -141,7 +141,15 @@ class TestDrift:
 
 
 class TestStability:
-    """The claim that justifies making this the product's headline."""
+    """The claim that justifies making this the product's headline.
+
+    These lock the position-derived findings in REMEDIATION_PLAN.md §1.2.
+    They are deliberately *not* marked ``baseline``: unlike the model figures
+    in tests/test_audit_baseline.py, these describe the descriptive spine,
+    which the remediation keeps rather than retires. They should hold forever.
+
+    Verified against the audit on 2026-09-07 — see the §13 entry for that date.
+    """
 
     @staticmethod
     def _spearman(result, lag):
@@ -150,7 +158,59 @@ class TestStability:
         return np.mean([piv[a].corr(piv[b], method="spearman") for a, b in pairs])
 
     def test_one_year_rank_stability_above_098(self, result):
+        """Audit: 0.992. Recomputed 2026-09-07: 0.9924."""
         assert self._spearman(result, 1) > 0.98
 
     def test_ten_year_rank_stability_above_090(self, result):
+        """Audit: 0.915. Recomputed 2026-09-07: 0.9299.
+
+        The 0.008 gap against the audit is windowing detail (which year pairs
+        are averaged), not a disagreement — both say the same thing.
+        """
         assert self._spearman(result, 10) > 0.90
+
+    def test_variance_in_position_is_overwhelmingly_between_kommuner(self, result):
+        """Audit: 98.3 %. Recomputed 2026-09-07: 98.0 % on the full panel.
+
+        This is the single number that condemns the old specification: entity
+        fixed effects delete this share of the variation the ranking is about.
+        """
+        grand = result["relative_position"].mean()
+        kommun_means = result.groupby("kommun_kod")["relative_position"].mean()
+        n = result.groupby("kommun_kod").size()
+        between = (n * (kommun_means - grand) ** 2).sum()
+        total = ((result["relative_position"] - grand) ** 2).sum()
+        assert between / total > 0.95
+
+
+class TestGrowthIsNotPredictable:
+    """The other half of the argument: why position replaced growth as the target.
+
+    Position is near-frozen (above); the growth rate the old model predicted is
+    serially unpredictable. Both must hold for the remediation's premise.
+    """
+
+    def test_growth_persistence_is_near_zero_after_removing_year_effects(self, panel):
+        """Audit: −0.06. Recomputed 2026-09-07: −0.0537.
+
+        **The demeaning is the whole point and the audit's table omits it.**
+        Raw pooled autocorrelation is +0.153, which looks like persistence but
+        is national wage growth moving every kommun together. What a two-way FE
+        model could actually exploit is what remains after the year effect is
+        removed, and that is indistinguishable from noise.
+        """
+        d = panel.dropna(subset=["tax_base_growth_pct"]).sort_values(
+            ["kommun_kod", "year"]
+        ).copy()
+        d["demeaned"] = d["tax_base_growth_pct"] - d.groupby("year")[
+            "tax_base_growth_pct"
+        ].transform("mean")
+        d["lagged"] = d.groupby("kommun_kod")["demeaned"].shift(1)
+        d = d.dropna(subset=["demeaned", "lagged"])
+
+        persistence = d["demeaned"].corr(d["lagged"])
+        assert abs(persistence) < 0.15, (
+            f"Year-demeaned growth persistence is {persistence:+.4f}. The audit "
+            "measured -0.06; if this has become substantial, the claim that the "
+            "growth target is unpredictable no longer holds."
+        )

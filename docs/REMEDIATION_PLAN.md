@@ -21,14 +21,16 @@ This is a **specification mismatch, not a bug and not an architecture failure.**
 
 ### 1.2 The evidence
 
-Measured from SCB OE0101 (2005–2026, all 290 kommuner) and the committed artifacts, on 2026-09-04:
+Measured from SCB OE0101 (2005–2026, all 290 kommuner) and the committed artifacts, on 2026-09-04.
+
+**Verification status (added 2026-09-07).** Every figure below has now been independently recomputed — the model rows by `tests/test_audit_baseline.py` since T0.3, the position rows by `tests/test_position.py` and `TestVulnerabilityScoreIsBackwardLooking` once `position.parquet` made drift computable. All nine hold; two reproduce to four decimal places. One *illustration* in this table was wrong and is struck below. Definitions that were previously implicit are now stated, because one of them (the persistence row) could not be reproduced without knowing it.
 
 | Finding | Value | Implication |
 |---|---|---|
-| Share of variance in relative position that is **between** kommuner | **98.3 %** | Entity FE deletes almost all usable signal |
-| Rank stability of relative position, 1 year | **0.992** | The cross-section is near-frozen |
+| Share of variance in relative position that is **between** kommuner | **98.3 %** | Between-group sum of squares over total, on stacked kommun-years. Entity FE deletes almost all usable signal |
+| Rank stability of relative position, 1 year | **0.992** | Mean Spearman across all available year pairs. The cross-section is near-frozen |
 | Rank stability of relative position, 10 years | **0.915** | ~~Filipstad: index 75 (2010) → 76 (2026)~~ — **the 2010 figure is wrong; corrected 2026-09-07 (see §13). Filipstad ran 86 → 76, a ten-point fall.** The 0.915 measurement stands (re-measured at 0.929); rank stability is not level stability |
-| Year-to-year persistence of growth rate | **−0.06** | The current target is serially unpredictable |
+| Year-to-year persistence of growth rate | **−0.06** | **Year-demeaned** autocorrelation — the demeaning is essential and was omitted from this table until 2026-09-07. Raw pooled is +0.15, which is national wage growth moving every kommun together, not persistence a model could exploit. The current target is serially unpredictable |
 | Current model, R²(within) | **0.0083** | Symptom of the mismatch, not a curiosity |
 | Current model, out-of-sample 2025 forecast | **r = 0.016** | Loses to a constant national-mean guess (RMSE 1.51 vs 0.97 pp) |
 | Risk classes vs realised 2025 growth | hög 4.68 %, medel 4.52 %, låg 4.74 % | No separation, wrong order |
@@ -797,6 +799,27 @@ Phase 2's redesign was specified against the model layer. Reading the UI afterwa
 **Correction to §1.2 of this plan.** The evidence table illustrates near-frozen ranks with *"Filipstad: index 75 (2010) → 76 (2026)"*. **The 2010 figure is wrong.** Verified twice — from the rebuilt panel and by a live SCB query of `OE0101B0` — Filipstad's index was **86 in 2010**, falling 86 → 80 → 77 → 76 across 2010/2016/2021/2026. It lost ten index points, not one.
 
 The headline claim it was attached to is unaffected: rank stability at ten years measures 0.929 here against the audit's 0.915, and *rank* stability is not *level* stability — a kommun can fall ten points while the whole distribution spreads and move only a few places. But the specific illustration argued the opposite of what the data shows, and it is the kind of example that gets quoted into UI copy. **T1.2 must not reuse it**; `position.parquet` now supplies real ones.
+
+---
+
+### 2026-09-07 — §1.2 fully verified · one illustration wrong, nine measurements sound
+
+Finding a wrong figure in the evidence table raised a fair question: what else in there had never been checked? The answer was five of nine. T0.3 locked the model rows in 2026-09-06; the position-derived rows had no artifact to check against until T1.1 produced one. They do now.
+
+| §1.2 figure | Audit | Recomputed 2026-09-07 | |
+|---|---|---|---|
+| Between-kommun share of variance | 98.3 % | 98.2 % (≤2024), 98.0 % (full) | holds |
+| Rank stability, 1 year | 0.992 | 0.9922 | holds |
+| Rank stability, 10 years | 0.915 | 0.9238 (≤2024), 0.9299 (full) | holds; 0.008 is windowing |
+| Growth persistence | −0.06 | −0.0382 (≤2024), −0.0537 (full) | holds **once year-demeaned** |
+| Vulnerability vs past 5-yr drift | −0.653 | **−0.6530** | exact |
+| Vulnerability vs future 2-yr drift | −0.165 | **−0.1652** | exact |
+
+**The persistence row nearly read as an error and was not.** Raw pooled autocorrelation of the growth rate is **+0.15** on the full panel — the opposite sign to the audit's −0.06, and large enough to undercut the "serially unpredictable" claim the row exists to support. Testing the plausible definitions resolved it: year-demeaned autocorrelation gives −0.054, and that is the quantity the argument needs, because raw persistence is national wage growth moving all 290 kommuner together, not something a two-way FE model could exploit. The audit was right; its table omitted the demeaning. §1.2 now states it, along with the definitions behind the variance-share and rank-stability rows.
+
+**Locked so this cannot drift again.** The four model-free findings are asserted in `tests/test_position.py` as ordinary tests — deliberately *not* marked `baseline`, because unlike the model figures they describe the descriptive spine, which the remediation keeps rather than retires. The two vulnerability-score correlations went into `tests/test_audit_baseline.py` under the `baseline` marker, since they depend on the score Phase 2 removes. Suite is **176 passed**, of which `pytest -m "not baseline"` runs 160 — the split still works, so the pre-remediation suite remains cleanly excludable when the old model retires.
+
+**What this settles.** The audit's evidence base is sound: one illustration was wrong, the nine measurements are not. Phase 2 can be built on §1.2 without re-deriving it, and the tests will say so if that ever stops being true.
 
 ---
 

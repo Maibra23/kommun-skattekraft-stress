@@ -181,3 +181,55 @@ class TestBacktest2025:
     def test_predicted_dispersion_is_too_narrow(self, predictions, actual_2025):
         df = self._merged(predictions, actual_2025)
         assert df["predicted_growth_2025"].std() < 0.5 * df["actual_growth_2025"].std()
+
+
+class TestVulnerabilityScoreIsBackwardLooking:
+    """The audit's sharpest finding: the score describes the past, not the future.
+
+    Added 2026-09-07. These two figures sat in REMEDIATION_PLAN.md §1.2
+    unverified until artifacts/position.parquet made drift computable; both
+    then reproduced to four decimal places (-0.6530 and -0.1652 against the
+    audit's -0.653 and -0.165).
+
+    They live here rather than in test_position.py because they depend on the
+    pre-remediation vulnerability score, which Phase 2 retires.
+    """
+
+    @staticmethod
+    def _scored_with_drift() -> pd.DataFrame:
+        ranking = pd.read_parquet(_ARTIFACTS_DIR / "ranking.parquet")
+        position = pd.read_parquet(_ARTIFACTS_DIR / "position.parquet")
+
+        past = position.loc[position.year == 2024, ["kommun_kod", "drift_5y"]]
+        pivot = position.pivot_table(
+            index="kommun_kod", columns="year", values="relative_position"
+        )
+        future = (pivot[2026] - pivot[2024]).rename("future_drift_2y").reset_index()
+
+        return (
+            ranking[["kommun_kod", "vulnerability_score"]]
+            .merge(past, on="kommun_kod")
+            .merge(future, on="kommun_kod")
+        )
+
+    def test_score_tracks_past_drift_strongly(self):
+        """Audit: -0.653. It is a descriptor of where a kommun has already been."""
+        df = self._scored_with_drift()
+        r = df["vulnerability_score"].corr(df["drift_5y"])
+        assert r == pytest.approx(-0.653, abs=0.02)
+
+    def test_score_tracks_future_drift_weakly(self):
+        """Audit: -0.165. Yet it is presented to users as forward-looking."""
+        df = self._scored_with_drift()
+        r = df["vulnerability_score"].corr(df["future_drift_2y"])
+        assert r == pytest.approx(-0.165, abs=0.02)
+
+    def test_backward_association_dominates_forward(self):
+        """The comparison is the finding, not either number alone."""
+        df = self._scored_with_drift()
+        past = abs(df["vulnerability_score"].corr(df["drift_5y"]))
+        future = abs(df["vulnerability_score"].corr(df["future_drift_2y"]))
+        assert past > 3 * future, (
+            f"Baseline asserts the score is backward-looking: |past| {past:.3f} "
+            f"vs |future| {future:.3f}"
+        )
