@@ -166,14 +166,6 @@ SWEDISH_LABELS = {
         "varandra. Resultatet är en förklaring av kommunens läge, inte en "
         "prognos för nästa år."
     ),
-    "landing_model_example": (
-        "Filipstad ligger 16,7 indexenheter under riksgenomsnittet. Modellen "
-        "hänför 12,9 av dem till utbildningsnivån och 4,0 till "
-        "arbetslösheten, och lämnar 0,1 oförklarat. Danderyd ligger 99,3 "
-        "enheter över. Där förklarar samma modell knappt hälften. Sambandet "
-        "är starkast i mitten av fördelningen och svagast i toppen."
-    ),
-    "landing_model_expander": "Hur läser jag diagrammet?",
     "landing_vars_explanation": (
         "Varje punkt är effekten av en variabel, mätt i indexenheter per "
         "standardavvikelse. Strecket genom punkten är ett 95-procentigt "
@@ -182,13 +174,65 @@ SWEDISH_LABELS = {
         "kontroll snarare än som drivkraft."
     ),
     "landing_vars_example": (
-        "Exempel: utbildningsnivån ligger på +10,0 indexenheter. En kommun "
-        "vars andel eftergymnasialt utbildade är en standardavvikelse högre "
-        "än en annans ligger alltså ungefär 10 indexenheter högre i "
-        "skattekraft. Det är ett starkt och robust samband, men det ligger "
-        "nära en omskrivning av samma sak, inte en knapp att trycka på."
+        "**Ett scenario**"
+        "\n\n"
+        "Du är ekonomichef i en kommun som ligger på index 84, alltså 16 "
+        "indexenheter under riksgenomsnittet. Du vill veta vad den skillnaden "
+        "består av innan du tar den vidare till nämnden. Diagrammet ovan "
+        "svarar på precis den frågan, och det svarar inte på frågan om vad "
+        "som skulle hända om ni ändrade något."
+        "\n\n"
+        "**Så läser du diagrammet**"
+        "\n\n"
+        "Punkten är effekten av en variabel och strecket genom den är ett "
+        "95-procentigt konfidensintervall."
+        "\n\n"
+        "Den streckade nollinjen avgör tolkningen. Ligger hela strecket på "
+        "ena sidan av linjen skiljer variabeln kommuner åt. Rör strecket "
+        "linjen går effekten inte att skilja från noll, och punkten ritas "
+        "grå. En grå variabel finns kvar i modellen som kontroll, men den "
+        "förklarar inte varför en kommun ligger högre än en annan."
+        "\n\n"
+        "Effekten mäts per standardavvikelse i stället för per enhet. Det "
+        "behövs för att de fyra variablerna ska gå att jämföra med varandra: "
+        "en försörjningskvot rör sig mellan 0,5 och 1,2 medan "
+        "utbildningsandelen rör sig mellan 6 och 61 procent, så råa "
+        "koefficienter säger ingenting om vilken variabel som betyder mest."
+        "\n\n"
+        "**Vad diagrammet säger just nu**"
+        "\n\n"
+        "Utbildningsandelen ligger på +10,0 indexenheter per "
+        "standardavvikelse, med intervallet +6,4 till +13,7. Hela strecket "
+        "ligger klart över noll. Öppen arbetslöshet ligger på -2,7 med "
+        "intervallet -3,8 till -1,5, alltså helt under noll."
+        "\n\n"
+        "Försörjningskvoten ligger på -0,6 med intervallet -2,4 till +1,2, "
+        "som omsluter noll. Räknat i råa koefficienter ser försörjningskvoten "
+        "störst ut av alla fyra. Räknat i verklig effekt mellan kommuner går "
+        "den inte att skilja från ingenting."
+        "\n\n"
+        "**Två färdiga uträkningar**"
+        "\n\n"
+        "Filipstad ligger 16,7 indexenheter under riksgenomsnittet. Modellen "
+        "hänför 12,9 av dem till utbildningsnivån och 4,0 till "
+        "arbetslösheten, och lämnar 0,1 oförklarat."
+        "\n\n"
+        "Danderyd ligger 99,3 enheter över, och där förklarar samma modell "
+        "knappt hälften. Sambandet är starkast i mitten av fördelningen och "
+        "svagast i toppen, så för de allra rikaste kommunerna ska "
+        "dekomponeringen läsas med försiktighet."
+        "\n\n"
+        "**Det viktigaste förbehållet**"
+        "\n\n"
+        "Utbildningsandelen samvarierar 0,81 med skattekraften. Sambandet är "
+        "robust, men det ligger nära en omskrivning av samma sak: en "
+        "befolkning med höga inkomster och en befolkning med lång utbildning "
+        "är i stor utsträckning samma befolkning. Stapelns längd säger alltså "
+        "inte hur mycket skattekraft en utbildningssatsning skulle ge."
     ),
-    "landing_vars_expander": "Hur tolkar jag koefficienterna?",
+    "landing_vars_expander": (
+        "Hur läser jag diagrammet? Med exempel"
+    ),
     "landing_nav_explanation": (
         "Dashboarden har två huvudvyer. Välj den som passar din frågeställning."
     ),
@@ -550,26 +594,6 @@ SWEDISH_LABELS = {
     "vars_table_interpretation": "Tolkning",
 
     # Graph explanations (collapsible, standardized)
-    "explain_coef_chart_expander": "Hur läser jag detta diagram?",
-    "explain_coef_chart_text": (
-        "Diagrammet visar effekten per standardavvikelse, i indexenheter. "
-        "Måttet behövs för att variablerna ska gå att jämföra med varandra: "
-        "de mäts i olika enheter, så råa koefficienter säger ingenting om "
-        "vilken som betyder mest."
-        "\n\n"
-        "Punkten är skattningen och strecket är dess 95-procentiga "
-        "konfidensintervall. Nollinjen är det som avgör: rör strecket den, "
-        "går effekten inte att skilja från noll, och punkten ritas grå. En "
-        "stapel från noll skulle dölja halva intervallet bakom sin egen "
-        "fyllning. Därför punkt och streck i stället."
-        "\n\n"
-        "Exempel: utbildningsandelen ligger på +10,0 indexenheter per "
-        "standardavvikelse med intervallet [+6,4, +13,7], och hela strecket "
-        "ligger klart över noll. Försörjningskvoten ligger på -0,6 med "
-        "intervallet [-2,4, +1,2], som omsluter noll. Räknat i råa "
-        "koefficienter ser försörjningskvoten störst ut av alla fyra; räknat "
-        "i verklig effekt går den inte att skilja från ingenting."
-    ),
     "explain_choropleth_expander": "Hur läser jag kartan?",
     "explain_choropleth_text": (
         "Kartan visar alla 290 kommuner. Vad färgen betyder beror på vilket "

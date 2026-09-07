@@ -270,9 +270,6 @@ st.html(f"""
 </div>
 """)
 
-with st.expander(SWEDISH_LABELS["landing_model_expander"]):
-    st.markdown(SWEDISH_LABELS["landing_model_example"])
-
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
@@ -432,10 +429,12 @@ with st.container(border=True):
     )
     st.dataframe(coef_table, use_container_width=True, hide_index=True)
 
+    # One guide rather than three. The scenario, the reading rules, the
+    # worked example and the caveat were spread over two cards and three
+    # expanders, so a reader had to assemble them; the example even sat under
+    # the model diagram, two cards above the chart it explains.
     with st.expander(SWEDISH_LABELS["landing_vars_expander"]):
         st.markdown(SWEDISH_LABELS["landing_vars_example"])
-    with st.expander(SWEDISH_LABELS["explain_coef_chart_expander"]):
-        st.markdown(SWEDISH_LABELS["explain_coef_chart_text"])
 
 # ---------------------------------------------------------------------------
 # Section 4b: Samband inom kommuner över tid (the FE panel, T2.4)
