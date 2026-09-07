@@ -440,12 +440,17 @@ with st.container(border=True):
             y=bar_labels,
             orientation="h",
             marker_color=[
-                COLORS["positive"] if v >= 0 else COLORS["negative"]
-                for v in bar_values
+                COLORS["text_tertiary"]
+                if label == SWEDISH_LABELS["var_residual"]
+                else (COLORS["positive"] if v >= 0 else COLORS["negative"])
+                for label, v in zip(bar_labels, bar_values)
             ],
             text=[format_index_points(v) for v in bar_values],
-            textposition="outside",
-            textfont={"family": "IBM Plex Mono", "size": 11},
+            # Inside: an outside label on a negative bar lands on the category
+            # name, given the wide left margin these labels need.
+            textposition="inside",
+            insidetextanchor="middle",
+            textfont={"family": "IBM Plex Mono", "size": 11, "color": "#FFFFFF"},
             hovertemplate=(
                 "<b>%{y}</b><br>%{x:+.2f} "
                 + SWEDISH_LABELS["unit_index_points"]
@@ -491,7 +496,7 @@ with st.container(border=True):
         control_rows.append(
             {
                 SWEDISH_LABELS["vars_table_variable"]: _VAR_LABELS.get(var, var),
-                SWEDISH_LABELS["unit_index_points"]: format_index_points(
+                SWEDISH_LABELS["decomp_contribution_col"]: format_index_points(
                     float(selected_decomp[col])
                 ),
                 SWEDISH_LABELS["vars_table_ci"]: ci,
