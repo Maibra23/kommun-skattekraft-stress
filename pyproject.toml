@@ -12,6 +12,7 @@ dependencies = [
     "pandas>=2.0",
     "pyarrow",
     "linearmodels>=6.0",
+    "statsmodels>=0.14",
     "streamlit>=1.30",
     "plotly>=5.0",
     "folium",

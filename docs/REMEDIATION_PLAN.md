@@ -2,8 +2,8 @@
 
 **Project:** Kommunal Skattekraft Stress Monitor
 **Created:** 2026-09-05
-**Last updated:** 2026-09-06
-**Status:** In progress — **Phase 0 complete** (steps 1, 2, 2b, 3 done 2026-09-06/07). Next: the post-Phase-0 GATE, then step 4 (T1.1).
+**Last updated:** 2026-09-07
+**Status:** In progress — **Phase 0 complete**; T1.1 and T2.1 done, both Phase-2 gates passed. Next: step 6 (T2.2 + T2.3, decomposition and diagnostics).
 **Trigger:** Skattekraft Model Audit, 2026-09-04
 **Audit report:** https://claude.ai/code/artifact/b3dfec90-7359-45fa-91d8-ea137080eb42
 
@@ -574,9 +574,9 @@ STEP  TASK                                            PHASE  DELEGATION
  [x] 3   T0.2  Extend full panel, handle ragged years    0    [SOLO]  done 2026-09-07
  [x] --- GATE  Re-run 2025 backtest on real data              PASSED 2026-09-07
  [x] 4   T1.1  Position and drift module                 1    [SOLO]  done 2026-09-07
- [ ] 5   T2.1  Cross-sectional estimator                 2    [SOLO]  <- NEXT
- ---     GATE  Cross-sectional R2 > 0.60
- [ ] 6   T2.2 + T2.3  Decomposition + diagnostics        2    [SOLO]  merged 2026-09-07
+ [x] 5   T2.1  Cross-sectional estimator                 2    [SOLO]  done 2026-09-07
+ [x] --- GATE  Cross-sectional R2 > 0.60                       PASSED 2026-09-07 (0.690-0.723)
+ [ ] 6   T2.2 + T2.3  Decomposition + diagnostics        2    [SOLO]  merged 2026-09-07  <- NEXT
  [ ] 7   T2.4  Demote FE to inference panel              2    [SOLO]
  [ ] 8a  T1.2  Dashboard leads with position/drift       1    [SOLO]
  [ ] 8b  T1.3  Show SCB index alongside                  1    [PARALLEL-A]
@@ -820,6 +820,39 @@ Finding a wrong figure in the evidence table raised a fair question: what else i
 **Locked so this cannot drift again.** The four model-free findings are asserted in `tests/test_position.py` as ordinary tests — deliberately *not* marked `baseline`, because unlike the model figures they describe the descriptive spine, which the remediation keeps rather than retires. The two vulnerability-score correlations went into `tests/test_audit_baseline.py` under the `baseline` marker, since they depend on the score Phase 2 removes. Suite is **176 passed**, of which `pytest -m "not baseline"` runs 160 — the split still works, so the pre-remediation suite remains cleanly excludable when the old model retires.
 
 **What this settles.** The audit's evidence base is sound: one illustration was wrong, the nine measurements are not. Phase 2 can be built on §1.2 without re-deriving it, and the tests will say so if that ever stops being true.
+
+---
+
+### 2026-09-07 — T2.1 complete · the fix lands, and the evidence block reproduces exactly
+
+**Done.** `src/model/estimate_cross.py` estimates the four structural variables on `tax_base_index_riket` with no entity effects: single-year HC3 for 2021–2024, plus a pooled spec with year effects and kommun-clustered SE. `tests/test_estimate_cross.py` adds 26 tests. Suite is **202 passed**, no regressions.
+
+**Both Phase-2 gates pass.** R² = 0.7023, 0.7115, 0.7228, 0.6900 — above 0.60 in all four years, so the gate holds from four independent directions rather than the single year the audit tested.
+
+**The evidence block reproduces to the decimal, through a different code path.** The 2026-09-07 numbers in T2.1 were computed ad hoc while diagnosing the task; this module recomputes them from the panel through the project's own code and lands on the same values:
+
+| Variable | β × SD | 95 % CI (SD units) | Verdict |
+|---|---|---|---|
+| `edu_share` | **+10.03** | [+6.36, +13.70] | driver |
+| `unemployment_rate` | **−2.69** | [−3.84, −1.53] | driver |
+| `dependency_ratio` | −0.64 | [−2.44, +1.15] | control, not identified |
+| `population_growth_pct` | −0.56 | [−1.98, +0.85] | control, not identified |
+
+As with T0.3's fixture, agreement across two independent implementations means the identification finding is a property of the data, not of how it was measured.
+
+**The identification bar is coded, not asserted by hand.** `_apply_identification_bar` applies the rule from T2.1 point 2 literally — interval excludes zero in the latest year *and* sign holds across 2021–2024 — and writes a boolean `identified` column. Nothing downstream has to re-derive the judgment or re-read the plan to know which variables may be drawn as bars.
+
+**The finding is regression-tested in both directions.** The suite asserts that education and unemployment exclude zero with the expected signs in every year, *and* that dependency ratio and population growth span zero in the latest year. Per the revised DoD the signs of all four are deliberately not asserted — that would lock noise into the suite for two of them. If the non-identification ever changes, a test fails and says so, rather than the change passing silently.
+
+**Two decisions beyond the written task.**
+- *`statsmodels` promoted to a declared dependency* in `requirements.txt` and `pyproject.toml`. It was already present transitively through `linearmodels`, so importing it worked locally — but the Streamlit Cloud deploy resolves from `requirements.txt`, and an undeclared transitive import is exactly the kind of thing that breaks on a dependency bump rather than on the commit that introduced it. `linearmodels` is kept: the FE model in `estimate.py` still uses `PanelOLS`, and T2.4 retains that model rather than deleting it.
+- *No shared artifact was touched.* `coefficients_cross.parquet` is a new file; `coefficients.parquet`, `decomposition.parquet` and the rest are byte-unchanged, so the deployed dashboard reads exactly what it read before. This follows T2.2's staging note, which was written for the decomposition but applies with equal force here.
+
+**One gap found on review and fixed: the module was not wired into `pipeline.py`.** `run_estimation_cross` existed and worked when invoked directly, but nothing called it, and `coefficients_cross.parquet` was absent from `_MODEL_ARTIFACTS`, so it was excluded from the freshness check too. The artifact would have silently gone stale the first time the panel changed — the same failure mode as T0.1's index column, which was computed correctly and then dropped before writing. Added as step 5b and verified by deleting the artifact and running `pipeline.py --force-refresh` from cold: it regenerates with identical values.
+
+**Independently audited on review**, not merely accepted: 202 tests re-run, the artifact checked against every clause of the revised DoD, and all four β × SD values plus their intervals reproduced against the ad-hoc computation from the T2.1 evidence block. The other artifacts were confirmed byte-identical (`max numeric diff 0.00e+00`), so the deployed dashboard is genuinely untouched rather than assumed to be.
+
+**Note for step 6.** T2.3's own reframing suggests folding the diagnostics into T2.1. Partly moot now: per-variable SD, β × SD, CI in SD units and `identified` are already emitted here, which is the half T2.3 called "the diagnostic this phase actually needs". What remains for T2.3 is genuinely separate — VIF and the condition number for **both** designs, where the within-design numbers are the ones that will show F3's problem. Recommend running T2.3 before or alongside T2.2 rather than after: T2.3 is what tells the decomposition how much to trust separating these variables into bars at all.
 
 ---
 

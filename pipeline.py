@@ -30,6 +30,7 @@ LOG_PATH = PROJECT_ROOT / "data" / "raw" / "pipeline.log"
 _MODEL_ARTIFACTS = [
     ARTIFACTS_DIR / "model_results.pkl",
     ARTIFACTS_DIR / "coefficients.parquet",
+    ARTIFACTS_DIR / "coefficients_cross.parquet",
 ]
 _PREDICTION_ARTIFACTS = [
     ARTIFACTS_DIR / "predictions.parquet",
@@ -176,6 +177,17 @@ def main() -> None:
             from src.model.estimate import run_estimation
 
             _run_step(5, "Estimate panel regression model", run_estimation)
+
+            # Step 5b: Cross-sectional estimate (REMEDIATION_PLAN.md T2.1).
+            # Writes its own artifact; the FE coefficients.parquet the deployed
+            # dashboard reads is left untouched until the T1.2 cutover.
+            from src.model.estimate_cross import run_estimation_cross
+
+            _run_step(
+                5,
+                "Estimate cross-sectional model (position on structural variables)",
+                run_estimation_cross,
+            )
 
             # Step 6: Predict
             from src.model.predict import run_prediction
