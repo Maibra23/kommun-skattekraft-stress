@@ -150,11 +150,37 @@ SWEDISH_LABELS = {
     "landing_stat_vars": "STRUKTURVARIABLER",
     "landing_stat_fe": "FIXED EFFECTS",
     "landing_stat_identified": "MÄTBARA DRIVKRAFTER",
+    # The stat strip is four numbers and four one-word labels. "2 mätbara
+    # drivkrafter" beside "4 strukturvariabler" is the single most important
+    # fact about the model, and it was left for the reader to notice.
+    "landing_stats_explanation": (
+        "Så läser du raden ovan. {kommuner} kommuner är samtliga kommuner i "
+        "Sverige, ingen är utelämnad. {years} år med data betyder att "
+        "underlaget sträcker sig från {first_year} till {last_year}. "
+        "{n_vars} strukturvariabler matas in i modellen: öppen arbetslöshet, "
+        "försörjningskvot, befolkningstillväxt och andel eftergymnasialt "
+        "utbildade. Av dem är det bara {n_identified} vars effekt går att "
+        "mäta säkert när kommuner jämförs med varandra, nämligen "
+        "utbildningsnivån och arbetslösheten. Övriga ingår som kontroller, "
+        "och deras effekt kan mycket väl vara noll."
+    ),
     "landing_model_title": "Modellöversikt",
     "landing_vars_title": "Variabler & koefficienter",
-    "landing_pipeline_title": "Pipelinesteg",
+    "landing_pipeline_title": "Så blir statistiken till siffrorna på sidan",
     "landing_nav_title": "Utforska dashboarden",
     "landing_sources_title": "Källor & metod",
+    # Four bare table codes. A reader could not tell which number came from
+    # which source, or that the oldest unemployment years are a saved copy.
+    "landing_sources_explanation": (
+        "Alla siffror kommer från SCB. Koderna är SCB:s egna namn på "
+        "tabellerna, så att den som vill kan hämta samma underlag själv. "
+        "OE0101 är den beskattningsbara inkomsten per invånare, alltså "
+        "skattekraften, och även SCB:s eget index. BE0101 är folkmängden, "
+        "som ger både befolkningstillväxt och försörjningskvot. AA0003 är "
+        "den öppna arbetslösheten; de äldsta åren finns inte längre kvar hos "
+        "SCB och läses från en sparad kopia i projektet. UF0506 är "
+        "utbildningsnivån i befolkningen."
+    ),
 
     # Landing page — section explanations (collapsible)
     "landing_model_explanation": (
@@ -243,6 +269,19 @@ SWEDISH_LABELS = {
     "landing_nav_kommun_desc": (
         "Detaljerad vy med historisk trend, strukturell "
         "dekomponering och jämförelse med liknande kommuner."
+    ),
+    # The four step boxes rendered with no heading and no explanation at all,
+    # so "Rensning" and "Estimering" were labels a reader had to guess at.
+    "landing_pipeline_explanation": (
+        "Ingen siffra på sidan är inmatad för hand. Underlaget går genom "
+        "fyra steg varje gång det uppdateras. Datainsamling hämtar "
+        "statistiken direkt från SCB:s öppna API. Rensning lägger ihop "
+        "källorna till en tabell med en rad per kommun och år, och rättar de "
+        "kommuner som slagits ihop eller delats sedan {first_year}. "
+        "Estimering skattar modellen och räknar fram varje kommuns läge mot "
+        "riksgenomsnittet. Förklaring delar upp det läget på de variabler "
+        "modellen kan mäta, och redovisar öppet hur stor del den inte kan "
+        "förklara."
     ),
     "landing_step_1": "Datainsamling",
     "landing_step_2": "Rensning",
@@ -347,6 +386,21 @@ SWEDISH_LABELS = {
     "kpi_index_spread": "Högsta / lägsta index",
     "kpi_largest_fall_10y": "Största fall, 10 år",
     "kpi_largest_rise_10y": "Största ökning, 10 år",
+    "kpi_index_spread_tooltip": (
+        "Den högsta och den lägsta kommunens index, där riksgenomsnittet är "
+        "100. Avståndet mellan talen visar hur olika kommunerna är: den "
+        "högsta har mer än dubbelt så stor skattekraft per invånare som den "
+        "lägsta."
+    ),
+    "kpi_largest_fall_tooltip": (
+        "Den kommun vars index sjunkit mest på tio år, mätt i indexenheter. "
+        "Ett fall betyder att kommunen vuxit långsammare än riket, inte att "
+        "skattekraften minskat."
+    ),
+    "kpi_largest_rise_tooltip": (
+        "Den kommun vars index stigit mest på tio år, mätt i indexenheter. "
+        "Kommunen har alltså vuxit snabbare än riket."
+    ),
     "kpi_cross_r2": "Modellens förklaringsgrad",
     "kpi_cross_r2_tooltip": (
         "Andel av skillnaderna i skattekraft mellan kommuner som de fyra "
@@ -371,7 +425,36 @@ SWEDISH_LABELS = {
         "{kommun} ligger på index <strong>{position}</strong> av "
         "riksgenomsnittet."
     ),
+    "kommun_kpi_explanation": (
+        "De fyra talen hör ihop två och två. De första två är samma sak mätt "
+        "på två sätt, och i båda är 100 genomsnittet: vårt index jämför med "
+        "genomsnittet av de 290 kommunerna, SCB:s med riksmedelvärdet där "
+        "varje invånare väger lika mycket. De sista två är förflyttning, "
+        "alltså hur många indexenheter kommunen flyttat sig på fem "
+        "respektive tio år. Ett minustal betyder att kommunen vuxit "
+        "långsammare än riket, inte att skattekraften minskat."
+    ),
     "chart_position_history": "Position över tid",
+    "chart_position_history_note": (
+        "Linjen visar vårt oviktade index, samma mått som det första "
+        "nyckeltalet ovanför. SCB:s index ligger något lägre och ritas inte "
+        "här."
+    ),
+    "explain_position_history_expander": "Hur läser jag diagrammet?",
+    "explain_position_history_text": (
+        "Linjen är kommunens skattekraft i procent av genomsnittet av de 290 "
+        "kommunerna, ett år i taget. Den streckade linjen vid 100 är det "
+        "genomsnittet, och den ligger på 100 varje år av konstruktion. "
+        "Diagrammet visar alltså inte om kommunen fått mer pengar, utan om "
+        "den flyttat sig i förhållande till de andra kommunerna."
+        "\n\n"
+        "**Exempel**: en linje som ligger stilla på 92 betyder att kommunen "
+        "legat 8 procent under genomsnittet hela perioden, även om "
+        "skattekraften i kronor stigit varje år. En linje som lutar nedåt "
+        "betyder att kommunen vuxit långsammare än de andra. Diagrammet "
+        "under det här visar samma kommun i kronor, och de två kan mycket "
+        "väl peka åt olika håll."
+    ),
     "axis_index": "Index (riket = 100)",
 
     # Decomposition of the position gap (T2.2)
@@ -550,6 +633,32 @@ SWEDISH_LABELS = {
     "backtest_naive": "Jämförelse: gissa genomsnittet",
     "backtest_persistence": "Jämförelse: anta att trenden fortsätter",
     "backtest_coverage": "Intervallets träffsäkerhet",
+    "backtest_coverage_sentence": (
+        "Intervallets träffsäkerhet: i efterhandstestet hamnade det verkliga "
+        "utfallet inom intervallet i {measured} av fallen, mot de {nominal} "
+        "intervallet är byggt för. Ligger de två talen nära varandra lovar "
+        "intervallet ungefär så mycket som det håller."
+    ),
+    "backtest_spearman_tooltip": (
+        "Hur väl prognosens ordning mellan kommuner stämmer med den verkliga "
+        "ordningen, på en skala från 0 till 1. 1 betyder exakt rätt ordning, "
+        "0 betyder att ordningen var slumpmässig."
+    ),
+    "backtest_rmse_tooltip": (
+        "Genomsnittligt fel i indexenheter när prognosen jämförs med vad som "
+        "faktiskt hände. Lägre är bättre, och talet säger ingenting ensamt: "
+        "det ska läsas mot de två jämförelserna bredvid."
+    ),
+    "backtest_naive_tooltip": (
+        "Samma fel för den enklaste tänkbara prognosen: att varje kommun rör "
+        "sig lika mycket som genomsnittet av alla kommuner gjorde senast. "
+        "Slår modellen inte det här talet är den inte värd att använda."
+    ),
+    "backtest_persistence_tooltip": (
+        "Samma fel för prognosen att kommunens rörelse de senaste fem åren "
+        "upprepas de kommande fem. Det är den svårare av de två "
+        "jämförelserna."
+    ),
     "backtest_verdict_better": (
         "Modellen slår båda jämförelserna. Den är ändå blygsam: en "
         "rangkorrelation på {rho} betyder att ordningen mellan kommuner till "
@@ -589,6 +698,14 @@ SWEDISH_LABELS = {
         "Försörjningskvoten har koefficienten -3,80, men den mäts som en kvot "
         "och inte i procent. En förändring på 0,1 motsvarar därför ungefär "
         "0,38 procentenheters lägre tillväxt, inte 3,8."
+        "\n\n"
+        "**Kolumnen Signifikans**"
+        "\n\n"
+        "Stjärnorna säger hur säkert sambandet är. Tre stjärnor betyder att "
+        "ett samband så starkt skulle uppstå av ren slump i mindre än ett "
+        "fall av tusen, två stjärnor i mindre än ett av hundra och en stjärna "
+        "i mindre än fem av hundra. Står det ej sign. går sambandet inte att "
+        "skilja från noll, och raden ska läsas som att vi inte vet."
         "\n\n"
         "**Varför den här tabellen inte kan rangordna kommuner**"
         "\n\n"
@@ -863,15 +980,20 @@ SWEDISH_LABELS = {
         "beskuren. Utan beskärning skulle nio kommuner av tio få samma färg."
     ),
     "explain_trend_expander": "Hur läser jag trenddiagrammet?",
+    # The span was written as "2010 till 2024" and the chart has plotted to
+    # 2026 since skattekraft gained two years. It is formatted from the panel.
     "explain_trend_text": (
         "Linjediagrammet visar den valda kommunens skattekraft per invånare "
-        "(kr) från 2010 till 2024 jämfört med riksgenomsnittet (streckad linje). "
-        "Om kommunens linje ligger under riksgenomsnittet har den lägre "
-        "skattekraft per invånare än en genomsnittskommun.\n\n"
-        "**Exempel**: Om linjen lutar uppåt men inte lika brant som "
-        "riksgenomsnittet, betyder det att kommunen visserligen växer, men "
-        "halkar efter relativt sett. Tvärtom, om linjen stiger brantare, "
-        "stärks kommunens relativa position."
+        "i kronor, från {first_year} till {last_year}, jämfört med "
+        "genomsnittet av alla kommuner (streckad linje). Här är talen kronor "
+        "och inte index, så diagrammet visar den faktiska nivån och inte "
+        "kommunens placering. Ligger kommunens linje under den streckade har "
+        "den lägre skattekraft per invånare än en genomsnittskommun."
+        "\n\n"
+        "**Exempel**: om linjen lutar uppåt men inte lika brant som den "
+        "streckade, växer kommunen men långsammare än de andra. Då stiger "
+        "kronorna samtidigt som indexet sjunker, och det är just därför de "
+        "två diagrammen på sidan kan peka åt olika håll."
     ),
 
     "explain_ranking_expander": "Hur läser jag tabellen?",

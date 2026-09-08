@@ -34,7 +34,11 @@ st.set_page_config(
 
 import streamlit.components.v1 as components  # noqa: E402
 
-from src.provenance import analysis_year, panel_max_year  # noqa: E402
+from src.provenance import (  # noqa: E402
+    analysis_year,
+    load_provenance,
+    panel_max_year,
+)
 from src.ui.chart_theme import get_chart_layout  # noqa: E402
 from src.ui.components import (  # noqa: E402
     card_header,
@@ -66,6 +70,14 @@ _ARTIFACTS_DIR = _PROJECT_ROOT / "artifacts"
 # unemployment.  See src/provenance.py.
 _ANALYSIS_YEAR = analysis_year()
 _PANEL_YEAR = panel_max_year()
+
+# The stat strip used to print 290, 17, 4 and 2 as literals in the HTML.  The
+# panel gained two years of skattekraft without anyone noticing the strip, so
+# the counts are read from the provenance artifact and the coefficient table.
+_PROVENANCE = load_provenance()
+_N_KOMMUNER = max(s["n_kommuner"] for s in _PROVENANCE["sources"].values())
+_FIRST_YEAR = min(s["min_year"] for s in _PROVENANCE["sources"].values())
+_N_YEARS = _PANEL_YEAR - _FIRST_YEAR + 1
 
 
 @st.cache_data
@@ -130,26 +142,44 @@ with st.expander(SWEDISH_LABELS["glossary_expander"]):
 # Section 2: Stat strip
 # ---------------------------------------------------------------------------
 
+_N_VARS = len(cross_df)
+_N_IDENTIFIED = int(cross_df["identified"].sum())
+
 st.html(f"""
 <div class="shai-stat-strip">
     <div class="shai-stat-cell">
-        <span class="shai-stat-value">290</span>
+        <span class="shai-stat-value">{_N_KOMMUNER}</span>
         <span class="shai-stat-label">{SWEDISH_LABELS["landing_stat_kommuner"]}</span>
     </div>
     <div class="shai-stat-cell">
-        <span class="shai-stat-value">17</span>
+        <span class="shai-stat-value">{_N_YEARS}</span>
         <span class="shai-stat-label">{SWEDISH_LABELS["landing_stat_panel"]}</span>
     </div>
     <div class="shai-stat-cell">
-        <span class="shai-stat-value">4</span>
+        <span class="shai-stat-value">{_N_VARS}</span>
         <span class="shai-stat-label">{SWEDISH_LABELS["landing_stat_vars"]}</span>
     </div>
     <div class="shai-stat-cell">
-        <span class="shai-stat-value">2</span>
+        <span class="shai-stat-value">{_N_IDENTIFIED}</span>
         <span class="shai-stat-label">{SWEDISH_LABELS["landing_stat_identified"]}</span>
     </div>
 </div>
 """)
+
+# Four numbers under four one-word labels said nothing on their own.  The one
+# that matters most is the last: two of the four variables carry the model.
+st.html(
+    '<div class="shai-explanation">'
+    + SWEDISH_LABELS["landing_stats_explanation"].format(
+        kommuner=_N_KOMMUNER,
+        years=_N_YEARS,
+        first_year=_FIRST_YEAR,
+        last_year=_PANEL_YEAR,
+        n_vars=_N_VARS,
+        n_identified=_N_IDENTIFIED,
+    )
+    + "</div>"
+)
 
 # ---------------------------------------------------------------------------
 # Section 3: Modellöversikt (SVG flow diagram)
@@ -507,7 +537,23 @@ for i, (num, label) in enumerate(steps):
     if i < len(steps) - 1:
         pipeline_html += '<span class="shai-pipeline-arrow">&gt;</span>'
 pipeline_html += '</div>'
+
+# The four boxes shipped with no heading and no explanation, so "Rensning"
+# and "Estimering" were words a reader had to guess at.
+st.html(f"""
+<div style="margin-top: 32px; margin-bottom: 4px;">
+    <h3 style="font-family: 'Source Sans 3', sans-serif; font-size: 18px;
+               font-weight: 700; color: {COLORS['text_primary']}; margin: 0;">
+        {SWEDISH_LABELS["landing_pipeline_title"]}
+    </h3>
+</div>
+""")
 st.html(pipeline_html)
+st.html(
+    '<div class="shai-explanation">'
+    + SWEDISH_LABELS["landing_pipeline_explanation"].format(first_year=_FIRST_YEAR)
+    + "</div>"
+)
 
 # ---------------------------------------------------------------------------
 # Section 6: Navigation cards
@@ -569,6 +615,10 @@ st.html(f"""
     <div style="margin-top:8px;">
         {pills_html}
     </div>
+    <p style="font-size:13px;color:{COLORS['text_secondary']};margin-top:12px;
+              line-height:1.5;text-align:left;">
+        {SWEDISH_LABELS["landing_sources_explanation"]}
+    </p>
     <p style="font-size:12px;color:{COLORS['text_secondary']};margin-top:12px;">
         {SWEDISH_LABELS["method_model_name"]},
         {SWEDISH_LABELS["method_period"]},

@@ -182,6 +182,7 @@ kpi_cards = [
             f"{format_index(_lowest['relative_position'])}"
         ),
         variant="default",
+        tooltip=SWEDISH_LABELS["kpi_index_spread_tooltip"],
     ),
     kpi_card(
         SWEDISH_LABELS["kpi_largest_fall_10y"],
@@ -190,6 +191,7 @@ kpi_cards = [
             f"{_biggest_fall['kommun_name']}"
         ),
         variant="danger",
+        tooltip=SWEDISH_LABELS["kpi_largest_fall_tooltip"],
     ),
     kpi_card(
         SWEDISH_LABELS["kpi_largest_rise_10y"],
@@ -198,6 +200,7 @@ kpi_cards = [
             f"{_biggest_rise['kommun_name']}"
         ),
         variant="default",
+        tooltip=SWEDISH_LABELS["kpi_largest_rise_tooltip"],
     ),
     kpi_card(
         SWEDISH_LABELS["kpi_cross_r2"],
@@ -428,21 +431,25 @@ if not forecast_df.empty:
                     SWEDISH_LABELS["backtest_spearman"],
                     value=f"{_f['backtest_spearman']:.2f}".replace(".", ","),
                     variant="default",
+                    tooltip=SWEDISH_LABELS["backtest_spearman_tooltip"],
                 ),
                 kpi_card(
                     SWEDISH_LABELS["backtest_rmse"],
                     value=f"{_f['backtest_rmse']:.1f}".replace(".", ","),
                     variant="default",
+                    tooltip=SWEDISH_LABELS["backtest_rmse_tooltip"],
                 ),
                 kpi_card(
                     SWEDISH_LABELS["backtest_naive"],
                     value=f"{_f['backtest_naive_rmse']:.1f}".replace(".", ","),
                     variant="default",
+                    tooltip=SWEDISH_LABELS["backtest_naive_tooltip"],
                 ),
                 kpi_card(
                     SWEDISH_LABELS["backtest_persistence"],
                     value=f"{_f['backtest_persistence_rmse']:.1f}".replace(".", ","),
                     variant="default",
+                    tooltip=SWEDISH_LABELS["backtest_persistence_tooltip"],
                 ),
             ]
         )
@@ -451,10 +458,19 @@ if not forecast_df.empty:
             + SWEDISH_LABELS["backtest_verdict_better"].format(
                 rho=f"{_f['backtest_spearman']:.2f}".replace(".", ",")
             )
-            + " "
-            + SWEDISH_LABELS["backtest_coverage"]
-            + f": {_f['interval_coverage_measured']:.0%}".replace("%", " %")
-            + f" (nominellt {_f['interval_coverage']:.0%})".replace("%", " %")
+            + "</div>"
+        )
+        # Was "Intervallets träffsäkerhet: 79 % (nominellt 80 %)", assembled
+        # here from two bare percentages. The word nominellt carried the whole
+        # meaning and explained none of it.
+        st.html(
+            '<div class="shai-explanation">'
+            + SWEDISH_LABELS["backtest_coverage_sentence"].format(
+                measured=f"{_f['interval_coverage_measured']:.0%}".replace(
+                    "%", " %"
+                ),
+                nominal=f"{_f['interval_coverage']:.0%}".replace("%", " %"),
+            )
             + "</div>"
         )
         st.html(

@@ -248,6 +248,13 @@ kpi_cards = [
 ]
 render_kpi_row(kpi_cards)
 
+# Two indexes and two movements, in two different units, with nothing saying
+# so. The row read as four interchangeable numbers.
+st.html(
+    f'<div class="shai-explanation">'
+    f'{SWEDISH_LABELS["kommun_kpi_explanation"]}</div>'
+)
+
 # ---------------------------------------------------------------------------
 # Section 3: Position over time
 # ---------------------------------------------------------------------------
@@ -294,8 +301,10 @@ with st.container(border=True):
     st.plotly_chart(fig_pos, use_container_width=True, config={"displayModeBar": False})
     st.html(
         f'<div class="shai-explanation">'
-        f'{SWEDISH_LABELS["index_compare_explanation"]}</div>'
+        f'{SWEDISH_LABELS["chart_position_history_note"]}</div>'
     )
+    with st.expander(SWEDISH_LABELS["explain_position_history_expander"]):
+        st.markdown(SWEDISH_LABELS["explain_position_history_text"])
 
 # ---------------------------------------------------------------------------
 # Section 4: Historisk skattekraft (kronor), with comparison kommuner
@@ -397,7 +406,12 @@ with st.container(border=True):
         fig_trend, use_container_width=True, config={"displayModeBar": False}
     )
     with st.expander(SWEDISH_LABELS["explain_trend_expander"]):
-        st.markdown(SWEDISH_LABELS["explain_trend_text"])
+        st.markdown(
+            SWEDISH_LABELS["explain_trend_text"].format(
+                first_year=int(panel_df["year"].min()),
+                last_year=int(panel_df["year"].max()),
+            )
+        )
 
 # ---------------------------------------------------------------------------
 # Section 5: Decomposition of the position gap
