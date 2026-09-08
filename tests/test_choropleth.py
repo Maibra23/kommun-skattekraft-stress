@@ -62,7 +62,7 @@ from src.ui.css import DIVERGING_SCALE, SEQUENTIAL_SCALE
 
 class TestMapLayers:
     def test_the_three_planned_layers_exist(self):
-        assert set(MAP_LAYERS) == {"position", "drift", "vulnerability"}
+        assert set(MAP_LAYERS) == {"position", "drift"}
 
     def test_each_layer_reads_a_different_column(self):
         columns = [layer.column for layer in MAP_LAYERS.values()]
@@ -94,25 +94,20 @@ class TestMapLayers:
         assert layer.diverging
         assert layer.vmin == -layer.vmax, "a signed scale must centre on zero"
 
-    def test_vulnerability_layer_keeps_its_column_and_range(self):
-        layer = MAP_LAYERS["vulnerability"]
-        assert layer.column == "vulnerability_score"
-        assert layer.vmin == -2.5 and layer.vmax == 2.5
-
-    def test_drift_and_vulnerability_run_in_opposite_directions(self):
-        """High drift is good; a high vulnerability score is bad. The two
-        layers therefore cannot share a ramp direction, or one of them would
-        colour its bad end reassuringly."""
+    def test_drift_keeps_the_diverging_ramp(self):
         assert MAP_LAYERS["drift"].colors == DIVERGING_SCALE
-        assert MAP_LAYERS["vulnerability"].colors == list(reversed(DIVERGING_SCALE))
 
     def test_the_warm_end_always_means_worse(self):
         """DIVERGING_SCALE runs warm (orange) to cool (blue)."""
         warm = DIVERGING_SCALE[0]
         assert MAP_LAYERS["drift"].colors[0] == warm, "falling behind must read warm"
-        assert MAP_LAYERS["vulnerability"].colors[-1] == warm, (
-            "a high vulnerability score must read warm"
-        )
+
+    def test_the_retired_score_is_not_offered_as_a_layer(self):
+        """It was withdrawn from the map: r = +0.016 against realised growth,
+        and a layer a reader can still select is a layer they will still use."""
+        assert "vulnerability" not in MAP_LAYERS
+        for layer in MAP_LAYERS.values():
+            assert "arbarhet" not in layer.label, layer.label
 
     def test_every_layer_carries_a_swedish_label_and_caption(self):
         for layer in MAP_LAYERS.values():

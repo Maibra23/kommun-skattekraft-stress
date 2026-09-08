@@ -197,10 +197,6 @@ else:
     )
 st.html(f'<div class="shai-summary">{_lead}</div>')
 
-# Same reason as on the national page: the lead sentence states an index.
-with st.expander(SWEDISH_LABELS["glossary_expander"]):
-    st.markdown(SWEDISH_LABELS["glossary_text"])
-
 st.html(
     '<div class="shai-vintage">'
     + SWEDISH_LABELS["vintage_note"].format(
@@ -264,7 +260,11 @@ st.html(
 # ---------------------------------------------------------------------------
 
 with st.container(border=True):
-    st.html(card_header(SWEDISH_LABELS["chart_position_history"]))
+    st.html(card_header(
+            SWEDISH_LABELS["chart_position_history"],
+            help_terms=("index", "forflyttning", "tva_genomsnitt"),
+        )
+    )
 
     fig_pos = go.Figure()
     fig_pos.add_trace(
@@ -315,7 +315,11 @@ with st.container(border=True):
 # ---------------------------------------------------------------------------
 
 with st.container(border=True):
-    st.html(card_header(SWEDISH_LABELS["chart_historical"]))
+    st.html(card_header(
+            SWEDISH_LABELS["chart_historical"],
+            help_terms=("skattekraft",),
+        )
+    )
 
     _all_names = sorted(position_latest["kommun_name"].dropna().unique())
     compare_kommuner = st.multiselect(
@@ -429,7 +433,11 @@ _VAR_LABELS = {
 }
 
 with st.container(border=True):
-    st.html(card_header(SWEDISH_LABELS["decomp_position_title"]))
+    st.html(card_header(
+            SWEDISH_LABELS["decomp_position_title"],
+            help_terms=("index", "standardavvikelse", "residual"),
+        )
+    )
     st.html(
         f'<div class="shai-explanation">'
         f'{SWEDISH_LABELS["decomp_position_explanation"]}</div>'
@@ -497,7 +505,16 @@ with st.container(border=True):
 
     # Controls: reported as numbers with their intervals, never as bars.  A bar
     # would claim a precision the interval denies.
-    st.html(card_header(SWEDISH_LABELS["decomp_controls_title"]))
+    st.html(card_header(
+            SWEDISH_LABELS["decomp_controls_title"],
+            help_terms=(
+                "kontrollvariabel",
+                "konfidensintervall",
+                "forsorjningskvot",
+                "befolkningstillvaxt",
+            ),
+        )
+    )
     st.html(
         f'<div class="shai-explanation">'
         + SWEDISH_LABELS["decomp_controls_explanation"].format(year=_ANALYSIS_YEAR)
@@ -539,7 +556,11 @@ with st.container(border=True):
 # ---------------------------------------------------------------------------
 
 with st.container(border=True):
-    st.html(card_header(SWEDISH_LABELS["chart_peers_title"]))
+    st.html(card_header(
+            SWEDISH_LABELS["chart_peers_title"],
+            help_terms=("index", "forflyttning", "arbetsloshet", "utbildning"),
+        )
+    )
 
     peers = position_latest[position_latest["kommun_kod"] != selected_kod].copy()
     peers["_gap"] = (

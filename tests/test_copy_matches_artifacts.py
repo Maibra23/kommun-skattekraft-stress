@@ -133,6 +133,27 @@ def _thousands(value: float) -> str:
     return f"{int(round(value, -3)):,}".replace(",", " ")
 
 
+def _means(d):
+    """The two national averages the "Två mått" section contrasts."""
+    year = analysis_year()
+    rows = d.panel[(d.panel["year"] == year) & d.panel["tax_base_per_capita"].notna()]
+    unweighted = rows["tax_base_per_capita"].mean()
+    weighted = (
+        rows["tax_base_per_capita"] * rows["population"]
+    ).sum() / rows["population"].sum()
+    return rows, unweighted, weighted
+
+
+def _pop(d, kommun: str) -> float:
+    rows, _, _ = _means(d)
+    return rows.set_index("kommun_name").loc[kommun, "population"]
+
+
+def _group(value: float) -> str:
+    """An integer as the copy writes it: space between thousands."""
+    return f"{int(round(value)):,}".replace(",", " ")
+
+
 CLAIMS = {
     # The four cross-sectional effects, quoted in the guide and the glossary.
     "edu_effect": lambda d: _cross_effect(d, "edu_share"),
@@ -224,6 +245,26 @@ CLAIMS = {
     "concept_as_index": lambda d: (
         f"index {_sv(d.position_latest['relative_position'].max(), 0)} "
         f"respektive {_sv(d.position_latest['relative_position'].min(), 0)}"
+    ),
+    # The "Två mått på samma sak" section, which states both national averages
+    # in kronor, the gap between them, and the rank correlation that makes the
+    # difference a level shift rather than a disagreement.
+    "two_means_unweighted": lambda d: f"blir snittet {_group(_means(d)[1])} kr",
+    "two_means_weighted": lambda d: (
+        f"blir snittet {_group(_means(d)[2])} kr, "
+        f"{_sv((_means(d)[2] / _means(d)[1] - 1) * 100)} procent högre"
+    ),
+    "two_means_populations": lambda d: (
+        f"Bjurholms {_group(_pop(d, 'Bjurholm'))} invånare väger lika tungt "
+        f"som Stockholms {_group(_pop(d, 'Stockholm'))}"
+    ),
+    "two_means_rank_correlation": lambda d: (
+        f"rangkorrelationen mellan måtten {_sv(d.position_latest['relative_position'].corr(d.position_latest['tax_base_index_riket'], method='spearman'), 3)}"
+    ),
+    "two_means_all_positive": lambda d: (
+        "positiv för alla "
+        f"{int((d.position_latest['relative_position'] - d.position_latest['tax_base_index_riket'] > 0).sum())} "
+        f"av {len(d.position_latest)}"
     ),
     "retired_risk_classes": lambda d: (
         "låg {lag} %, medel {medel} %, hög {hog} %".format(

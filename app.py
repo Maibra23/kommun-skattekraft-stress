@@ -125,18 +125,12 @@ st.html(f"""
 </div>
 """)
 
-# Collapsible concept explanation
+# What the measure is and how to read the dashboard, in one place: they were
+# two expanders asking the reader to open both to get one answer. The glossary
+# that used to sit beside them now travels to the sections that use its terms,
+# behind the '?' in each card heading.
 with st.expander(SWEDISH_LABELS["concept_skattekraft_expander"]):
     st.markdown(SWEDISH_LABELS["concept_skattekraft_text"])
-
-# Collapsible usage guide
-with st.expander(SWEDISH_LABELS["guide_expander"]):
-    st.markdown(SWEDISH_LABELS["guide_text"])
-
-# Every term the dashboard uses, in one place. Without it a reader met
-# "indexenheter", "förflyttning" and "konfidensintervall" as things to infer.
-with st.expander(SWEDISH_LABELS["glossary_expander"]):
-    st.markdown(SWEDISH_LABELS["glossary_text"])
 
 # ---------------------------------------------------------------------------
 # Section 2: Stat strip
@@ -438,6 +432,12 @@ with st.container(border=True):
         card_header(
             SWEDISH_LABELS["landing_vars_title"],
             tag=SWEDISH_LABELS["method_period"],
+            help_terms=(
+                "standardavvikelse",
+                "konfidensintervall",
+                "kontrollvariabel",
+                "korrelation",
+            ),
         )
     )
     st.html(f'<div class="shai-explanation">{SWEDISH_LABELS["landing_vars_explanation"]}</div>')
@@ -478,7 +478,12 @@ with st.container(border=True):
 # Physically separated from everything above, because it answers a different
 # question and cannot rank kommuner.
 with st.container(border=True):
-    st.html(card_header(SWEDISH_LABELS["within_section_title"]))
+    st.html(
+        card_header(
+            SWEDISH_LABELS["within_section_title"],
+            help_terms=("skattekraft", "arbetsloshet", "forsorjningskvot"),
+        )
+    )
     st.html(f'<div class="shai-explanation">{SWEDISH_LABELS["within_section_lead"]}</div>')
     st.html(f'<div class="shai-explanation">{SWEDISH_LABELS["within_section_spec"]}</div>')
 

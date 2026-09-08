@@ -126,11 +126,6 @@ def test_the_scan_actually_finds_references():
 #: the backtest's account of what the old forecast scored, and the column
 #: headers of the retired layer itself.
 _MAY_DISCUSS_THE_RETIRED_MODEL = {
-    "vulnerability_retired_title",
-    "vulnerability_retired_text",
-    "map_layer_vulnerability",
-    "map_legend_caption",
-    "tooltip_vulnerability_score",
     "th_risk_class",
     "th_prognosis",
     "backtest_caveat",
@@ -141,7 +136,6 @@ _MAY_DISCUSS_THE_RETIRED_MODEL = {
     "forecast_col",
     "method_period",
     "method_units",
-    "guide_text",
     "landing_model_explanation",
 }
 
@@ -316,10 +310,13 @@ def test_no_label_contains_mojibake():
 
 
 def test_the_glossary_defines_the_terms_the_app_actually_uses():
-    """Every term a reader meets without introduction should be defined in one
-    place. "Förflyttning" is the one users ask about, because a fall in it
-    sounds like the tax base shrank and it does not mean that."""
-    glossary = SWEDISH_LABELS["glossary_text"].lower()
+    """Every term a reader meets without introduction should still be defined,
+    now per term rather than in one blob. "Förflyttning" is the one users ask
+    about, because a fall in it sounds like the tax base shrank and it does
+    not mean that."""
+    from src.ui.labels import GLOSSARY
+
+    defined = " ".join(f"{e.title} {e.text}" for e in GLOSSARY.values()).lower()
     for term in (
         "skattekraft",
         "indexenheter",
@@ -335,15 +332,41 @@ def test_the_glossary_defines_the_terms_the_app_actually_uses():
         "residual",
         "träffsäkerhet",
     ):
-        assert term in glossary, f"undefined in the glossary: {term}"
+        assert term in defined, f"undefined in the glossary: {term}"
 
 
 def test_the_glossary_says_what_a_fall_in_position_does_not_mean():
     """The distinction that matters: a kommun can grow every year in kronor and
     still fall in the index. Stating only the positive definition invites the
     wrong reading."""
-    glossary = SWEDISH_LABELS["glossary_text"]
-    assert "Det betyder inte att skattekraften har minskat" in glossary
+    from src.ui.labels import GLOSSARY
+
+    assert (
+        "Det betyder inte att skattekraften har minskat"
+        in GLOSSARY["forflyttning"].text
+    )
+
+
+def test_every_glossary_entry_is_reachable_from_some_section():
+    """A definition nobody can open is a definition nobody has. Each term must
+    be named by at least one card heading's help badge."""
+    import re
+    from src.ui.labels import GLOSSARY
+
+    wired = set()
+    for source in _UI_SOURCES:
+        wired |= set(re.findall(r'"([a-z_]+)",?\s*(?=[,)])', source.read_text("utf-8")))
+    orphans = sorted(set(GLOSSARY) - wired)
+    assert not orphans, f"glossary terms no section offers: {orphans}"
+
+
+def test_glossary_entries_carry_no_typographic_dash():
+    """Same rule as the labels: these strings are rendered too."""
+    from src.ui.labels import GLOSSARY
+
+    for key, entry in GLOSSARY.items():
+        for char in _TYPOGRAPHIC_DASHES:
+            assert char not in entry.title + entry.text, key
 
 
 #: The idiom is retired everywhere. It reads either as losing territory or as

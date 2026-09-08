@@ -6,12 +6,12 @@ realised 2025 growth (REMEDIATION_PLAN.md T1.2).  Page sections:
 
   1. Page title block
   2. KPI row: index spread, largest 10-year fall and rise, cross-sectional R²
-  3. Choropleth with a layer toggle — position / 5-year drift / vulnerability —
-     beside a histogram of the same quantity
+  3. Choropleth with a layer toggle, position or 5-year drift, beside a
+     histogram of the same quantity
   4. Table of all 290 kommuner: our index, SCB's index, and both drifts
 
-The vulnerability score survives as one map layer and nowhere else.  It is not
-what sorts the table, not what filters the sidebar, and not a KPI.
+The retired vulnerability score is gone from this page entirely: it does not
+sort the table, filter the sidebar, draw a map layer, or appear as a KPI.
 
 All data loaded from precomputed artifacts using @st.cache_data.
 All Swedish strings come from SWEDISH_LABELS in src/ui/labels.py.
@@ -102,17 +102,6 @@ def _load_panel_latest() -> pd.DataFrame:
 
 
 @st.cache_data
-def _load_vulnerability() -> pd.DataFrame:
-    """The deprecated score, kept only to draw its map layer."""
-    path = _ARTIFACTS_DIR / "predictions.parquet"
-    if not path.exists():
-        return pd.DataFrame(columns=["kommun_kod", "vulnerability_score"])
-    return pd.read_parquet(path)[
-        ["kommun_kod", "vulnerability_score", "vulnerability_rank", "risk_class"]
-    ]
-
-
-@st.cache_data
 def _load_forecast() -> pd.DataFrame:
     """The five-year drift forecast, if it cleared its own gate.
 
@@ -137,12 +126,9 @@ def _load_cross_r2() -> float:
 forecast_df = _load_forecast()
 position_df = _load_position().merge(_load_names(), on="kommun_kod", how="left")
 panel_latest = _load_panel_latest()
-vulnerability_df = _load_vulnerability()
 cross_r2 = _load_cross_r2()
 
-map_df = position_df.merge(panel_latest, on="kommun_kod", how="left").merge(
-    vulnerability_df, on="kommun_kod", how="left"
-)
+map_df = position_df.merge(panel_latest, on="kommun_kod", how="left")
 
 _UPDATED_DATE = ""
 if (_ARTIFACTS_DIR / "position.parquet").exists():
@@ -230,12 +216,6 @@ st.html(
     + "</div>"
 )
 
-# The glossary used to live on the landing page alone, but this page is the
-# one that states an index and two correlations in its opening sentence, and
-# it can be reached directly.
-with st.expander(SWEDISH_LABELS["glossary_expander"]):
-    st.markdown(SWEDISH_LABELS["glossary_text"])
-
 # ---------------------------------------------------------------------------
 # Sidebar filter: position bands
 # ---------------------------------------------------------------------------
@@ -268,6 +248,7 @@ with col_map:
             card_header(
                 SWEDISH_LABELS["map_title"],
                 subtitle=SWEDISH_LABELS["map_subtitle"],
+                help_terms=("index", "forflyttning"),
             )
         )
         _layer_label = st.radio(
@@ -278,17 +259,11 @@ with col_map:
         )
         active_layer = resolve_layer(_layer_label)
         render_choropleth(map_df, layer=active_layer)
-        if active_layer.key == "vulnerability":
-            st.warning(
-                f"**{SWEDISH_LABELS['vulnerability_retired_title']}.** "
-                + SWEDISH_LABELS["vulnerability_retired_text"]
-            )
-        else:
-            st.html(
-                '<div class="shai-explanation">'
-                + SWEDISH_LABELS[f"map_legend_{active_layer.key}_full"]
-                + "</div>"
-            )
+        st.html(
+            '<div class="shai-explanation">'
+            + SWEDISH_LABELS[f"map_legend_{active_layer.key}_full"]
+            + "</div>"
+        )
         with st.expander(SWEDISH_LABELS["explain_choropleth_expander"]):
             st.markdown(SWEDISH_LABELS["explain_choropleth_text"])
 
@@ -298,15 +273,14 @@ with col_hist:
             card_header(
                 SWEDISH_LABELS["chart_distribution_of"].format(
                     quantity=active_layer.label.lower()
-                )
+                ),
+                help_terms=("index", "forflyttning"),
             )
         )
 
         # The histogram follows the map: same quantity, same units, so the two
         # cannot disagree about what is being shown.
-        hist_values = filtered_df.merge(
-            vulnerability_df, on="kommun_kod", how="left"
-        )[active_layer.column]
+        hist_values = filtered_df[active_layer.column]
 
         fig_hist = go.Figure()
         fig_hist.add_trace(
@@ -351,10 +325,11 @@ with col_hist:
 # ---------------------------------------------------------------------------
 
 with st.container(border=True):
-    st.html(card_header(SWEDISH_LABELS["index_compare_title"]))
     st.html(
-        f'<div class="shai-explanation">'
-        f'{SWEDISH_LABELS["index_compare_explanation"]}</div>'
+        card_header(
+            SWEDISH_LABELS["index_compare_title"],
+            help_terms=("tva_genomsnitt", "index"),
+        )
     )
 
     _both = position_df.dropna(subset=["relative_position", "tax_base_index_riket"])
@@ -395,6 +370,8 @@ with st.container(border=True):
     st.html(
         f'<div class="shai-explanation">{SWEDISH_LABELS["index_scatter_note"]}</div>'
     )
+    with st.expander(SWEDISH_LABELS["index_compare_expander"]):
+        st.markdown(SWEDISH_LABELS["index_compare_explanation"])
 
 # ---------------------------------------------------------------------------
 # Section 5b: The forecast and its track record (T3.2, T3.3)
@@ -409,6 +386,7 @@ if not forecast_df.empty:
             card_header(
                 SWEDISH_LABELS["forecast_title"].format(horizon=_horizon),
                 subtitle=SWEDISH_LABELS["backtest_title"],
+                help_terms=("prognos", "traffsakerhet", "rangkorrelation"),
             )
         )
         st.html(
@@ -459,10 +437,21 @@ if not forecast_df.empty:
                 ),
             ]
         )
+        # Scale the scores against how far a kommun actually moves, and
+        # against how many forecasts cannot even name a direction. Both are
+        # read from the artifacts, so neither can go stale in the copy.
+        _typical_move = position_df["drift_5y"].abs().median()
+        _spans_zero = int(
+            ((forecast_df["lower"] < 0) & (forecast_df["upper"] > 0)).sum()
+        )
         st.html(
             '<div class="shai-explanation">'
             + SWEDISH_LABELS["backtest_verdict_better"].format(
-                rho=f"{_f['backtest_spearman']:.2f}".replace(".", ",")
+                rho=f"{_f['backtest_spearman']:.2f}".replace(".", ","),
+                rmse=f"{_f['backtest_rmse']:.1f}".replace(".", ","),
+                typical=f"{_typical_move:.1f}".replace(".", ","),
+                spans_zero=_spans_zero,
+                total=len(forecast_df),
             )
             + "</div>"
         )
@@ -491,7 +480,12 @@ if not forecast_df.empty:
 # ---------------------------------------------------------------------------
 
 with st.container(border=True):
-    st.html(card_header(SWEDISH_LABELS["chart_ranking_title"]))
+    st.html(
+        card_header(
+            SWEDISH_LABELS["chart_ranking_title"],
+            help_terms=("index", "forflyttning", "tva_genomsnitt", "prognos"),
+        )
+    )
     with st.expander(SWEDISH_LABELS["explain_ranking_expander"]):
         st.markdown(SWEDISH_LABELS["explain_ranking_text"])
 

@@ -14,7 +14,7 @@ All user-facing strings come from SWEDISH_LABELS in src/ui/labels.py.
 
 import streamlit as st
 
-from src.ui.labels import SWEDISH_LABELS
+from src.ui.labels import GLOSSARY, SWEDISH_LABELS
 
 
 # ---------------------------------------------------------------------------
@@ -116,10 +116,45 @@ def render_kpi_row(cards: list[str]) -> None:
             st.html(card_html)
 
 
+def help_badge(*terms: str) -> str:
+    """Render a '?' that reveals the glossary entries a section relies on.
+
+    Replaces the single glossary expander: a reader who meets
+    "försörjningskvot" under a chart should find out what it means there,
+    not on another page.  Pure CSS, revealed on hover and on keyboard focus,
+    so it costs no rerun and works without JavaScript.
+
+    Args:
+        *terms: Keys into labels.GLOSSARY, shown in the order given.
+
+    Returns:
+        HTML string for the badge, or "" when no term is named.
+
+    Raises:
+        KeyError: If a term is not in the glossary.
+    """
+    if not terms:
+        return ""
+    entries = "".join(
+        f'<span class="shai-help-item">'
+        f"<strong>{GLOSSARY[term].title}</strong> {GLOSSARY[term].text}"
+        f"</span>"
+        for term in terms
+    )
+    return (
+        '<span class="shai-help" tabindex="0" role="note" '
+        f'aria-label="{SWEDISH_LABELS["help_aria"]}">'
+        '<span class="shai-help-mark">?</span>'
+        f'<span class="shai-help-pop">{entries}</span>'
+        "</span>"
+    )
+
+
 def card_header(
     title: str,
     subtitle: str = "",
     tag: str = "",
+    help_terms: tuple[str, ...] = (),
 ) -> str:
     """Render a card header with title, optional subtitle, and tag.
 
@@ -127,6 +162,7 @@ def card_header(
         title: Card title.
         subtitle: Optional description.
         tag: Optional metadata tag (e.g. '2024').
+        help_terms: Glossary keys to offer behind a '?' beside the title.
 
     Returns:
         HTML string for the card header.
@@ -140,7 +176,10 @@ def card_header(
     return f"""
     <div class="shai-card-header">
         <div>
-            <h3>{title}</h3>
+            <div class="shai-card-title-row">
+                <h3>{title}</h3>
+                {help_badge(*help_terms)}
+            </div>
             {subtitle_html}
         </div>
         {tag_html}

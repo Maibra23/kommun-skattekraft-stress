@@ -370,6 +370,97 @@ html, body, [class*="css"] {
     margin-top: 2px;
 }
 
+/* ---- Contextual help: the '?' beside a card heading ----
+   Replaces the one-page glossary expander. Pure CSS so it needs no rerun:
+   revealed on hover and on keyboard focus, dismissed by moving away. The
+   popup is absolutely positioned and sits above the card border, so nothing
+   in the flow shifts when it opens. */
+.shai-card-title-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.shai-help {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: help;
+    outline: none;
+}
+
+.shai-help-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%%;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    color: var(--color-text-tertiary);
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    transition: color 0.12s ease, border-color 0.12s ease;
+}
+
+.shai-help:hover .shai-help-mark,
+.shai-help:focus-visible .shai-help-mark {
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+}
+
+.shai-help-pop {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    top: calc(100%% + 8px);
+    left: 0;
+    z-index: 999;
+    width: 340px;
+    max-width: 78vw;
+    padding: 12px 14px;
+    background: var(--color-card-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    box-shadow: 0 6px 20px rgba(26, 26, 46, 0.14);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--color-text-secondary);
+    text-align: left;
+    white-space: normal;
+    transition: opacity 0.12s ease;
+}
+
+.shai-help:hover .shai-help-pop,
+.shai-help:focus-visible .shai-help-pop {
+    visibility: visible;
+    opacity: 1;
+}
+
+.shai-help-item {
+    display: block;
+}
+
+.shai-help-item + .shai-help-item {
+    margin-top: 8px;
+}
+
+.shai-help-item strong {
+    color: var(--color-text-primary);
+}
+
+/* Near the right edge the popup would run off the card, so the last help in
+   a row opens leftwards instead. */
+.shai-help.align-right .shai-help-pop {
+    left: auto;
+    right: 0;
+}
+
 /* ---- Risk pill ---- */
 .shai-pill {
     display: inline-block;

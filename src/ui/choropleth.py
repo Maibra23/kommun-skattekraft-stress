@@ -1,15 +1,16 @@
-"""Render an interactive Folium choropleth map of municipal vulnerability scores.
+"""Render an interactive Folium choropleth map of municipal position and drift.
 
 Run scripts/download_geojson.py once before first use to populate data/geo/.
 
-render_choropleth(data, height, key) creates a polygon-based Folium map
-using data/geo/kommuner.geojson (from okfse/sweden-geojson).  Colors are drawn
-from DIVERGING_SCALE: green = low vulnerability, red = high vulnerability.
-Map height is 480 px.  Tooltips show municipality name and key metrics.
-The map is embedded in Streamlit via streamlit_folium.st_folium().
-Basemap tiles come from Esri's light grey canvas, which needs no API key.
+render_choropleth(data, layer, height, key) creates a polygon-based Folium map
+using data/geo/kommuner.geojson (from okfse/sweden-geojson).  Two layers are
+offered: relative position on a sequential ramp, and five-year drift on a
+diverging one centred at zero.  Map height is 480 px.  Tooltips show
+municipality name and key metrics.  The map is embedded in Streamlit via
+streamlit_folium.st_folium().  Basemap tiles come from Esri's light grey
+canvas, which needs no API key.
 
-Legend caption comes from SWEDISH_LABELS['map_legend_caption'].
+Each layer carries its own legend caption; see MAP_LAYERS.
 """
 
 import json
@@ -25,12 +26,8 @@ from streamlit_folium import st_folium
 from src.ui.css import COLORS, DIVERGING_SCALE, SEQUENTIAL_SCALE
 from src.ui.labels import SWEDISH_LABELS, format_pct, format_sek
 
-#: DIVERGING_SCALE runs orange (low) to blue (high), which is already the right
-#: direction for drift: falling behind reads warm, gaining reads cool.  The
-#: vulnerability score runs the other way — a high score is the bad end — so
-#: that layer takes the reversed ramp.
-DIVERGING_SCALE_REVERSED = list(reversed(DIVERGING_SCALE))
-
+#: DIVERGING_SCALE runs orange (low) to blue (high), which is the right
+#: direction for drift: falling behind reads warm, gaining reads cool.
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _GEOJSON_PATH = _PROJECT_ROOT / "data" / "geo" / "kommuner.geojson"
 
@@ -48,10 +45,6 @@ _TILE_MAX_ZOOM = 16
 # Map viewport centred on Sweden
 _MAP_CENTER = (63.0, 16.5)
 _MAP_ZOOM_START = 5
-
-# Z-score range for the color scale (vulnerability_score)
-_VMIN = -2.5
-_VMAX = 2.5
 
 
 # ---------------------------------------------------------------------------
@@ -115,17 +108,6 @@ MAP_LAYERS: dict[str, MapLayer] = {
         diverging=True,
         legend_caption=SWEDISH_LABELS["map_legend_drift"],
     ),
-    "vulnerability": MapLayer(
-        key="vulnerability",
-        column="vulnerability_score",
-        label=SWEDISH_LABELS["map_layer_vulnerability"],
-        colors=DIVERGING_SCALE_REVERSED,
-        vmin=_VMIN,
-        vmax=_VMAX,
-        diverging=True,
-        legend_caption=SWEDISH_LABELS["map_legend_caption"],
-        decimals=2,
-    ),
 }
 
 
@@ -165,10 +147,6 @@ _TOOLTIP_ALIASES = {
     "tax_base_per_capita_fmt": SWEDISH_LABELS["th_skattekraft"],
     "unemployment_rate_fmt": SWEDISH_LABELS["th_unemployment"],
     "population_fmt": SWEDISH_LABELS["tooltip_population"],
-    "risk_class_label": SWEDISH_LABELS["th_risk_class"],
-    "vulnerability_score_fmt": SWEDISH_LABELS["tooltip_vulnerability_score"],
-    "predicted_growth_fmt": SWEDISH_LABELS["th_prognosis"],
-    "vulnerability_rank": SWEDISH_LABELS["th_rank"],
 }
 
 
@@ -197,26 +175,11 @@ def _format_tooltip_columns(df: pd.DataFrame) -> pd.DataFrame:
             "population",
             lambda v: f"{int(v):,}".replace(",", " "),
         ),
-        "vulnerability_score_fmt": (
-            "vulnerability_score",
-            lambda v: f"{v:+.2f}".replace(".", ","),
-        ),
-        "predicted_growth_fmt": ("predicted_growth_2025", format_pct),
     }
 
     for target, (source, fmt) in formatters.items():
         if source in df.columns:
             df[target] = df[source].apply(lambda v, f=fmt: "" if pd.isna(v) else f(v))
-
-    if "risk_class" in df.columns:
-        risk_label_map = {
-            "lag": SWEDISH_LABELS["risk_low"],
-            "medel": SWEDISH_LABELS["risk_medium"],
-            "hog": SWEDISH_LABELS["risk_high"],
-        }
-        df["risk_class_label"] = (
-            df["risk_class"].astype(object).map(risk_label_map).fillna("")
-        )
 
     return df
 
@@ -235,9 +198,8 @@ def render_choropleth(
     """Render an interactive Folium choropleth in Streamlit.
 
     The colour scale comes from the selected layer, and the layers do not share
-    one: relative position is a level on a sequential ramp, five-year drift is
-    signed and centred on zero, and the vulnerability score keeps the original
-    diverging scale. See MAP_LAYERS.
+    one: relative position is a level on a sequential ramp, and five-year
+    drift is signed and centred on zero. See MAP_LAYERS.
 
     Args:
         data: DataFrame keyed by kommun_kod. It must carry the selected layer's

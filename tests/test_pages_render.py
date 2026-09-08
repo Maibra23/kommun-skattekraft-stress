@@ -168,19 +168,25 @@ class TestKommunPageContent:
         assert len(control_tables[0]) == 2
 
 
-class TestRetiredLayerExplainsItself:
-    """Selecting the retired score must say why it is retired, where it is used."""
+class TestRetiredLayerIsGone:
+    """The retired score is off the map, and its record stays on the page.
 
-    def test_callout_appears_only_for_the_vulnerability_layer(self):
+    Removing the layer must not remove the accountability: what that forecast
+    scored is still stated, in the permanent backtest box instead of behind a
+    radio button nobody had to press.
+    """
+
+    def test_the_map_offers_only_position_and_drift(self, riks):
         from src.ui.choropleth import MAP_LAYERS
 
-        app = _page(_PAGES[0])
-        assert not app.warning, "no callout on the default position layer"
+        offered = set(riks.radio[0].options)
+        assert offered == {layer.label for layer in MAP_LAYERS.values()}
+        assert not any("arbarhet" in option for option in offered)
 
-        app.radio[0].set_value(MAP_LAYERS["vulnerability"].label).run()
-        assert app.warning, "the retired layer must carry its scored record"
-        text = " ".join(str(w.value) for w in app.warning)
-        assert "0,02" in text, "the callout must state what the score actually scored"
+    def test_the_scored_record_survives_on_the_page(self, riks):
+        text = _rendered_text(riks)
+        assert "0,02" in text, "the page must still state what the score scored"
+        assert "1,51 procentenheter" in text, "and what its error was"
 
 
 class TestBacktestPanelIsPublished:
