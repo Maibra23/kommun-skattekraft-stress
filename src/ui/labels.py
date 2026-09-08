@@ -305,7 +305,7 @@ SWEDISH_LABELS = {
     "map_layer_drift": "Förflyttning 5 år",
     "map_layer_vulnerability": "Sårbarhetsindex (avvecklas)",
     "map_legend_position": "Index mot riket · mörkare = högre",
-    "map_legend_drift": "Indexenheter, 5 år · orange = tappat mark",
+    "map_legend_drift": "Indexenheter, 5 år · orange = sjunkit mot riket",
     "map_legend_position_full": (
         "Kommunens skattekraft i procent av det oviktade riksgenomsnittet. "
         "Mörkare blå = högre. Skalan är beskuren vid 80 och 130, eftersom "
@@ -314,11 +314,12 @@ SWEDISH_LABELS = {
     ),
     "map_legend_drift_full": (
         "Förändring i indexenheter de senaste fem åren. Orange betyder att "
-        "kommunen tappat mark mot riket, alltså vuxit långsammare än övriga "
-        "kommuner. Det betyder inte att skattekraften minskat: en kommun kan "
-        "växa i kronor varje år och ändå tappa mark. Blått betyder vunnen "
-        "mark. Skalan är centrerad på noll och beskuren vid fyra indexenheter "
-        "åt vardera hållet."
+        "kommunens index har sjunkit, alltså att kommunen vuxit långsammare "
+        "än övriga kommuner. Det betyder inte att skattekraften minskat: en "
+        "kommun kan växa i kronor varje år och ändå sjunka i index. Blått "
+        "betyder att indexet stigit, alltså att kommunen vuxit snabbare än "
+        "övriga. Skalan är centrerad på noll och beskuren vid fyra "
+        "indexenheter åt vardera hållet."
     ),
     "index_compare_title": "Två mått på samma sak",
     "index_compare_explanation": (
@@ -409,12 +410,12 @@ SWEDISH_LABELS = {
     "identified_no": (
         "Nej, intervallet omsluter noll"
     ),
-    # A plain-language glossary. Terms like indexenheter, tappa mark,
+    # A plain-language glossary. Terms like indexenheter, forflyttning,
     # forsorjningskvot and konfidensintervall appear dozens of times across
     # the app and were defined nowhere, so a reader had to infer them.
-    # A plain-language glossary. Terms like indexenheter, tappa mark,
-    # forsorjningskvot and konfidensintervall appear dozens of times across
-    # the app and were defined nowhere, so a reader had to infer them.
+    # The idiom "tappa mark" was retired here and everywhere else: it reads
+    # as losing territory or as the tax base shrinking, and it means neither.
+    # Movement is stated literally instead, as the index rising or falling.
     "glossary_expander": "Ord och begrepp: vad betyder orden?",
     "glossary_text": (
         "Alla ord som används i dashboarden, förklarade utan fackspråk."
@@ -429,14 +430,14 @@ SWEDISH_LABELS = {
         "Skillnaden mellan två indextal mäts i indexenheter: från 80 till 84 "
         "är fyra indexenheter."
         "\n\n"
-        "**Att tappa mark.** Förflyttning är hur mycket kommunens index har "
-        "ändrats under en period. Att tappa mark betyder att indexet har "
-        "sjunkit, alltså att kommunen vuxit långsammare än riket. Det betyder "
-        "inte att skattekraften har minskat. En kommun kan öka sin "
-        "skattekraft i kronor varje år och ändå tappa mark, om övriga "
-        "kommuner ökar mer. Att vinna mark är samma sak omvänt: kommunen har "
-        "vuxit snabbare än riket, oavsett om det gick fort eller långsamt i "
-        "kronor."
+        "**Förflyttning.** Förflyttning är hur mycket kommunens index har "
+        "ändrats under en period, mätt i indexenheter. Ett minustal betyder "
+        "att indexet har sjunkit, alltså att kommunen vuxit långsammare än "
+        "riket. Det betyder inte att skattekraften har minskat. En kommun kan "
+        "öka sin skattekraft i kronor varje år och ändå sjunka i index, om "
+        "övriga kommuner ökar mer. Ett plustal är samma sak omvänt: kommunen "
+        "har vuxit snabbare än riket, oavsett om det gick fort eller långsamt "
+        "i kronor."
         "\n\n"
         "**Två genomsnitt som inte är samma sak.** Vårt index jämför med "
         "genomsnittet av de 290 kommunerna, där varje kommun väger lika "
@@ -641,7 +642,8 @@ SWEDISH_LABELS = {
         "**Ett scenario**"
         "\n\n"
         "Du planerar på fem års sikt och vill veta om kommunen är på väg att "
-        "tappa mark mot riket. Prognosen ger ett svar, och lika viktigt ger "
+        "sjunka i förhållande till riket. Prognosen ger ett svar, och lika "
+        "viktigt ger "
         "den ett intervall som säger hur säkert svaret är."
         "\n\n"
         "**Så läser du prognosen**"
@@ -687,8 +689,8 @@ SWEDISH_LABELS = {
         "från {position_year}, det senaste år skattekraften finns."
         "\n\n"
         "**Förflyttning 5 år** är hur många indexenheter kommunen flyttat sig "
-        "de senaste fem åren. Plus betyder vunnen mark mot riket, minus "
-        "förlorad."
+        "de senaste fem åren. Plus betyder att kommunen stigit i förhållande "
+        "till riket, minus att den sjunkit."
         "\n\n"
         "**Arbetslöshet ({analysis_year})** och **Utbildning "
         "({analysis_year})** är två av de strukturvariabler som förklarar "
@@ -839,13 +841,13 @@ SWEDISH_LABELS = {
         "skattekraft mot riksgenomsnittet, och skalan är beskuren vid 80 och "
         "130 eftersom mediankommunen ligger på 97 och den högsta på 208. "
         "Förflyttning 5 år är en förändring med ett tecken: orange betyder "
-        "att kommunen tappat mark mot riket, blått att den vunnit mark, och "
-        "skalan är centrerad på noll."
+        "att kommunens index sjunkit i förhållande till riket, blått att det "
+        "stigit, och skalan är centrerad på noll."
         "\n\n"
         "Exempel: i positionslagret framträder Stockholmsregionen mörk och "
         "delar av inlandet ljusa, nivåskillnader som ligger fast över "
         "decennier. I förflyttningslagret ser samma karta helt annorlunda ut, "
-        "eftersom en kommun kan ligga lågt och ändå vinna mark. Håll "
+        "eftersom en kommun kan ligga lågt och ändå stiga i index. Håll "
         "muspekaren över en kommun för att se båda talen."
     ),
     "explain_histogram_expander": "Hur läser jag fördelningen?",
@@ -880,8 +882,8 @@ SWEDISH_LABELS = {
         "intervall."
         "\n\n"
         "Exempel: en kommun med index 88 och förflyttning -2,4 ligger under "
-        "riksgenomsnittet och har tappat ytterligare mark de senaste fem "
-        "åren. En kommun med index 88 och +1,1 ligger lika lågt men rör sig "
+        "riksgenomsnittet och har sjunkit ytterligare de senaste fem åren. "
+        "En kommun med index 88 och +1,1 ligger lika lågt men rör sig "
         "uppåt. Samma nivå, olika riktning, och det är skillnaden tabellen "
         "finns för att visa. Klicka på en kolumnrubrik för att sortera om."
     ),

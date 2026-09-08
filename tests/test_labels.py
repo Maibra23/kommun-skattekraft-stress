@@ -317,13 +317,13 @@ def test_no_label_contains_mojibake():
 
 def test_the_glossary_defines_the_terms_the_app_actually_uses():
     """Every term a reader meets without introduction should be defined in one
-    place. "Tappa mark" is the one users ask about, because it sounds like the
-    tax base shrank and it does not mean that."""
+    place. "Förflyttning" is the one users ask about, because a fall in it
+    sounds like the tax base shrank and it does not mean that."""
     glossary = SWEDISH_LABELS["glossary_text"].lower()
     for term in (
         "skattekraft",
         "indexenheter",
-        "tappa mark",
+        "förflyttning",
         "riksmedelvärdet",
         "öppen arbetslöshet",
         "försörjningskvot",
@@ -338,9 +338,36 @@ def test_the_glossary_defines_the_terms_the_app_actually_uses():
         assert term in glossary, f"undefined in the glossary: {term}"
 
 
-def test_the_glossary_says_what_tappa_mark_does_not_mean():
+def test_the_glossary_says_what_a_fall_in_position_does_not_mean():
     """The distinction that matters: a kommun can grow every year in kronor and
-    still lose ground. Stating only the positive definition invites the wrong
-    reading."""
+    still fall in the index. Stating only the positive definition invites the
+    wrong reading."""
     glossary = SWEDISH_LABELS["glossary_text"]
     assert "Det betyder inte att skattekraften har minskat" in glossary
+
+
+#: The idiom is retired everywhere. It reads either as losing territory or as
+#: the tax base shrinking, and it means neither: it means the index fell while
+#: the kronor may well have risen. Movement is stated literally instead.
+_RETIRED_IDIOM = re.compile(
+    r"tappa[rt]?\s+mark|vinn(a|er)\s+mark|vunn(en|it)\s+mark",
+    re.IGNORECASE,
+)
+
+
+def test_no_label_uses_the_retired_ground_losing_idiom():
+    offenders = {
+        key: text[:80]
+        for key, text in SWEDISH_LABELS.items()
+        if isinstance(text, str) and _RETIRED_IDIOM.search(text)
+    }
+    assert not offenders, f"'tappa mark' and its relatives are retired: {offenders}"
+
+
+@pytest.mark.parametrize("source", _UI_SOURCES, ids=lambda p: p.name)
+def test_no_page_renders_the_retired_idiom(source):
+    for line in source.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
+        assert not _RETIRED_IDIOM.search(line), f"{source.name}: {stripped[:80]}"
