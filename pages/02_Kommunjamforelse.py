@@ -197,6 +197,10 @@ else:
     )
 st.html(f'<div class="shai-summary">{_lead}</div>')
 
+# Same reason as on the national page: the lead sentence states an index.
+with st.expander(SWEDISH_LABELS["glossary_expander"]):
+    st.markdown(SWEDISH_LABELS["glossary_text"])
+
 st.html(
     '<div class="shai-vintage">'
     + SWEDISH_LABELS["vintage_note"].format(

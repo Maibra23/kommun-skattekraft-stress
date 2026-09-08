@@ -113,6 +113,26 @@ def _forecast_sentence(d, kommun):
     )
 
 
+def _latest_panel(d):
+    """The last panel year that actually carries a tax base."""
+    with_tax = d.panel[d.panel["tax_base_per_capita"].notna()]
+    return with_tax[with_tax["year"] == d.position_year]
+
+
+def _kronor(d, kommun: str) -> float:
+    return _latest_panel(d).set_index("kommun_name").loc[kommun, "tax_base_per_capita"]
+
+
+def _lowest_kommun(d) -> str:
+    latest = _latest_panel(d)
+    return latest.loc[latest["tax_base_per_capita"].idxmin(), "kommun_name"]
+
+
+def _thousands(value: float) -> str:
+    """Kronor as the concept copy rounds them: nearest thousand, space group."""
+    return f"{int(round(value, -3)):,}".replace(",", " ")
+
+
 CLAIMS = {
     # The four cross-sectional effects, quoted in the guide and the glossary.
     "edu_effect": lambda d: _cross_effect(d, "edu_share"),
@@ -188,6 +208,22 @@ CLAIMS = {
     "retired_rmse": lambda d: (
         f"{_sv(d.baseline['backtest_2025']['rmse'], 2)} procentenheter, mot "
         f"{_sv(d.baseline['backtest_2025']['naive_rmse'], 2)}"
+    ),
+    # The concept section's kronor figures. These went stale unnoticed once
+    # already: they named "flera Norrlandskommuner" as the lowest when the
+    # five lowest sat in Värmland, Kalmar and Skåne, and put them under
+    # 180 000 kr when none was.
+    "concept_top_kronor": lambda d: (
+        f"{d.position_year} hade Danderyd {_thousands(_kronor(d, 'Danderyd'))} "
+        f"kr per invånare"
+    ),
+    "concept_bottom_kronor": lambda d: (
+        f"{_lowest_kommun(d)}, den lägsta kommunen, hade "
+        f"{_thousands(_kronor(d, _lowest_kommun(d)))} kr"
+    ),
+    "concept_as_index": lambda d: (
+        f"index {_sv(d.position_latest['relative_position'].max(), 0)} "
+        f"respektive {_sv(d.position_latest['relative_position'].min(), 0)}"
     ),
     "retired_risk_classes": lambda d: (
         "låg {lag} %, medel {medel} %, hög {hog} %".format(

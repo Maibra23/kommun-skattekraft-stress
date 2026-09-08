@@ -250,7 +250,8 @@ SWEDISH_LABELS = {
         "\n\n"
         "**Det viktigaste förbehållet**"
         "\n\n"
-        "Utbildningsandelen samvarierar 0,81 med skattekraften. Sambandet är "
+        "Utbildningsandelen samvarierar 0,81 med skattekraften, på en skala "
+        "där 1 vore ett perfekt samband och 0 inget samband alls. Sambandet är "
         "robust, men det ligger nära en omskrivning av samma sak: en "
         "befolkning med höga inkomster och en befolkning med lång utbildning "
         "är i stor utsträckning samma befolkning. Stapelns längd säger alltså "
@@ -343,7 +344,7 @@ SWEDISH_LABELS = {
     "map_layer_position": "Nuvarande position",
     "map_layer_drift": "Förflyttning 5 år",
     "map_layer_vulnerability": "Sårbarhetsindex (avvecklas)",
-    "map_legend_position": "Index mot riket · mörkare = högre",
+    "map_legend_position": "Index mot riksgenomsnittet · mörkare = högre",
     "map_legend_drift": "Indexenheter, 5 år · orange = sjunkit mot riket",
     "map_legend_position_full": (
         "Kommunens skattekraft i procent av det oviktade riksgenomsnittet. "
@@ -408,22 +409,36 @@ SWEDISH_LABELS = {
         "annat mått än panelmodellens R² inom kommuner, som är lågt av "
         "konstruktion och redovisas separat längre ner."
     ),
+    # This is where most readers meet the word "index" for the first time:
+    # the glossary sits on the landing page, and a reader can arrive here
+    # directly. Both the unit and the thing it is measured against are stated
+    # in the sentence itself, and the two correlations now say what kind of
+    # correlation they are and what scale they live on. "Sambandet är 0,99"
+    # invited reading a rank correlation as a percentage.
     "national_position_summary": (
-        "Skillnaderna mellan kommuner är stora och trögrörliga. {high_name} "
-        "ligger på index {high:.0f} och {low_name} på {low:.0f}. "
-        "Rangordningen är i praktiken låst: sambandet mellan ett års position "
-        "och nästa års är 0,99, och över tio år 0,93. Det som rör sig gör det "
-        "långsamt. Därför visas förflyttning över fem och tio år, inte över "
-        "ett."
+        "Skillnaderna mellan kommuner är stora och trögrörliga. Index är "
+        "kommunens skattekraft i procent av genomsnittet för alla 290 "
+        "kommuner, där genomsnittet är 100. {high_name} ligger på "
+        "{high:.0f} och har alltså {high:.0f} procent av "
+        "genomsnittskommunens skattekraft per invånare, {low_name} på "
+        "{low:.0f}. Rangordningen är i praktiken låst: jämför man "
+        "kommunernas inbördes ordning ett år med ordningen året därpå blir "
+        "rangkorrelationen 0,99, på en skala där 1 betyder exakt samma "
+        "ordning och 0 betyder slumpmässig. Över tio år är den 0,93. Det som "
+        "rör sig gör det långsamt, och därför visas förflyttning över fem "
+        "och tio år, inte över ett."
     ),
+    # "index 92 av riksgenomsnittet" left the unit implicit and read as a
+    # fraction with a missing denominator. The comparison is now spelled out.
     "kommun_position_lead": (
-        "{kommun} ligger på index <strong>{position}</strong> av "
-        "riksgenomsnittet, en förflyttning på <strong>{drift} "
-        "indexenheter</strong> sedan {since}."
+        "{kommun} ligger på index <strong>{position}</strong>, alltså "
+        "{position} procent av genomsnittet för alla 290 kommuner. Sedan "
+        "{since} har kommunen flyttat sig <strong>{drift} "
+        "indexenheter</strong>."
     ),
     "kommun_position_lead_no_drift": (
-        "{kommun} ligger på index <strong>{position}</strong> av "
-        "riksgenomsnittet."
+        "{kommun} ligger på index <strong>{position}</strong>, alltså "
+        "{position} procent av genomsnittet för alla 290 kommuner."
     ),
     "kommun_kpi_explanation": (
         "De fyra talen hör ihop två och två. De första två är samma sak mätt "
@@ -449,13 +464,14 @@ SWEDISH_LABELS = {
         "den flyttat sig i förhållande till de andra kommunerna."
         "\n\n"
         "**Exempel**: en linje som ligger stilla på 92 betyder att kommunen "
-        "legat 8 procent under genomsnittet hela perioden, även om "
+        "legat 8 indexenheter under genomsnittet hela perioden, alltså på 92 "
+        "procent av det, även om "
         "skattekraften i kronor stigit varje år. En linje som lutar nedåt "
         "betyder att kommunen vuxit långsammare än de andra. Diagrammet "
         "under det här visar samma kommun i kronor, och de två kan mycket "
         "väl peka åt olika håll."
     ),
-    "axis_index": "Index (riket = 100)",
+    "axis_index": "Index (genomsnittet av 290 kommuner = 100)",
 
     # Decomposition of the position gap (T2.2)
     "decomp_position_title": "Vad förklarar kommunens läge?",
@@ -562,6 +578,18 @@ SWEDISH_LABELS = {
         "fem gånger av hundra hamnar det sanna värdet utanför. Innehåller "
         "intervallet noll kan vi inte påstå att effekten finns alls."
         "\n\n"
+        "**Korrelation** mäter hur starkt två tal följer varandra, på en "
+        "skala från -1 till +1. Noll betyder inget samband alls, +1 att de "
+        "följs helt åt och -1 att de rör sig helt åt motsatt håll. Det är "
+        "inte procent: 0,81 betyder inte 81 procent av någonting."
+        "\n\n"
+        "**Rangkorrelation** mäter samma sak för ordningen i stället för för "
+        "talen: hur lika två rangordningar är, på en skala från 0 till 1. "
+        "1 betyder exakt samma ordning, 0 att ordningen är slumpmässig. När "
+        "vi skriver att rangkorrelationen mellan ett års position och nästa "
+        "års är 0,99 betyder det att nästan ingen kommun byter plats, inte "
+        "att någonting är 99 procent."
+        "\n\n"
         "**Kontrollvariabel** är en variabel som finns med i modellen men "
         "vars effekt inte går att skilja från noll. Den redovisas som en "
         "siffra i stället för som en stapel, eftersom en stapel skulle se "
@@ -592,7 +620,8 @@ SWEDISH_LABELS = {
     "vulnerability_retired_text": (
         "Sårbarhetsindexet bygger på en tillväxtprognos för 2025 som nu går "
         "att pröva mot utfallet. Den träffade inte: korrelationen med faktisk "
-        "tillväxt blev +0,02 och medelfelet 1,51 procentenheter, mot 0,97 för "
+        "tillväxt blev +0,02, alltså i praktiken ingen träff alls på en skala "
+        "där +1 vore en perfekt träff, och medelfelet 1,51 procentenheter, mot 0,97 för "
         "att bara gissa riksgenomsnittet. Riskklasserna skilde sig inte "
         "heller åt i utfallet: låg 4,74 %, medel 4,52 %, hög 4,68 %. Lagret "
         "ligger kvar tills det tas bort helt; använd position och "
@@ -666,8 +695,9 @@ SWEDISH_LABELS = {
     ),
     "backtest_caveat": (
         "Den tidigare prognosen i det här projektet redovisades aldrig mot "
-        "utfall. När den till slut testades hamnade korrelationen på 0,02 och "
-        "den förlorade mot att gissa riksgenomsnittet. Därför står den här "
+        "utfall. När den till slut testades hamnade korrelationen på 0,02, "
+        "där +1 vore en perfekt träff och 0 ingen alls, och den förlorade mot "
+        "att gissa riksgenomsnittet. Därför står den här "
         "rutan kvar permanent: om prognosen försämras syns det här."
     ),
 
@@ -876,10 +906,10 @@ SWEDISH_LABELS = {
         "hur mycket inkomstskatt kommunen kan ta in per person, och avgör i "
         "praktiken vilka tjänster kommunen har råd att erbjuda sina invånare."
         "\n\n"
-        "Skillnaderna är enorma: 2024 hade Danderyd ca 481 000 kr per "
-        "invånare medan flera Norrlandskommuner låg under 180 000 kr. Det "
-        "innebär att vissa kommuner har mer än dubbelt så stor skattebas per "
-        "invånare."
+        "Skillnaderna är enorma: 2026 hade Danderyd 517 000 kr per invånare "
+        "medan Högsby, den lägsta kommunen, hade 198 000 kr. Danderyd har "
+        "alltså mer än dubbelt så stor skattebas per invånare, vilket är "
+        "samma sak som att de två ligger på index 208 respektive 80."
         "\n\n"
         "Sverige har ett utjämningssystem som delvis kompenserar för dessa "
         "skillnader, men den underliggande skattekraften förblir en avgörande "

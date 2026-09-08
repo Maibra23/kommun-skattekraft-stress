@@ -230,6 +230,12 @@ st.html(
     + "</div>"
 )
 
+# The glossary used to live on the landing page alone, but this page is the
+# one that states an index and two correlations in its opening sentence, and
+# it can be reached directly.
+with st.expander(SWEDISH_LABELS["glossary_expander"]):
+    st.markdown(SWEDISH_LABELS["glossary_text"])
+
 # ---------------------------------------------------------------------------
 # Sidebar filter: position bands
 # ---------------------------------------------------------------------------
