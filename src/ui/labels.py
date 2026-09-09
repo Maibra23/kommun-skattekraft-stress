@@ -37,9 +37,6 @@ SWEDISH_LABELS = {
     "title_national": "Riksöversikt",
     "title_kommun": "Kommunjämförelse",
 
-    # Sidebar controls
-    "label_year": "ÅR",
-    "label_risk_filter": "RISKKLASS",
     "label_position_filter": "POSITION MOT RIKET",
 
     # Position bands (replaced the risk-class quintiles at the T1.2 cutover)
@@ -53,46 +50,17 @@ SWEDISH_LABELS = {
     ),
     "label_kommun_select": "VÄLJ KOMMUN",
 
-    # Quintiles of the retired vulnerability score, relabelled by T4.2.
-    # The cut is *relative*: exactly 58 kommuner land in the bottom fifth every
-    # year, including years when every kommun's tax base grew. "Hög risk" said
-    # fiscal distress; the data only ever said "lowest fifth of this ranking".
-    "risk_low": "Översta femtedelen",
-    "risk_medium": "De mittersta tre femtedelarna",
-    "risk_high": "Nedersta femtedelen",
-
-    # KPI labels (national)
-    "kpi_median_prognosis": "Median prognos 2025",
-    "kpi_high_risk_count": "Kommuner i hög risk",
-    "kpi_largest_decline": "Största nedgång (prognos)",
-    "kpi_model_r2": "Modellens R2",
-
-    # KPI labels (kommun)
-    "kpi_skattekraft_2024": "Skattekraft 2024",
-    "kpi_growth_2024": "Tillväxt 2024",
-    "kpi_prognosis_2025": "Prognos 2025",
-    "kpi_vulnerability_rank": "Sårbarhetsrang",
-
     # Chart axes and titles
     "axis_year": "År",
     "axis_skattekraft": "Skattekraft per invånare (kr)",
-    "axis_growth_pct": "Tillväxt (%)",
     "axis_kommuner_count": "Antal kommuner",
     "chart_historical": "Historisk skattekraft",
-    "chart_decomposition": "Strukturell dekomponering",
-    "chart_distribution": "Fördelning av position",
     "chart_distribution_of": "Fördelning: {quantity}",
 
-    # Table headers
-    "th_rank": "Rang",
     "th_kommun": "Kommun",
     "th_lan": "Län",
-    "th_prognosis": "Prognos 2025 (%)",
-    "th_risk_class": "Riskklass",
     "th_skattekraft": "Skattekraft (kr)",
     "th_unemployment": "Arbetslöshet (%)",
-    "th_dependency": "Försörjningskvot",
-    "th_pop_growth": "Befolkning (%)",
     "th_education": "Utbildning (%)",
 
     # Variable display names
@@ -102,32 +70,16 @@ SWEDISH_LABELS = {
     "var_education": "Andel eftergymnasialt utbildade",
     "var_residual": "Residual (kommunspecifika faktorer)",
 
-    # Decomposition contributions
-    "contrib_unemployment": "Bidrag: arbetslöshet",
-    "contrib_dependency": "Bidrag: försörjningskvot",
-    "contrib_population": "Bidrag: befolkning",
-    "contrib_education": "Bidrag: utbildning",
-    "contrib_residual": "Bidrag: residual",
-
     # Map
     "map_title": "Geografisk fördelning",
     "map_subtitle": "Välj vad kartan ska visa",
-    "map_color_scale_note": "Färgskala: Grön = låg sårbarhet, Gul = medel, Röd = hög sårbarhet",
 
     # Buttons and actions
     "btn_download_csv": "Ladda ned som CSV",
-    "btn_show_method": "Visa metod",
-
-    # States
-    "state_loading": "Laddar data...",
-    "state_no_data": "Inga data tillgängliga för den valda perioden",
-    "state_error_io": "Kunde inte hämta data. Försök igen senare.",
-    "state_error_compute": "Beräkningsfel. Se metodologisidan för detaljer.",
 
     # Footer
     "footer_source_label": "KÄLLA",
     "footer_source": "SCB (OE0101, BE0101, AA0003, UF0506)",
-    "footer_method_link": "Metodologi",
 
     # Methodology callouts
     "method_model_name": "Två modeller, två olika frågor",
@@ -147,7 +99,6 @@ SWEDISH_LABELS = {
     "landing_stat_kommuner": "KOMMUNER",
     "landing_stat_panel": "ÅR MED DATA",
     "landing_stat_vars": "STRUKTURVARIABLER",
-    "landing_stat_fe": "FIXED EFFECTS",
     "landing_stat_identified": "MÄTBARA DRIVKRAFTER",
     # The stat strip is four numbers and four one-word labels. "2 mätbara
     # drivkrafter" beside "4 strukturvariabler" is the single most important
@@ -295,19 +246,12 @@ SWEDISH_LABELS = {
     "chart_national_avg": "Riksgenomsnitt",
     "chart_peers_title": "Jämförbara kommuner",
     "subtitle_national": "Alla 290 kommuners läge mot riksgenomsnittet och deras förflyttning",
-    "subtitle_kommun": "Strukturell dekomponering för vald kommun",
 
     # Choropleth tooltip
     "tooltip_population": "Befolkning",
 
-    # Coefficient chart axis
-    "axis_coefficient": "Koefficient (beta)",
-
     # SVG diagram labels (landing page)
     "svg_regression_model": "Regressionsmodell",
-    "svg_panel_ols": "PanelOLS, 2-way FE",
-    "svg_prognosis": "Prognos 2025",
-    "svg_ranking": "Rangordning",
     "svg_decomposition": "Dekomponering av läget",
     # The flow diagram must not draw four equal drivers: two of the four are
     # not separately identified between kommuner (T1.2).
@@ -315,20 +259,6 @@ SWEDISH_LABELS = {
     "svg_controls_heading": "KONTROLLER: EFFEKTEN KAN VARA NOLL",
     "svg_cross_section": "Tvärsnittsmodell",
     "svg_position": "Kommunens läge mot riket",
-
-    # Contextual summary (Riksöversikt)
-    "national_summary_template": (
-        "Mediankommunen förväntas se {median} nominell tillväxt under 2025. "
-        "{count} kommuner klassas som högrisk, med störst förväntad nedgång "
-        "i {kommun} ({decline})."
-    ),
-
-    # Decomposition explanation (Kommunjämförelse)
-    "decomp_explanation": (
-        "Staplarna visar hur varje strukturvariabel bidrar till kommunens "
-        "avvikelse från riksgenomsnittet. Positiva staplar (gröna) drar "
-        "uppåt, negativa (röda) drar nedåt."
-    ),
 
     # ---- Position and drift: the descriptive spine (T1.1, rendered by T1.2) ----
     "position_index": "Index mot riksgenomsnittet",
@@ -533,7 +463,6 @@ SWEDISH_LABELS = {
     ),
     "col_with_year": "{label} ({year})",
 
-    "index_scatter_title": "Vårt index mot SCB:s, alla 290 kommuner",
     "index_scatter_note": (
         "Varje punkt är en kommun. Den streckade linjen är där måtten skulle "
         "sammanfalla. Alla 290 ligger ovanför den. Skillnaden är systematisk "
@@ -568,7 +497,6 @@ SWEDISH_LABELS = {
     "backtest_rmse": "Medelfel (RMSE)",
     "backtest_naive": "Jämförelse: gissa genomsnittet",
     "backtest_persistence": "Jämförelse: anta att trenden fortsätter",
-    "backtest_coverage": "Intervallets träffsäkerhet",
     "backtest_coverage_sentence": (
         "Intervallets träffsäkerhet: i efterhandstestet hamnade det verkliga "
         "utfallet inom intervallet i {measured} av fallen, mot de {nominal} "
@@ -796,26 +724,13 @@ SWEDISH_LABELS = {
         "högre än en annan. 98 % av skillnaderna i skattekraft finns mellan "
         "kommuner, och just den variationen räknar den här modellen bort."
     ),
-    "kpi_r2_tooltip": (
-        "R2(within) mäter hur mycket av variationen inom kommuner som "
-        "förklaras av strukturvariablerna, efter att kommun- och årseffekter "
-        "absorberats. Ett lågt värde är förväntat och säger inget om hur väl "
-        "modellen förklarar skillnader mellan kommuner. Det måttet är "
-        "tvärsnittets R2, som redovisas separat och ligger på 0,69."
-    ),
     "footer_updated": "Senast uppdaterad",
     "help_aria": "Ord och begrepp i det här avsnittet",
 
     # Choropleth tooltip label for vulnerability score
 
-    # Risk boundary labels (histogram)
-    "risk_boundary_high_medium": "Hög / Medel",
-    "risk_boundary_medium_low": "Medel / Låg",
-
     # Units (use these everywhere)
     "unit_sek": "kr",
-    "unit_pct": "%",
-    "unit_per_capita": "per invånare",
 
     # Concept explanation (landing page, collapsible)
     # One expander where there were two. "Vad är skattekraft" and "Hur
@@ -856,11 +771,9 @@ SWEDISH_LABELS = {
         "och vad som statistiskt förklarar skillnaderna. Femårsprognosen "
         "redovisas alltid tillsammans med sitt eget träffsäkerhetstest."
     ),
-    "vars_table_header": "Koefficientvärden",
     "vars_table_variable": "Variabel",
     "vars_table_coef": "Koefficient",
     "vars_table_sig": "Signifikans",
-    "vars_table_interpretation": "Tolkning",
 
     # Graph explanations (collapsible, standardized)
     "explain_choropleth_expander": "Hur läser jag kartan?",
@@ -924,7 +837,6 @@ SWEDISH_LABELS = {
     ),
     "compare_label": "Jämför med andra kommuner",
     "compare_placeholder": "Välj en eller flera kommuner",
-    "compare_legend_national_avg": "Riksgenomsnitt",
 
     # Coefficient table — significance label for non-significant results
     "sig_not_significant": "ej sign.",
@@ -935,13 +847,7 @@ SWEDISH_LABELS = {
         "ladda ned kommunkartan."
     ),
 
-    # Coefficient table — interpretation templates (use .format(v=effect_str))
-    "interp_unemployment": "1 procentenhets ökning i arbetslöshet ger ca {v} procentenheter tillväxt",
-    "interp_dependency": "0,1 ökning i försörjningskvot ger ca {v} procentenheter tillväxt",
-    "interp_population": "1 procentenhets befolkningstillväxt ger ca {v} procentenheter tillväxt",
-    "interp_education": "1 procentenhets ökning i utbildningsandel ger ca {v} procentenheter tillväxt",
 }
-
 
 # ---------------------------------------------------------------------------
 # Glossary
@@ -956,13 +862,11 @@ SWEDISH_LABELS = {
 # losing territory or as the tax base shrinking, and it means neither.
 # ---------------------------------------------------------------------------
 
-
 class Term(NamedTuple):
     """One glossary entry: the word, and what it means without jargon."""
 
     title: str
     text: str
-
 
 GLOSSARY: dict[str, Term] = {
     "skattekraft": Term(
@@ -1070,7 +974,6 @@ GLOSSARY: dict[str, Term] = {
 # Number formatting helpers (PRD §9)
 # ---------------------------------------------------------------------------
 
-
 def format_sek(value: float) -> str:
     """Format integer SEK with narrow no-break space thousands separator.
 
@@ -1081,7 +984,6 @@ def format_sek(value: float) -> str:
         Formatted string like '271\u202f000 kr'.
     """
     return f"{int(round(value)):,}".replace(",", "\u202f") + " kr"
-
 
 def format_pct(value: float, decimals: int = 1) -> str:
     """Format percentage with comma decimal separator and % suffix.
@@ -1095,7 +997,6 @@ def format_pct(value: float, decimals: int = 1) -> str:
     """
     return f"{value:.{decimals}f}".replace(".", ",") + " %"
 
-
 def format_signed_pct(value: float, decimals: int = 1) -> str:
     """Format signed percentage with explicit + or - sign.
 
@@ -1107,7 +1008,6 @@ def format_signed_pct(value: float, decimals: int = 1) -> str:
         Formatted string like '+2,3 %' or '-1,8 %'.
     """
     return f"{value:+.{decimals}f}".replace(".", ",") + " %"
-
 
 #: How many decimals each displayed quantity carries.  Collected here because
 #: the same number was previously shown three different ways: relative position
@@ -1124,7 +1024,6 @@ DISPLAY_DECIMALS = {
     "share": 0,         # R2 and coverage, shown as whole percent
 }
 
-
 def format_index(value: float) -> str:
     """Format a position index for display: whole numbers, no sign.
 
@@ -1135,7 +1034,6 @@ def format_index(value: float) -> str:
         Formatted string like '208'.
     """
     return f"{value:.{DISPLAY_DECIMALS['index']}f}"
-
 
 def format_effect(value: float) -> str:
     """Format an effect per standard deviation, signed.
@@ -1148,7 +1046,6 @@ def format_effect(value: float) -> str:
     """
     return _signed(value, DISPLAY_DECIMALS["effect"])
 
-
 def format_interval(low: float, high: float) -> str:
     """Format a confidence interval, with no dash between the bounds.
 
@@ -1160,7 +1057,6 @@ def format_interval(low: float, high: float) -> str:
         Formatted string like '+6,4 till +13,7'.
     """
     return f"{format_effect(low)} till {format_effect(high)}"
-
 
 def format_index_points(value: float, decimals: int = 1) -> str:
     """Format a signed movement in index points.
@@ -1177,7 +1073,6 @@ def format_index_points(value: float, decimals: int = 1) -> str:
         Formatted string like '+1,2' or '-0,4'.
     """
     return _signed(value, decimals)
-
 
 def _signed(value: float, decimals: int) -> str:
     """Format a signed number, without producing a negative zero.
@@ -1197,11 +1092,9 @@ def _signed(value: float, decimals: int) -> str:
         return f"{0:.{decimals}f}".replace(".", ",")
     return f"{rounded:+.{decimals}f}".replace(".", ",")
 
-
 # ---------------------------------------------------------------------------
 # Position bands
 # ---------------------------------------------------------------------------
-
 
 class PositionBand(NamedTuple):
     """One band of relative position, used for filtering and for legends.
@@ -1218,7 +1111,6 @@ class PositionBand(NamedTuple):
     upper: float
     label: str
 
-
 #: Contiguous and exhaustive: every kommun falls in exactly one band. The cuts
 #: sit at 90 and 110 because the middle band then holds roughly the central
 #: two-thirds of kommuner (the median sits at 96,6).
@@ -1227,7 +1119,6 @@ POSITION_BANDS: tuple[PositionBand, ...] = (
     PositionBand("mid", 90.0, 110.0, SWEDISH_LABELS["band_mid"]),
     PositionBand("high", 110.0, float("inf"), SWEDISH_LABELS["band_high"]),
 )
-
 
 def classify_position(index: float) -> PositionBand | None:
     """Return the band a relative-position index falls in.

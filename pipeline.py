@@ -1,14 +1,15 @@
-"""Data pipeline orchestrator: fetch → clean → estimate → predict → decompose.
+"""Data pipeline orchestrator: fetch → clean → estimate → decompose → forecast.
 
 Run this script locally (not on Streamlit Cloud) to regenerate all artifacts.
 Steps executed in order:
   1. Fetch raw data from SCB PxWeb API (skattekraft, population, unemployment, education)
   2. Harmonize municipality codes to 2024 boundaries
   3. Compute derived variables (dependency_ratio, growth rates)
-  4. Build and validate the balanced 290 × 15 panel, write panel.parquet
-  5. Estimate the two-way fixed-effects PanelOLS model, write model_results.pkl
-  6. Generate 2025 vulnerability predictions and ranking, write predictions.parquet
-  7. Compute structural decomposition, write decomposition.parquet
+  4. Build and validate the ragged 290-kommun panel, write panel.parquet
+  5. Estimate both models: the FE panel and the cross-section
+  6. Compute relative position and drift, the descriptive spine
+  7. Diagnostics, then decompose the position gap into identified components
+  8. Forecast five-year drift, gated by its own backtest
 
 All steps are logged to data/raw/pipeline.log.  Re-run is idempotent: cached
 raw JSON responses in data/raw/ are reused unless --force-refresh is passed.
@@ -33,12 +34,7 @@ _MODEL_ARTIFACTS = [
     ARTIFACTS_DIR / "coefficients_cross.parquet",
     ARTIFACTS_DIR / "forecast.parquet",
 ]
-_PREDICTION_ARTIFACTS = [
-    ARTIFACTS_DIR / "predictions.parquet",
-    ARTIFACTS_DIR / "ranking.parquet",
-]
 _DECOMPOSITION_ARTIFACTS = [
-    ARTIFACTS_DIR / "decomposition.parquet",
     ARTIFACTS_DIR / "decomposition_cross.parquet",
     ARTIFACTS_DIR / "diagnostics.parquet",
 ]
@@ -192,25 +188,7 @@ def main() -> None:
                 run_estimation_cross,
             )
 
-            # Step 6: Predict
-            from src.model.predict import run_prediction
-
-            _run_step(
-                6,
-                "Generate 2025 predictions and vulnerability ranking",
-                run_prediction,
-            )
-
-            # Step 7: Decompose
-            from src.model.decompose import run_decomposition
-
-            _run_step(
-                7,
-                "Compute structural decomposition",
-                run_decomposition,
-            )
-
-            # Step 7b: Diagnostics, then the cross-sectional decomposition.
+            # Step 7: Diagnostics, then the cross-sectional decomposition.
             # Order matters: the diagnostics say how far the variables can be
             # separated at all, and the decomposition then draws only what the
             # identification flag permits (REMEDIATION_PLAN.md T2.3, T2.2).

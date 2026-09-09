@@ -95,7 +95,9 @@ _UI_SOURCES = (
     + sorted((_PROJECT_ROOT / "pages").glob("*.py"))
     + sorted((_PROJECT_ROOT / "src" / "ui").glob("*.py"))
 )
-_LABEL_REF = re.compile(r'SWEDISH_LABELS\[\s*"([^"]+)"\s*\]')
+# Both quote styles: the pages use each, and matching only double quotes left
+# SWEDISH_LABELS['key'] invisible to the reference check below.
+_LABEL_REF = re.compile(r"""SWEDISH_LABELS\[\s*["']([^"']+)["']\s*\]""")
 
 
 @pytest.mark.parametrize("source", _UI_SOURCES, ids=lambda p: p.name)
@@ -126,8 +128,6 @@ def test_the_scan_actually_finds_references():
 #: the backtest's account of what the old forecast scored, and the column
 #: headers of the retired layer itself.
 _MAY_DISCUSS_THE_RETIRED_MODEL = {
-    "th_risk_class",
-    "th_prognosis",
     "backtest_caveat",
     "backtest_title",
     "backtest_lead",

@@ -2,8 +2,7 @@
 
 Implements: page_title(eyebrow, title, subtitle, year), kpi_card(label,
 value, unit, delta, delta_direction, variant, tooltip), render_kpi_row(cards),
-card_header(title, subtitle, tag), risk_pill(level), and footer_note(source,
-version).
+card_header(title, subtitle, tag), and footer_note(source, version).
 
 Delta direction semantics for skattekraft growth are inverted from the SHAI
 reference: 'up' = growth = GREEN (good), 'down' = decline = RED (bad),
@@ -185,25 +184,6 @@ def card_header(
         {tag_html}
     </div>
     """
-
-
-def risk_pill(level: str) -> str:
-    """Render a colored risk-class pill.
-
-    Args:
-        level: Risk class code — 'lag', 'medel', or 'hog'.
-
-    Returns:
-        HTML string for the risk pill.
-    """
-    label_map = {
-        "lag": SWEDISH_LABELS["risk_low"],
-        "medel": SWEDISH_LABELS["risk_medium"],
-        "hog": SWEDISH_LABELS["risk_high"],
-    }
-    label = label_map.get(level, str(level))
-    css_class = f"risk-{level}"
-    return f'<span class="shai-pill {css_class}">{label}</span>'
 
 
 def footer_note(source: str, version: str, updated: str = "") -> str:

@@ -2,8 +2,8 @@
 
 **Project:** Skattekraftspanelen
 **Created:** 2026-09-05
-**Last updated:** 2026-09-07
-**Status:** In progress — **Phase 0 complete**; T1.1 and T2.1 done, both Phase-2 gates passed. Next: step 6 (T2.2 + T2.3, decomposition and diagnostics).
+**Last updated:** 2026-09-09
+**Status:** Complete. All four phases shipped: the descriptive spine (T1.1) and the UI cutover (T1.2), the cross-sectional estimator, decomposition and diagnostics (T2.1–T2.3), the FE panel demoted to within-time inference (T2.4), and the backtested five-year forecast (T3.2–T3.3). The retired vulnerability model was removed from the repository on 2026-09-09; this document is kept as the record of why the rebuild happened.
 **Trigger:** Skattekraft Model Audit, 2026-09-04
 **Audit report:** https://claude.ai/code/artifact/b3dfec90-7359-45fa-91d8-ea137080eb42
 

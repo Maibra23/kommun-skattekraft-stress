@@ -490,18 +490,21 @@ SCB publishes the official kommun code list at:
         |     to artifacts/model_results.pkl
         |     to artifacts/coefficients.parquet
         |
-        | to  src/model/predict.py
-        |     - Use estimated betas + 2024 values
-        |     - Generate predicted_growth_2025 for all 290 kommuner
-        |     - Compute vulnerability_score (z-score, sign-flipped)
-        |     - Assign risk_class (quintile-based)
-        |     to artifacts/predictions.parquet
-        |     to artifacts/ranking.parquet
+        | to  src/model/position.py
+        |     - Relative position and drift from skattekraft alone
+        |     to artifacts/position.parquet
         |
-        + to  src/model/decompose.py
-              - For each kommun, decompose 2024 gap vs national mean
-              - Contribution = (kommun_value - national_mean) * beta
-              to artifacts/decomposition.parquet
+        | to  src/model/estimate_cross.py
+        |     - Cross-sectional OLS, one year, no entity effects
+        |     to artifacts/coefficients_cross.parquet
+        |
+        | to  src/model/decompose_cross.py
+        |     - Decompose the position gap into identified components only
+        |     to artifacts/decomposition_cross.parquet
+        |
+        + to  src/model/forecast.py
+              - Five-year drift forecast, gated by its own backtest
+              to artifacts/forecast.parquet
 ```
 
 ---

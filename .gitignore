@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
+.coverage
 .venv/
 *.egg-info/
 .streamlit/secrets.toml

@@ -76,10 +76,11 @@
 
 ## 4. Documentation Structure
 
-### 4.1 REVIEW_2026-04-24.md
+### 4.1 REVIEW_2026-04-24.md (added, then removed 2026-09-09)
 **Original plan:** Not in the original PRD folder structure.
 **Addition:** Created after the initial code review to document empirical findings, bugs fixed, and API verification results.
-**Rationale:** Provides an audit trail of the code review process and captures verification evidence.
+**Rationale:** Provided an audit trail of the code review process and captured verification evidence.
+**Removal:** Deleted on 2026-09-09. It reviewed commit `44b57d2` against a 48-test suite and reported `predict`, `decompose` and the pipeline orchestrator as unimplemented. Two of those three modules have since been written, shipped, retired and deleted, and the suite is now 433 tests, so the document described a codebase that no longer exists in any part. The bugs it found were fixed at the time and are recorded in this file.
 
 ### 4.2 This file (DEVIATIONS.md)
 **Original plan:** Not in the original PRD folder structure.
@@ -186,7 +187,7 @@ The forecast lost to the naive benchmark by 55 %, and the risk classes did not o
 3. **The FE model kept, demoted, and relabelled.** It answers "within a kommun over time" and is presented under its own heading with an explicit statement that it cannot rank kommuner. Its lagged specification is now primary: every regressor's within-kommun correlation peaks at t−1 or later.
 4. **The forecast rebuilt on terms that make the failure hard to repeat.** Five-year drift rather than one-year growth; a rolling-origin backtest written *before* the forecaster; two mandatory benchmarks; intervals from the backtest's own errors; and a gate enforced in code that writes nothing when out-of-sample Spearman falls below 0.25. Measured: **+0.329**, beating both benchmarks, with intervals calibrated at 81 % against a nominal 80 %.
 
-**What the vulnerability score's fate is.** Retired from every part of the dashboard except one map layer, which carries a callout stating what it scored. `predictions.parquet` and `ranking.parquet` are still written and read by nothing else.
+**What the vulnerability score's fate is.** Retired from the dashboard in stages, then removed from the repository on 2026-09-09 once nothing read it. Deleted: `src/model/predict.py` and `src/model/decompose.py`, the artifacts `predictions.parquet`, `ranking.parquet` and `decomposition.parquet`, their tests, and `scripts/freeze_audit_baseline.py`. The audit fixture `tests/fixtures/audit_baseline_2026-09-04.json` is deliberately **kept**: `tests/test_copy_matches_artifacts.py` still checks the dashboard's account of what the retired forecast scored against it, so the claim in the UI cannot drift from the record. The numbers themselves are preserved in this document and in METHODOLOGY.
 
 **Two thresholds in the remediation plan itself proved arithmetically impossible** and were corrected in place rather than quietly met: T2.2's "mean |residual| < 40 % of the gap" (unreachable given the R² it was derived from) and T3.2's "predicted dispersion within 30 % of realised" (requires r ≥ 0.70 while the same DoD asks only for ρ > 0.25). Both were replaced with criteria that test the same intent — residual *variance* share, and interval *coverage*.
 

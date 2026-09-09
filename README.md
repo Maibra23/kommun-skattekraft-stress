@@ -163,11 +163,9 @@ skattekraftspanelen/
             estimate_cross.py       # Tvärsnittsmodellen (rangordningens källa)
             decompose_cross.py      # Dekomponering av läget
             estimate.py             # PanelOLS, samband inom kommuner över tid
-            decompose.py            # Dekomponering av tillväxt (utfasad)
             forecast.py             # Femårsprognos, grindad av sitt eget backtest
             backtest.py             # Rullande ursprung: testar innan publicering
             diagnostics.py          # Robusthets- och diagnostikmått
-            predict.py              # Prognos 2025 (utfasad, se DEVIATIONS 6.4)
         ui/                         # Streamlit-komponenter
             css.py                  # Designsystem (färger, typografi, CSS)
             components.py           # KPI-kort, sidtitel, footer
@@ -185,9 +183,6 @@ skattekraftspanelen/
         forecast.parquet            # Femårsprognos + intervall + backtest-resultat
         diagnostics.parquet         # Diagnostik och robusthet
         model_results.pkl           # Fitted PanelOLS-objekt
-        decomposition.parquet       # Tillväxtdekomponering (utfasad)
-        predictions.parquet         # Sårbarhetspoäng 2025 (utfasad)
-        ranking.parquet             # Sårbarhetsrankning (utfasad)
     data/
         raw/                        # Cachade SCB-svar (JSON)
         processed/panel.parquet     # Rensad panel, 290 kommuner x 17 år
@@ -196,7 +191,6 @@ skattekraftspanelen/
     scripts/
         download_geojson.py         # Hämtar kommungränser
         freeze_unemployment_snapshot.py  # Fryser 2010-2021 efter SCB:s indragning
-        freeze_audit_baseline.py    # Låser revisionens utgångsläge
         screenshot_dashboard.py     # Skärmbilder för dokumentationen
     tests/                          # pytest-tester
     docs/
@@ -204,7 +198,6 @@ skattekraftspanelen/
         KRI_Dataset_Identification.md  # Datakällrevision
         DEVIATIONS.md               # Avvikelser från ursprunglig plan
         REMEDIATION_PLAN.md         # Ombyggnaden av modellagret, 2026-09
-        REVIEW_2026-04-24.md        # Granskning
         PRD.md                      # Ursprunglig produktkravspecifikation (historisk)
         TASKS.md                    # Ursprungliga implementeringsuppgifter (historisk)
     notebooks/

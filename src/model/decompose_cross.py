@@ -35,9 +35,9 @@ differs from the national average on this variable, and that variable covaries
 with the tax base. It does not say that changing the variable would move the
 tax base.
 
-Writes ``artifacts/decomposition_cross.parquet``. The deployed dashboard's
-``decomposition.parquet`` is deliberately untouched until the T1.2 cutover
-(METHODOLOGY §11.7).
+Writes ``artifacts/decomposition_cross.parquet``, which superseded the growth
+decomposition at the T1.2 cutover; ``decompose.py`` and its artifact were
+removed on 2026-09-09.
 
 Implements REMEDIATION_PLAN.md T2.2.
 """

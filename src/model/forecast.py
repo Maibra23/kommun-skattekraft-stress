@@ -23,9 +23,9 @@ forecast failed (REMEDIATION_PLAN.md T3.2):
 Written after ``src/model/backtest.py``, which it uses, so no forecast here can
 exist without a score attached to it.
 
-Writes ``artifacts/forecast.parquet``. The deprecated ``predictions.parquet``
-is left untouched: the dashboard still reads it for the retired vulnerability
-map layer, and artifacts are a published contract (METHODOLOGY §11.7).
+Writes ``artifacts/forecast.parquet``. This replaced the vulnerability score
+outright: ``predictions.parquet`` and its producer were removed on 2026-09-09
+once nothing read them (DEVIATIONS §6.4).
 """
 
 import logging

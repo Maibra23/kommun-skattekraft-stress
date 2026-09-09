@@ -185,7 +185,7 @@ The two-way FE model is the **within-time inference panel**: it answers "within 
 
 The two models must be presented as separate findings under separate headings. The FE panel's heading is *"Samband inom kommuner över tid"* (`SWEDISH_LABELS["within_section_title"]`), and its accompanying caveat states that these coefficients cannot rank kommuner.
 
-The vulnerability score and risk classes in `predictions.parquet` / `ranking.parquet` are **deprecated** as of T2.4: `compute_vulnerability` emits a `DeprecationWarning`, and both artifacts are written only until the dashboard reads position and drift instead. The 2025 horizon has since closed and the forecast has been scored against it — Pearson r = +0.016, Spearman = +0.033, RMSE 1.512 pp against a naive constant-mean benchmark of 0.974 pp, and risk classes that do not separate (realised growth 4.74 % låg, 4.52 % medel, 4.68 % hög). §3.4 still argues that predictive validity is the right standard; the model failed the standard it set. Replacing that section is T4.1's job.
+The vulnerability score and risk classes were **removed** on 2026-09-09: `src/model/predict.py`, `predictions.parquet` and `ranking.parquet` are gone from the repository, having been deprecated at T2.4 and unread by any page since the T1.2 cutover. The 2025 horizon has since closed and the forecast has been scored against it — Pearson r = +0.016, Spearman = +0.033, RMSE 1.512 pp against a naive constant-mean benchmark of 0.974 pp, and risk classes that do not separate (realised growth 4.74 % låg, 4.52 % medel, 4.68 % hög). §3.4 still argues that predictive validity is the right standard; the model failed the standard it set. Replacing that section is T4.1's job.
 
 ---
 
