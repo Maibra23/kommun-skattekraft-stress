@@ -2,7 +2,7 @@
 
 Six call sites used to hardcode `year == 2024`.  That was correct while 2024
 was the complete-case year and silently wrong the moment SCB publishes 2025
-unemployment.  See REMEDIATION_PLAN.md T1.2.
+unemployment.  See METHODOLOGY §13.4.
 """
 
 import json

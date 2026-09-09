@@ -138,7 +138,7 @@ This is the standard specification in modern applied micro for panel data. It is
 
 ### 2.6 Specifications: which one is primary
 
-*Revised 2026-09-07 by REMEDIATION_PLAN.md T2.4. The full rewrite of this document is T4.1; this section is corrected early because it is what tells a reader which numbers to quote.*
+*Revised 2026-09-07. This section is what tells a reader which numbers to quote, so it was corrected ahead of the rest of the document.*
 
 The **lagged specification is primary**. `X_it` is replaced by `X_{i,t-1}` on the RHS; the contemporaneous specification is retained as a robustness check.
 
@@ -719,7 +719,7 @@ Results from both sources are concatenated to form the complete series. Constant
 
 **Impact:** Open unemployment for 2010–2021 (3 480 kommun-year observations) cannot be fetched from SCB by any route. Searched and ruled out: `AA0003B` (labour market, `Tid` = 2022–2024 only), `AA0003E` (demography), `AA0003H` (education), `AM0207` RAMS (municipal series end 2018/2021), and `AM0210D` BAS (kommun-level but 2020–2024 only, and a different unemployment definition).
 
-**Fix applied:** Option A of REMEDIATION_PLAN.md T0.2a. `fetch_unemployment` now reads 2010–2021 from the committed snapshot `data/lookup/unemployment_2010_2021.csv` and 2022 onwards from the live `AA0003B/IntGr1KomUtbBAS`. The dead `_PRIMARY_TABLE_URL` constant was removed so no code path can request the withdrawn archive. See 8.1 for the reproducibility consequence and 13.1 for the decision record.
+**Fix applied:** Option A (see 13.1). `fetch_unemployment` now reads 2010–2021 from the committed snapshot `data/lookup/unemployment_2010_2021.csv` and 2022 onwards from the live `AA0003B/IntGr1KomUtbBAS`. The dead `_PRIMARY_TABLE_URL` constant was removed so no code path can request the withdrawn archive. See 8.1 for the reproducibility consequence and 13.1 for the decision record.
 
 **Considered and rejected (unemployment):** re-sourcing the full history from Kolada or Arbetsförmedlingen. Both are live and carry a 2010-onwards municipal series, and both rank kommuner almost identically to the SCB series (Spearman +0.926 and +0.952 against our 2024 values), but neither matches its *level*: Kolada `N03937` runs 3.65x below our series, `N01720` 0.72x above. The gap is definitional, not an error in either series — ours is a **flow** measure (registered as openly unemployed at any point during the year, over population 20-64; see KRI §3), while `N03937` is a stock-like annual average over population 18-65, itself carrying an 18-64 → 18-65 age-band change at 2023. Splicing either onto 2010–2021 would put a step change at the 2021/2022 seam, inside the within-kommun time variation the FE model reads as signal — a series break disguised as continuity, which is worse than a documented snapshot. High rank agreement means these remain viable *fallbacks* if SCB withdraws more; it does not make them drop-in replacements.
 

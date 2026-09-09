@@ -2,7 +2,7 @@
 
 Leads with relative position and drift, which is the reliable descriptive fact
 this project has, rather than with a forecast that scored r = +0.016 against
-realised 2025 growth (REMEDIATION_PLAN.md T1.2).  Page sections:
+realised 2025 growth (METHODOLOGY §13.4).  Page sections:
 
   1. Page title block
   2. KPI row: index spread, largest 10-year fall and rise, cross-sectional R²
@@ -107,7 +107,7 @@ def _load_forecast() -> pd.DataFrame:
 
     The artifact is absent when the forecast failed its backtest, which is a
     supported outcome rather than an error: Phases 0-2 are a complete product
-    without a forward-looking number (REMEDIATION_PLAN.md T3.2).
+    without a forward-looking number (METHODOLOGY §13.4).
     """
     path = _ARTIFACTS_DIR / "forecast.parquet"
     if not path.exists():

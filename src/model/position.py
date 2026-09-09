@@ -32,7 +32,7 @@ unemployment gap that caps the model at 2024 is irrelevant here.
 
 Writes ``artifacts/position.parquet``.
 
-Implements REMEDIATION_PLAN.md T1.1.
+Implements METHODOLOGY §13.4.
 """
 
 import logging

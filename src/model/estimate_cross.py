@@ -47,7 +47,7 @@ Writes ``artifacts/coefficients_cross.parquet``. The FE model's
 dashboard reads committed artifacts directly and is cut over in one
 deliberate change at T1.2 (METHODOLOGY §11.7).
 
-Implements REMEDIATION_PLAN.md T2.1.
+Implements METHODOLOGY §13.4.
 """
 
 import logging

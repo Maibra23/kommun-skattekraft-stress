@@ -17,7 +17,7 @@ handles the rest.
 
 Any consumer that needs all four structural variables must read
 `complete_case_max_year` from the provenance artifact rather than assuming the
-panel's own maximum year. See REMEDIATION_PLAN.md T0.2 and METHODOLOGY §2.3.1.
+panel's own maximum year. See METHODOLOGY §13.2 and METHODOLOGY §2.3.1.
 
 Final panel columns:
     kommun_kod, kommun_name, lan_kod, lan_name, year,
@@ -56,7 +56,7 @@ _EXPECTED_COMMUNES: int = 290
 _PANEL_START_YEAR: int = 2010
 # Each source is fetched to its own maximum; the panel has no fixed end year.
 # 2009 is fetched for skattekraft and population only to seed the 2010 growth
-# rates, then dropped.  See REMEDIATION_PLAN.md T0.2.
+# rates, then dropped.  See METHODOLOGY §13.2.
 _FETCH_YEARS_SKATTEKRAFT: list[int] = list(range(2009, 2027))  # to 2026
 _FETCH_YEARS_POPULATION: list[int] = list(range(2009, 2026))  # to 2025
 _FETCH_YEARS_UNEMPLOYMENT: list[int] = list(range(2010, 2025))  # to 2024
@@ -274,7 +274,7 @@ def _build_provenance(sources: dict[str, pd.DataFrame]) -> dict:
         "note": (
             "The panel is ragged at the top end: sources end in different "
             "years. Use complete_case_max_year for any analysis needing all "
-            "four structural variables. See REMEDIATION_PLAN.md T0.2."
+            "four structural variables. See METHODOLOGY §13.2."
         ),
     }
 

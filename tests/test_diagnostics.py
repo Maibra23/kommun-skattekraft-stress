@@ -1,6 +1,6 @@
 """Unit tests for collinearity and scale diagnostics.
 
-Covers REMEDIATION_PLAN.md T2.3 as reframed on 2026-09-07.
+Covers METHODOLOGY §13.4 as reframed on 2026-09-07.
 
 The task was written expecting collinearity to be the threat to the
 cross-sectional model. It is not: VIF there is 1.3-2.1. The audit's finding F3

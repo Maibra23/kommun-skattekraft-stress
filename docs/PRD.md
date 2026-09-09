@@ -91,8 +91,7 @@ src/ui/             css, components, sidebar, filters, chart_theme,
                     choropleth, labels
 artifacts/          precomputed parquet the dashboard reads directly
 data/               raw cache, processed panel, geojson, lookups
-docs/               METHODOLOGY, KRI_Dataset_Identification, REMEDIATION_PLAN,
-                    this file
+docs/               METHODOLOGY, KRI_Dataset_Identification, this file
 tests/              pytest
 ```
 
@@ -252,5 +251,4 @@ breaks the live site.
 |---|---|
 | `METHODOLOGY.md` | Model specification, formulas, limitations, decision record |
 | `KRI_Dataset_Identification.md` | SCB tables, API queries, data audit |
-| `REMEDIATION_PLAN.md` | The 2026-09 model-layer rebuild, complete |
 | `README.md` | Orientation, install, file tree |

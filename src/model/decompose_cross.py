@@ -39,7 +39,7 @@ Writes ``artifacts/decomposition_cross.parquet``, which superseded the growth
 decomposition at the T1.2 cutover; ``decompose.py`` and its artifact were
 removed on 2026-09-09.
 
-Implements REMEDIATION_PLAN.md T2.2.
+Implements METHODOLOGY §13.4.
 """
 
 import logging

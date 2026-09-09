@@ -48,7 +48,7 @@ The `{topic}` segment of the URL must match the table family (e.g. OE for offent
 
 `OE0101B0` is SCB's own published index with riket = 100 — the figure Regionfakta
 and other secondary sources republish. It went unused until the 2026-09-04 audit
-(finding F1); see `REMEDIATION_PLAN.md` T0.1.
+(finding F1); see `METHODOLOGY §13.4` T0.1.
 
 **Weighting caution.** SCB's riksmedelvärde is **population-weighted** (≈271 000 kr
 for 2026). This project's own cross-municipality mean is **unweighted** (≈230 660 kr
@@ -485,9 +485,7 @@ SCB publishes the official kommun code list at:
         |
         | to  src/model/estimate.py
         |     - Load panel.parquet
-        |     - Estimate two-way FE PanelOLS
-        |     - Save model object and coefficients
-        |     to artifacts/model_results.pkl
+        |     - Estimate two-way FE PanelOLS, all specifications
         |     to artifacts/coefficients.parquet
         |
         | to  src/model/position.py

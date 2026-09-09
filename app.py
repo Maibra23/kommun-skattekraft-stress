@@ -328,7 +328,8 @@ plot_df = plot_df.sort_values("beta_sd")
 # so a 0-to-10 bar hid its entire lower half behind the fill.  A point with a
 # whisker shows the estimate and the whole interval, and makes "crosses zero"
 # — the thing that decides whether a variable is identified — readable at a
-# glance.  See docs/screenshots/ for the version this replaced.
+# glance.  It replaced a bar chart, whose fill hid the lower half of the
+# education interval entirely.
 _IDENTIFIED_COLOR = {True: None, False: COLORS["text_secondary"]}
 
 

@@ -13,7 +13,7 @@ same series SCB still publishes, and not a stale or divergent vintage.
 Run from the project root:
     python scripts/freeze_unemployment_snapshot.py
 
-Implements REMEDIATION_PLAN.md T0.2a, option A.
+Implements METHODOLOGY §13.1, option A.
 """
 
 import logging
@@ -99,7 +99,7 @@ def write_snapshot(hist: pd.DataFrame, max_diff: float, out_file: Path) -> None:
         f"# Frozen:    {date.today().isoformat()} by scripts/freeze_unemployment_snapshot.py\n"
         f"# Validated: overlap years {OVERLAP_YEARS[0]}-{OVERLAP_YEARS[-1]} re-fetched live from\n"
         f"#            AA0003B/IntGr1KomUtbBAS, max abs diff {max_diff:.6f} pp.\n"
-        "# Rationale: docs/REMEDIATION_PLAN.md T0.2a (option A), METHODOLOGY 13.1.\n"
+        "# Rationale: METHODOLOGY 13.1, option A.\n"
     )
     out_file.parent.mkdir(parents=True, exist_ok=True)
     with out_file.open("w", encoding="utf-8", newline="\n") as fh:
@@ -120,7 +120,7 @@ def main() -> None:
         raise ValueError(
             f"Overlap years diverge from live SCB by {max_diff:.4f} pp. "
             "The committed panel is not the series SCB now publishes — "
-            "investigate before freezing (REMEDIATION_PLAN.md T0.2a)."
+            "investigate before freezing (METHODOLOGY §13.1)."
         )
 
     write_snapshot(hist, max_diff, _SNAPSHOT_FILE)

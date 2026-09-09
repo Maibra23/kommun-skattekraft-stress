@@ -1,6 +1,6 @@
 """Unit tests for the BE0101 population fetcher.
 
-Covers the two-table split introduced by REMEDIATION_PLAN.md T0.2.  SCB froze
+Covers the two-table split introduced by METHODOLOGY §13.2.  SCB froze
 BefolkningNy at 2024 and published 2025 in a new parallel table, BefolkningCKM,
 which differs in three ways that would each corrupt the panel silently:
 

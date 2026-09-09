@@ -1,7 +1,7 @@
 """Streamlit page 3 — Municipality detail (Kommunjämförelse).
 
 Leads with where the kommun stands and which way it is moving, then explains
-that position (REMEDIATION_PLAN.md T1.2).  Page sections:
+that position (METHODOLOGY §13.4).  Page sections:
 
   1. Kommun selector, ordered by position rather than by a forecast rank
   2. Lead sentence: index, and the five-year movement behind it

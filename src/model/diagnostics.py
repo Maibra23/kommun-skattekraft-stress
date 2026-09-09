@@ -31,7 +31,7 @@ the numbers and flags them; it never raises.
 Writes ``artifacts/diagnostics.parquet`` in tidy form, one row per
 (design, metric, variable[, variable_2]).
 
-Implements REMEDIATION_PLAN.md T2.3.
+Implements METHODOLOGY §13.4.
 """
 
 import itertools

@@ -1,6 +1,6 @@
 """Unit tests for the ragged panel builder.
 
-Covers REMEDIATION_PLAN.md T0.2.  The four SCB sources refresh on different
+Covers METHODOLOGY §13.2.  The four SCB sources refresh on different
 cadences and no longer end in the same year (skattekraft 2026, population and
 education 2025, unemployment 2024).  The panel must keep the newest skattekraft
 rather than truncate every source to the shortest one, so it is deliberately

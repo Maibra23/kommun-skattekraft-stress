@@ -1,9 +1,8 @@
 {
   "audit_date": "2026-09-04",
-  "audit_url": "https://claude.ai/code/artifact/b3dfec90-7359-45fa-91d8-ea137080eb42",
   "source_commit": "3dcaab7",
   "scb_table": "OE0101/SkatteKraft, ContentsCode OE0101A0",
-  "note": "Pre-remediation baseline. Recorded so that REMEDIATION_PLAN.md Phase 2 can demonstrate improvement rather than mere change. See tests/test_audit_baseline.py.",
+  "note": "Pre-remediation baseline, frozen 2026-09-04. Kept so the dashboard's account of what the retired forecast scored can be checked against the record by tests/test_copy_matches_artifacts.py. See METHODOLOGY 13.4.",
   "panel": {
     "n_municipalities": 290,
     "year_min": 2010,

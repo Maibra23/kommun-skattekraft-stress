@@ -1,6 +1,6 @@
 """Unit tests for the position-gap decomposition.
 
-Covers REMEDIATION_PLAN.md T2.2 as revised on 2026-09-07.
+Covers METHODOLOGY §13.4 as revised on 2026-09-07.
 
 The old decomposition answered "why did Filipstad grow 1.8 pp below average in
 2024?" — a question about a quantity with no year-to-year persistence, where

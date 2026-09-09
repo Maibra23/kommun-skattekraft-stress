@@ -1,6 +1,6 @@
 """Unit tests for the AA0003 unemployment fetcher.
 
-Covers the snapshot/live split introduced by REMEDIATION_PLAN.md T0.2a
+Covers the snapshot/live split introduced by METHODOLOGY §13.1
 (option A).  SCB withdrew the AA0003X archive, so 2010-2021 can no longer be
 fetched from source and is served from a committed snapshot; 2022 onwards
 still comes from the live AA0003B table.

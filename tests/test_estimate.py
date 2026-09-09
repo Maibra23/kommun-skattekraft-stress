@@ -1,6 +1,5 @@
 """Tests for src.model.estimate — uses a small synthetic panel, no API calls."""
 
-import pickle
 import tempfile
 from pathlib import Path
 
@@ -172,20 +171,9 @@ def test_save_model_artifacts_creates_files(tmp_path):
     robustness_results = estimate_robustness(panel)
     save_model_artifacts(main_results, robustness_results, tmp_path)
 
-    assert (tmp_path / "model_results.pkl").exists()
     assert (tmp_path / "coefficients.parquet").exists()
-
-
-def test_save_model_artifacts_pickle_roundtrip(tmp_path):
-    panel = _make_synthetic_panel()
-    main_results = estimate_main(panel)
-    robustness_results = estimate_robustness(panel)
-    save_model_artifacts(main_results, robustness_results, tmp_path)
-
-    with open(tmp_path / "model_results.pkl", "rb") as fh:
-        loaded = pickle.load(fh)
-    assert loaded.nobs == main_results.nobs
-    assert set(loaded.params.index) == set(main_results.params.index)
+    # The fitted object is no longer pickled: nothing read it.
+    assert not (tmp_path / "model_results.pkl").exists()
 
 
 def test_save_model_artifacts_coef_table_has_all_specs(tmp_path):
@@ -212,7 +200,7 @@ def test_save_model_artifacts_coef_table_row_count(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Spec roles — REMEDIATION_PLAN.md T2.4 (the lagged spec is promoted to primary)
+# Spec roles — METHODOLOGY §13.4 (the lagged spec is promoted to primary)
 # ---------------------------------------------------------------------------
 
 
@@ -248,7 +236,7 @@ def test_contemporaneous_spec_keeps_its_legacy_name(tmp_path):
 
 def test_coef_table_carries_sample_and_fit_per_spec(tmp_path):
     """Each spec self-describes, so the within-time panel can be rendered
-    without unpickling model_results.pkl."""
+    without a fitted model object."""
     coef_df = _coef_table(tmp_path)
     assert {"n_obs", "r_squared_within"}.issubset(coef_df.columns)
 

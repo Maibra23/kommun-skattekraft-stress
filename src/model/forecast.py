@@ -4,7 +4,7 @@ Replaces the one-year growth forecast that scored **r = 0.016** against
 realised 2025 outcomes and lost to guessing the national mean by 55 %.
 
 Three things changed, and each of them addresses a specific way the old
-forecast failed (REMEDIATION_PLAN.md T3.2):
+forecast failed (METHODOLOGY §13.4):
 
 1. **The target.** One-year growth is not recoverable — year-demeaned
    persistence is about −0.05, which is a property of the data and not of the
@@ -244,7 +244,7 @@ def build_forecast(
             f"Out-of-sample Spearman is {rho:.4f}, which does not clear the "
             f"{MIN_SPEARMAN} gate, so no forecast is produced. This is an "
             "acceptable outcome, not a failure: the dashboard is complete "
-            "without a forward-looking number. See REMEDIATION_PLAN.md T3.2.\n"
+            "without a forward-looking number. See METHODOLOGY §13.4.\n"
             + backtest.summary()
         )
 

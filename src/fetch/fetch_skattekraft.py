@@ -54,7 +54,7 @@ _CACHE_MAX_AGE_DAYS: int = 7
 _EXPECTED_COMMUNES: int = 290
 # Coverage runs through the latest year SCB publishes.  Skattekraft for a
 # budget year is released the preceding December, so 2026 has been available
-# since December 2025.  See REMEDIATION_PLAN.md finding F2.
+# since December 2025.  See METHODOLOGY §13.4 finding F2.
 _DEFAULT_YEARS: list[int] = list(range(2010, 2027))
 
 # Known ContentsCode for "skattekraft per invånare"; verified at runtime via
@@ -210,7 +210,7 @@ def fetch_skattekraft(
 def _cache_shortfall(df: pd.DataFrame, years: list[int]) -> str | None:
     """Return why a cached frame is unusable, or None if it is usable.
 
-    A cache written before REMEDIATION_PLAN.md T0.1 predates the
+    A cache written before the two-metric fetch predates the
     tax_base_index_riket column and stops at 2024.  Age alone cannot detect
     that, so the schema and the requested year coverage are checked too —
     otherwise a fresh-but-obsolete cache silently yields a null index column.

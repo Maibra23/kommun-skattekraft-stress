@@ -24,7 +24,7 @@ def test_within_section_keys_exist_and_are_non_empty():
 
 
 def test_within_section_heading_matches_the_agreed_wording():
-    """REMEDIATION_PLAN.md T2.4 specifies this heading verbatim, so that the
+    """METHODOLOGY §13.4 specifies this heading verbatim, so that the
     within-time finding is visibly separated from the ranking."""
     assert SWEDISH_LABELS["within_section_title"] == "Samband inom kommuner över tid"
 

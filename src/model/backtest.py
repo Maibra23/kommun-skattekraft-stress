@@ -6,7 +6,7 @@ been tested against realised outcomes; when it finally was, it correlated with
 them at **r = 0.016** and lost to guessing the national mean by 55 %. Nothing
 in the codebase would have said so, because nothing scored it.
 
-Built **before** the forecaster it exists to test (REMEDIATION_PLAN.md T3.1),
+Built **before** the forecaster it exists to test (METHODOLOGY §13.4),
 which is the ordering that makes that failure structurally hard to repeat.
 
 How it works

@@ -10,7 +10,7 @@ The split is not a performance choice.  SCB withdrew the AA0003X archive that
 served 1997–2021 — the whole group returns HTTP 400, not just one table — so
 those years are no longer obtainable from SCB at any URL.  The snapshot is
 their only remaining source; see METHODOLOGY §8.1, §12.6 and §13.1,
-and REMEDIATION_PLAN.md T0.2a.
+and METHODOLOGY §13.1.
 
 The live query uses SCB's total-aggregate codes (BakgrVar='TOT', Kön='1+2',
 UtbNiv='000') to select the pre-aggregated unemployment rate directly.

@@ -48,7 +48,7 @@ def test_tile_attribution_is_non_empty() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Map layers (REMEDIATION_PLAN.md T1.2).
+# Map layers (METHODOLOGY §13.4).
 # The plan's explicit caution: position is a *level* and drift is *signed*.
 # Sharing one palette between them would mislead — a diverging scale implies a
 # meaningful midpoint, which an index level does not have.

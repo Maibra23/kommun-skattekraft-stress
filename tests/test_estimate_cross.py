@@ -1,6 +1,6 @@
 """Unit tests for the cross-sectional estimator.
 
-Covers REMEDIATION_PLAN.md T2.1 — the fix at the centre of the remediation.
+Covers METHODOLOGY §13.4 — the fix at the centre of the remediation.
 
 The two-way FE model estimates within-kommun variation; the product is a
 between-kommun ranking, and 98.3 % of the variation in relative position is
@@ -128,7 +128,7 @@ class TestIdentification:
         lo, hi = row["lower_ci"].iloc[0], row["upper_ci"].iloc[0]
         assert lo * hi < 0, (
             f"{var} CI [{lo:.3f}, {hi:.3f}] no longer spans zero — the "
-            "identification finding has changed, see REMEDIATION_PLAN T2.1"
+            "identification finding has changed, see METHODOLOGY §13.4"
         )
 
     @pytest.mark.parametrize("var", _IDENTIFIED)

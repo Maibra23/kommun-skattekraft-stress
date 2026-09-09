@@ -2,11 +2,10 @@
 
 Reads data/processed/panel.parquet, sets the MultiIndex to [kommun_kod, year],
 fits PanelOLS with entity_effects=True, time_effects=True, and standard errors
-clustered at the municipality level.  Writes the fitted result object to
-artifacts/model_results.pkl and the coefficient table to
-artifacts/coefficients.parquet.
+clustered at the municipality level.  Writes the coefficient table to
+artifacts/coefficients.parquet, one row per (variable, spec).
 
-What this model is, after REMEDIATION_PLAN.md T2.4
+What this model is, after METHODOLOGY §13.4
 --------------------------------------------------
 This is the **within-time inference panel**, not the headline model.  It
 answers "within a kommun over time, what is the association between its
@@ -31,7 +30,6 @@ belongs to the single UI cutover commit, not here.
 """
 
 import logging
-import pickle
 from pathlib import Path
 
 import pandas as pd
@@ -45,7 +43,7 @@ ARTIFACTS_DIR = PROJECT_ROOT / "artifacts"
 Y_VAR = "tax_base_growth_pct"
 X_VARS = ["unemployment_rate", "dependency_ratio", "population_growth_pct", "edu_share"]
 
-# The FE panel's primary specification (REMEDIATION_PLAN.md T2.4).  Every other
+# The FE panel's primary specification (METHODOLOGY §13.4).  Every other
 # spec in coefficients.parquet is a robustness check on this one.
 PRIMARY_SPEC = "lagged"
 
@@ -96,10 +94,9 @@ def _log_coefficients(label: str, results) -> None:
 def estimate_main(panel: pd.DataFrame):
     """Estimate the contemporaneous two-way fixed-effects specification.
 
-    Named ``main`` in ``coefficients.parquet`` for contract stability only; T2.4
-    demoted it to a robustness check against ``PRIMARY_SPEC``.  It remains the
-    spec pickled to ``model_results.pkl``, which the pre-remediation prediction
-    path still reads.
+    Named ``main`` in ``coefficients.parquet`` for contract stability only; it
+    was demoted to a robustness check against ``PRIMARY_SPEC`` when the lagged
+    specification became primary (METHODOLOGY §13.4).
 
     Args:
         panel: Panel DataFrame with columns including Y_VAR and all X_VARS.
@@ -126,10 +123,10 @@ def estimate_main(panel: pd.DataFrame):
 def estimate_robustness(panel: pd.DataFrame) -> dict:
     """Estimate the four remaining specifications.
 
-    One of them — ``lagged`` — is the panel's primary specification since T2.4;
-    it is estimated here rather than in ``estimate_main`` so that
-    ``model_results.pkl`` and the deployed dashboard's ``spec == "main"`` filter
-    keep reading what they read before the promotion.
+    One of them — ``lagged`` — is the panel's primary specification. It is
+    estimated here rather than in ``estimate_main`` so that the deployed
+    dashboard's ``spec == "main"`` filter keeps reading what it read before the
+    promotion; spec names are a published contract (METHODOLOGY §11.7).
 
     Args:
         panel: Panel DataFrame.
@@ -223,10 +220,13 @@ def save_model_artifacts(
     robustness_results: dict,
     output_dir: Path,
 ) -> None:
-    """Persist model results to disk.
+    """Persist the combined coefficient table to artifacts/coefficients.parquet.
 
-    Pickles main_results to artifacts/model_results.pkl and saves the combined
-    coefficient table (all specs) to artifacts/coefficients.parquet.
+    The fitted PanelOLS object used to be pickled to ``model_results.pkl``
+    alongside it. That artifact was removed on 2026-09-09: every consumer had
+    migrated to the coefficient table, which carries each spec's own role,
+    sample size and fit, so nothing needed to unpickle a 1 MB model object to
+    read a number that was already in a column.
 
     Args:
         main_results: Fitted results from estimate_main.
@@ -235,14 +235,8 @@ def save_model_artifacts(
     """
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    pkl_path = output_dir / "model_results.pkl"
-    with open(pkl_path, "wb") as fh:
-        pickle.dump(main_results, fh)
-    logger.info("Pickled main results -> %s", pkl_path)
-
-    # Build combined coefficient table: one row per (variable, spec).
-    # Each spec carries its own role, sample size and fit, so a consumer can
-    # render the primary specification without unpickling model_results.pkl.
+    # One row per (variable, spec). Each spec self-describes, so a consumer can
+    # render the primary specification without a fitted model object.
     all_coefs: list[pd.DataFrame] = []
     for spec_name, res in [("main", main_results)] + list(robustness_results.items()):
         df = extract_coefficients(res)

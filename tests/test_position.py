@@ -1,6 +1,6 @@
 """Unit tests for the relative position and drift module.
 
-Covers REMEDIATION_PLAN.md T1.1 — the product's new descriptive spine.
+Covers METHODOLOGY §13.4 — the product's new descriptive spine.
 
 Position answers "where does this kommun stand against the national average"
 and drift answers "which way is it moving", both from skattekraft alone. No
@@ -143,7 +143,7 @@ class TestDrift:
 class TestStability:
     """The claim that justifies making this the product's headline.
 
-    These lock the position-derived findings in REMEDIATION_PLAN.md §1.2.
+    These lock the position-derived findings in METHODOLOGY §13.4.
     They are deliberately *not* marked ``baseline``: unlike the model figures
     in tests/test_audit_baseline.py, these describe the descriptive spine,
     which the remediation keeps rather than retires. They should hold forever.

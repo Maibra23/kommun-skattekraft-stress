@@ -8,7 +8,7 @@ legend for those bands, and a footer with data source and version string.
 The filter used to cut on risk class -- quintiles of a forecast that scored
 r = +0.016 against realised growth, and relative by construction, so exactly
 58 kommuner were always "hog risk". It now cuts on observed position against
-the national mean. See REMEDIATION_PLAN.md T1.2.
+the national mean. See METHODOLOGY §13.4.
 
 All label strings come from SWEDISH_LABELS in src/ui/labels.py.
 """

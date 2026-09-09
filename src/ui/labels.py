@@ -699,7 +699,7 @@ SWEDISH_LABELS = {
         "öppning för en jämförelse, inte ett svar i sig."
     ),
 
-    # Within-time inference panel (REMEDIATION_PLAN.md T2.4).
+    # Within-time inference panel (METHODOLOGY §13.4).
     # The two-way FE model answers a different question than the ranking and
     # must be shown under its own heading, physically separated from it.
     # Added ahead of the UI cutover; no page renders these yet (T1.2 does).

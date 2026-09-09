@@ -1,7 +1,7 @@
 """Unit tests for the OE0101 skattekraft fetcher.
 
 Covers query construction, response cleaning and verification for the
-two-metric fetch introduced by REMEDIATION_PLAN.md T0.1: skattekraft per
+two-metric fetch introduced by METHODOLOGY §13.2: skattekraft per
 inhabitant (OE0101A0) alongside SCB's own published index, andel av
 riksmedelvärdet (OE0101B0).
 
@@ -156,7 +156,7 @@ class TestCoverage:
 
 
 # ---------------------------------------------------------------------------
-# The publisher cross-check (REMEDIATION_PLAN.md, 2026-09-07 review).
+# The publisher cross-check (METHODOLOGY §13.4, 2026-09-07 review).
 # SCB's index and its per-capita values come from the same table as two
 # separate ContentsCodes.  They must agree: index = 100 x kommun / riket,
 # to within SCB's own integer rounding of the index.  Needs no extra query —

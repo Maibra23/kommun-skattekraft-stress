@@ -5,7 +5,6 @@ of rows, and contains the required columns.  These tests catch pipeline
 regressions that would break the Streamlit dashboard at load time.
 """
 
-import pickle
 from pathlib import Path
 
 import pandas as pd
@@ -90,23 +89,3 @@ class TestCoefficients:
         df = pd.read_parquet(self.path)
         r2 = df.groupby("spec")["r_squared_within"].first()
         assert r2["lagged"] > r2["main"]
-
-
-class TestModelResults:
-    """Smoke tests for artifacts/model_results.pkl."""
-
-    @pytest.fixture(autouse=True)
-    def load(self):
-        self.path = _ARTIFACTS_DIR / "model_results.pkl"
-
-    def test_file_exists(self):
-        assert self.path.exists(), "model_results.pkl missing"
-
-    def test_loadable_and_has_rsquared(self):
-        with open(self.path, "rb") as f:
-            res = pickle.load(f)
-        assert hasattr(res, "rsquared_within"), (
-            "model_results.pkl must have rsquared_within attribute"
-        )
-        r2 = float(res.rsquared_within)
-        assert 0.0 < r2 < 1.0, f"R²(within) = {r2} out of (0, 1) range"

@@ -29,7 +29,6 @@ LOG_PATH = PROJECT_ROOT / "data" / "raw" / "pipeline.log"
 
 # Artifact files that must exist for steps 6-8 to be skippable
 _MODEL_ARTIFACTS = [
-    ARTIFACTS_DIR / "model_results.pkl",
     ARTIFACTS_DIR / "coefficients.parquet",
     ARTIFACTS_DIR / "coefficients_cross.parquet",
     ARTIFACTS_DIR / "forecast.parquet",
@@ -38,7 +37,7 @@ _DECOMPOSITION_ARTIFACTS = [
     ARTIFACTS_DIR / "decomposition_cross.parquet",
     ARTIFACTS_DIR / "diagnostics.parquet",
 ]
-# Descriptive spine (REMEDIATION_PLAN.md T1.1). Depends on the panel only, not
+# Descriptive spine (METHODOLOGY §13.4). Depends on the panel only, not
 # on the model, so it is regenerated with the panel rather than with steps 5-7.
 _POSITION_ARTIFACTS = [
     ARTIFACTS_DIR / "position.parquet",
@@ -177,7 +176,7 @@ def main() -> None:
 
             _run_step(5, "Estimate panel regression model", run_estimation)
 
-            # Step 5b: Cross-sectional estimate (REMEDIATION_PLAN.md T2.1).
+            # Step 5b: Cross-sectional estimate (METHODOLOGY §13.4).
             # Writes its own artifact; the FE coefficients.parquet the deployed
             # dashboard reads is left untouched until the T1.2 cutover.
             from src.model.estimate_cross import run_estimation_cross
@@ -191,7 +190,7 @@ def main() -> None:
             # Step 7: Diagnostics, then the cross-sectional decomposition.
             # Order matters: the diagnostics say how far the variables can be
             # separated at all, and the decomposition then draws only what the
-            # identification flag permits (REMEDIATION_PLAN.md T2.3, T2.2).
+            # identification flag permits (METHODOLOGY §13.4).
             from src.model.diagnostics import run_diagnostics
 
             _run_step(7, "Compute collinearity and scale diagnostics", run_diagnostics)
@@ -204,7 +203,7 @@ def main() -> None:
                 run_decomposition_cross,
             )
 
-            # Step 8: the five-year drift forecast (REMEDIATION_PLAN.md T3.2).
+            # Step 8: the five-year drift forecast (METHODOLOGY §13.4).
             # It backtests itself first and raises ForecastRejected rather than
             # writing anything when out-of-sample skill misses the gate. That
             # is not a pipeline failure — Phases 0-2 are a complete product

@@ -19,7 +19,7 @@ Two different years are needed and they are not interchangeable:
     and drift use this, because they need skattekraft alone and stopping them
     at the analysis year would throw away two published years.
 
-See REMEDIATION_PLAN.md T0.2 and T1.2.
+See METHODOLOGY §13.2.
 """
 
 import json
