@@ -1,10 +1,26 @@
-# Pinned for Streamlit Community Cloud deployment.
-# Keep in sync with pyproject.toml [project.dependencies].
+# Runtime dependencies for the deployed dashboard, and nothing else.
+#
+# Streamlit Community Cloud installs from this file, and it only ever runs
+# app.py. The dashboard reads precomputed parquet from artifacts/ and does no
+# estimation, so the econometrics stack is deliberately absent here:
+# linearmodels and statsmodels (which pulls scipy) come to about 175 MB
+# installed and are imported by pipeline.py alone. Leaving them in meant
+# paying that on every cold start for code the deployed app never reaches.
+#
+# This file is therefore NOT the full dependency list. To run the pipeline,
+# the tests, or anything outside the dashboard:
+#
+#     pip install -e ".[dev]"
+#
+# which reads [project.dependencies] in pyproject.toml. That list is the
+# superset; tests/test_requirements.py checks this file stays a subset of it.
+#
+# requests looks like a pipeline-only dependency and is not: folium imports it
+# at module scope (folium/features.py), so the map page fails without it.
+
 requests>=2.31.0
 pandas>=2.0.0
 pyarrow>=14.0.0
-linearmodels>=6.0
-statsmodels>=0.14.0
 streamlit==1.55.0
 plotly>=5.0.0
 folium>=0.14.0

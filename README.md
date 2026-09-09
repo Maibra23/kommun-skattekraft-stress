@@ -171,7 +171,7 @@ Vårt tal ligger därför systematiskt högre, i snitt ~8 indexenheter, för all
 
 ## Regenerera datan
 
-Behövs bara om du vill uppdatera med nyare SCB-data eller ändra modellen.
+Behövs bara om du vill uppdatera med nyare SCB-data eller ändra modellen. Pipelinen kräver ekonometripaketen, som följer med `pip install -e ".[dev]"` men medvetet inte med `requirements.txt`: den senare installerar bara det dashboarden själv använder.
 
 ```bash
 python pipeline.py                  # använder cachade svar där de finns

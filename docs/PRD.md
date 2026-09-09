@@ -56,8 +56,15 @@ gate.
 
 ## 2. Tech Stack
 
-Python 3.11. Pinned in `requirements.txt` for Streamlit Community Cloud, kept
-in sync with `pyproject.toml`.
+Python 3.11 (`requires-python = ">=3.11,<3.12"`).
+
+**Two dependency lists, deliberately different.** `requirements.txt` is what
+Streamlit Community Cloud installs and lists only what the dashboard imports at
+runtime. `pyproject.toml` carries the full set including the econometrics stack,
+which `pipeline.py` needs and the deployed app never reaches. Re-syncing them
+would put ~175 MB of linearmodels, statsmodels and scipy into every cold start
+for code that does not run there. `tests/test_requirements.py` enforces the
+direction of the split.
 
 | Layer | Library |
 |---|---|
