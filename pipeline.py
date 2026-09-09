@@ -118,7 +118,7 @@ def _run_step(step_num: int, description: str, func, *args, **kwargs):
 
 
 def main() -> None:
-    """Run the full pipeline: fetch → clean → estimate → predict → decompose."""
+    """Run the full pipeline: fetch → clean → estimate → decompose → forecast."""
     parser = argparse.ArgumentParser(
         description="Skattekraftspanelen data pipeline"
     )
@@ -162,7 +162,7 @@ def main() -> None:
         _run_step(4, "Compute relative position and drift", run_position)
 
         # ---------------------------------------------------------------
-        # Steps 5-7: Estimate, predict, decompose
+        # Steps 5-8: Estimate, decompose, forecast
         # ---------------------------------------------------------------
         # Idempotency: skip if all artifacts are fresh
         if not args.force_refresh and _artifacts_are_fresh():
