@@ -30,12 +30,13 @@ Varje fråga med vägen till svaret i dashboarden.
 
 ## Så läser du siffrorna
 
-Fyra begrepp räcker för att läsa hela dashboarden. Den fullständiga ordlistan finns i appen.
+Fem begrepp räcker för att läsa hela dashboarden. Den fullständiga ordlistan finns i appen.
 
 * **Index.** Kommunens skattekraft i procent av genomsnittet. **100 = genomsnittet.** Index 80 betyder 80 procent av genomsnittlig skattekraft, index 208 drygt dubbelt.
 * **Indexenheter.** Enheten för skillnaden mellan två indextal. Från 80 till 84 är fyra indexenheter. Det är inte procent.
 * **Förflyttning.** Hur mycket indexet ändrats under en period. **Ett minustal betyder inte att skattekraften minskat** — mellan 2021 och 2026 ökade skattekraften i kronor i samtliga 290 kommuner, men 173 av dem sjönk ändå i index, eftersom de övriga växte snabbare.
 * **Konfidensintervall.** Spannet det sanna värdet rimligen ligger inom. **Omsluter intervallet noll går effekten inte att skilja från slumpen**, och variabeln redovisas som kontroll i stället för som drivkraft.
+* **Inflation.** Index och förflyttning är **opåverkade av inflation**: kommunen och genomsnittet räknas alltid om i samma års kronor, så prisökningar tar ut sig själva. Detsamma gäller panelmodellen, vars årseffekter absorberar allt som är gemensamt för riket ett givet år. Det enda stället där nominella kronor visas är den historiska trenden i Kommunjämförelse, och där är en del av lutningen prisökningar: riksgenomsnittet steg från 162 909 kr till 248 378 kr mellan 2010 och 2026, alltså 52 procent.
 
 ---
 
@@ -217,7 +218,7 @@ Dokumenterade i [docs/METHODOLOGY.md](docs/METHODOLOGY.md) avsnitt 7.
 * **Ettårig tillväxt går inte att förutsäga** ur den här datan; årsavvikelsernas autokorrelation är ungefär −0,05
 * **Panelen är ojämn i toppen.** Modellen och positionen kan avse olika år; varje kolumn i dashboarden bär sitt eget årtal
 * Simultaneitet: fixed effects adresserar inte omvänd kausalitet
-* Nominell skattekraft inkluderar inflation, inte realt justerad
+* **Kronorbeloppen är nominella.** Det påverkar bara trenddiagrammet i kronor; index, förflyttning, tvärsnittsmodellen och prognosen är inflationsneutrala av konstruktion
 * Öppen arbetslöshet 2010–2021 kommer från en incheckad ögonblicksbild
 
 ---

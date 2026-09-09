@@ -483,9 +483,23 @@ The population growth coefficient beta_3 = -0.080 (p = 0.008) is negative, which
 
 **This is not a data error.** The "no_education" and "lagged" robustness specifications should be consulted to verify that the sign and magnitude are stable. If beta_3 flips sign in robustness checks, this finding should be treated with caution.
 
-### 7.12 Nominal tax base growth includes inflation
+### 7.12 Nominal kronor, and where inflation does and does not matter
 
-`tax_base_growth_pct` is computed from nominal SEK values (not inflation-adjusted). The year fixed effects (gamma_t) absorb the common inflation component across all kommuner, so the beta coefficients capture the association between structural variables and growth **in excess of the national average**. However, the predicted growth for 2025 - which uses a year FE proxy - will include an inflation component. Users should interpret predicted growth rates as nominal, not real.
+No series in this project is deflated. That matters far less than it sounds, because almost every published quantity is a ratio taken **within a single year**, so the price level cancels:
+
+| Quantity | Construction | Inflation exposure |
+|---|---|---|
+| `relative_position`, drift | kommun ÷ the same year's cross-kommun mean × 100 | **none** |
+| Cross-sectional model, decomposition | outcome is an index | **none** |
+| Five-year drift forecast | forecasts a difference in index points | **none** |
+| FE panel | nominal growth, but `time_effects=True` | **none in the betas**: gamma_t absorbs whatever is common to all kommuner in a year, inflation included |
+| Skattekraft in kronor, on the trend chart | raw SEK per capita | **the only exposed surface** |
+
+The trend chart is therefore the one place a reader can be misled: the unweighted national mean rose from 162 909 kr in 2010 to 248 378 kr in 2026, **+52 %**, and a kommun whose real tax base was flat still shows a rising line. `SWEDISH_LABELS["explain_trend_text"]` states this beside the chart, and points the reader at the index chart above it, which is inflation-neutral.
+
+Deflating was considered and not done. It would require a fifth SCB source (KPI, PR0101), a base-year choice, and a deflator column through the panel, to change one chart out of roughly a dozen surfaces while complicating the four-variable framing the rest of the project rests on. Disclosure is the proportionate treatment; if a real series is ever wanted, add it as a second line on that chart rather than replacing the nominal one, because kronor as published are what a kommun's accounts actually show.
+
+An earlier version of this section warned that predicted 2025 growth carried an inflation component through its year-effect proxy. That prediction path was removed (13.4); the forecast that replaced it targets index drift and carries no price level at all.
 
 ### 7.13 Unweighted cross-sectional statistics
 
