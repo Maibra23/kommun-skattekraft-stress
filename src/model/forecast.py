@@ -25,7 +25,7 @@ exist without a score attached to it.
 
 Writes ``artifacts/forecast.parquet``. This replaced the vulnerability score
 outright: ``predictions.parquet`` and its producer were removed on 2026-09-09
-once nothing read them (DEVIATIONS §6.4).
+once nothing read them (METHODOLOGY §13.4).
 """
 
 import logging

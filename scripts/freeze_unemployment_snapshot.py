@@ -99,7 +99,7 @@ def write_snapshot(hist: pd.DataFrame, max_diff: float, out_file: Path) -> None:
         f"# Frozen:    {date.today().isoformat()} by scripts/freeze_unemployment_snapshot.py\n"
         f"# Validated: overlap years {OVERLAP_YEARS[0]}-{OVERLAP_YEARS[-1]} re-fetched live from\n"
         f"#            AA0003B/IntGr1KomUtbBAS, max abs diff {max_diff:.6f} pp.\n"
-        "# Rationale: docs/REMEDIATION_PLAN.md T0.2a (option A), docs/DEVIATIONS.md.\n"
+        "# Rationale: docs/REMEDIATION_PLAN.md T0.2a (option A), METHODOLOGY 13.1.\n"
     )
     out_file.parent.mkdir(parents=True, exist_ok=True)
     with out_file.open("w", encoding="utf-8", newline="\n") as fh:

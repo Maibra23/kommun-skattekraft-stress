@@ -176,7 +176,7 @@ The pipeline splits the requested year range at the 2021/2022 boundary:
 
 Both frames are concatenated. Constants `_SNAPSHOT_LAST_YEAR = 2021` and `_LIVE_TABLE_FIRST_YEAR = 2022` in `fetch_unemployment.py` control the split.
 
-The snapshot is a **source of record**: it holds 3 480 kommun-year observations that exist nowhere else. It can be copied forward but never regenerated. `scripts/freeze_unemployment_snapshot.py` documents its provenance and re-runs the 2022-2024 overlap validation that shows it is the same series SCB still publishes (max abs diff 0.000000 pp at the 2026-09-07 freeze). See DEVIATIONS 6.1 for why this was chosen over re-sourcing from Kolada or Arbetsförmedlingen.
+The snapshot is a **source of record**: it holds 3 480 kommun-year observations that exist nowhere else. It can be copied forward but never regenerated. `scripts/freeze_unemployment_snapshot.py` documents its provenance and re-runs the 2022-2024 overlap validation that shows it is the same series SCB still publishes (max abs diff 0.000000 pp at the 2026-09-07 freeze). See METHODOLOGY 13.1 for why this was chosen over re-sourcing from Kolada or Arbetsförmedlingen.
 
 ### Query parameters (per table)
 ```python
@@ -204,7 +204,7 @@ query_body = {
 **Total-code optimization:** Using `Kön='1+2'`, `UtbNiv='000'`, `BakgrVar='TOT'` selects the pre-aggregated SCB total directly. This reduces each POST to 290 x 1 x 1 x 1 x n_years cells (well within the ~150 000 cell limit) and avoids any need for client-side averaging.
 
 ### Expected row count
-290 x 15 = **4 350 rows**, 2010-2024 (3 480 from the snapshot, 870 from the live table). This is the shortest of the four sources and therefore sets `complete_case_max_year` = 2024 for the whole panel.
+290 x 15 = **4 350 rows**, 2010-2024 (3 480 from the snapshot, 870 from the live table). This is the shortest of the four sources and therefore sets `complete_case_max_year` = 2024 for the whole panel. The panel itself is longer and ragged — 290 x 17 = 4 930 rows, 2010-2026, anchored on skattekraft — so any consumer needing all four structural variables must read `artifacts/data_provenance.json` rather than assume `max(panel.year)`. See METHODOLOGY 2.3.1.
 
 ### Known issues
 1. **Definition change in 2018:** SCB updated the methodology - "från och med uppdatering år 2018 av nya uppgifter från 1997 och framåt justerades även innehållet i Andel öppet arbetslösa." Pre-2018 values may differ slightly from post-2018 series. The table notes this; we accept it and document.

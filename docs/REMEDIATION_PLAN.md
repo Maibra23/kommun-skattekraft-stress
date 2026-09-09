@@ -7,7 +7,9 @@
 **Trigger:** Skattekraft Model Audit, 2026-09-04
 **Audit report:** https://claude.ai/code/artifact/b3dfec90-7359-45fa-91d8-ea137080eb42
 
-**References:** `METHODOLOGY.md` (current model and formulas — several sections are corrected by this plan), `PRD.md` §4–5 (variable and model spec — §5 is unlocked by this plan), `KRI_Dataset_Identification.md` (SCB tables and queries), `DEVIATIONS.md` (log of departures from plan).
+**References:** `METHODOLOGY.md` (current model, formulas, and the decision record in §13), `PRD.md` (rewritten to the delivered product), `KRI_Dataset_Identification.md` (SCB tables and queries).
+
+> **Note on references below.** This plan was written while `DEVIATIONS.md`, `TASKS.md` and `REVIEW_2026-04-24.md` existed, and its task entries still name them. Those files were removed on 2026-09-09; the deviations record was absorbed into `METHODOLOGY.md` §13, and the other two described a codebase that no longer exists. The plan text is left as written, because it is the record of what was instructed at the time.
 
 ---
 

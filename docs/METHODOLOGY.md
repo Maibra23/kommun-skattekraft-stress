@@ -185,43 +185,42 @@ The two-way FE model is the **within-time inference panel**: it answers "within 
 
 The two models must be presented as separate findings under separate headings. The FE panel's heading is *"Samband inom kommuner över tid"* (`SWEDISH_LABELS["within_section_title"]`), and its accompanying caveat states that these coefficients cannot rank kommuner.
 
-The vulnerability score and risk classes were **removed** on 2026-09-09: `src/model/predict.py`, `predictions.parquet` and `ranking.parquet` are gone from the repository, having been deprecated at T2.4 and unread by any page since the T1.2 cutover. The 2025 horizon has since closed and the forecast has been scored against it — Pearson r = +0.016, Spearman = +0.033, RMSE 1.512 pp against a naive constant-mean benchmark of 0.974 pp, and risk classes that do not separate (realised growth 4.74 % låg, 4.52 % medel, 4.68 % hög). §3.4 still argues that predictive validity is the right standard; the model failed the standard it set. Replacing that section is T4.1's job.
-
 ---
 
-## 3. Vulnerability Score (Path A: Prediction)
+## 3. The forecast: what failed, and what replaced it
 
-### 3.1 Construction
+### 3.1 The retired vulnerability score (historical)
 
-For each kommun *i*, compute predicted growth for 2025:
+*Sections 3.2 and 3.3 described the score's standardisation and its quintile risk
+classes. They were removed on 2026-09-09 together with the code, because a
+methodology section that specifies a model nobody can run is a trap: the next
+reader rebuilds it.*
 
-$$
-\widehat{\Delta\text{TaxBase}}_{i, 2025} = \hat{\alpha}_i + \bar{\gamma}_{recent} + \hat{\beta}_1 \text{Unemployment}_{i, 2024} + \hat{\beta}_2 \text{DependencyRatio}_{i, 2024} + \hat{\beta}_3 \text{PopGrowth}_{i, 2024} + \hat{\beta}_4 \text{EduShare}_{i, 2024}
-$$
+The original Path A predicted 2025 growth per kommun from the fitted two-way FE
+model — kommun fixed effect, plus the mean of the 2022–2024 year effects as a
+proxy for the unobserved 2025 effect, plus the four structural variables at
+their 2024 values. That prediction was standardised, sign-flipped into a
+`vulnerability_score` where higher meant worse, and cut into quintiles giving
+exactly 58 kommuner "hög risk" every year by construction.
 
-Where:
-* `alpha_hat_i` = estimated kommun fixed effect
-* `gamma_bar_recent` = mean of estimated year fixed effects for 2022, 2023, 2024 (proxy for unobserved 2025)
-* `beta_hat_k` = estimated coefficients
-* RHS values are most recent observed (2024)
+Three properties of that design are worth keeping on the record, because each
+is a mistake that is easy to repeat:
 
-### 3.2 Standardization to vulnerability_score
+1. **The quintile cut was relative, so it could never report good news.** 58
+   kommuner were "hög risk" in every year, including years when every tax base
+   in the country grew. The label said fiscal distress; the arithmetic only
+   ever said "lowest fifth of this ranking".
+2. **The year-effect proxy assumed the future resembled the recent past** in a
+   model whose year effects absorb the national business cycle — the single
+   largest component of any one year's growth.
+3. **Nothing scored it before it shipped.** The failure below was discoverable
+   only because the horizon eventually closed. See §3.4.
 
-To make scores comparable and interpretable as "vulnerability":
-
-$$
-\text{vulnerability\_score}_i = -1 \times \frac{\widehat{\Delta\text{TaxBase}}_{i, 2025} - \mu_{\text{predictions}}}{\sigma_{\text{predictions}}}
-$$
-
-Where mu and sigma are mean and standard deviation across all 290 predictions. The `-1` flips the sign so that **higher score = more vulnerable** (lower predicted growth).
-
-### 3.3 Risk class assignment
-
-* **Hög** (high risk): bottom 20% of predicted growth (top 20% of vulnerability_score) = 58 kommuner
-* **Medel** (medium risk): middle 60% = 174 kommuner
-* **Låg** (low risk): top 20% of predicted growth = 58 kommuner
-
-Quintiles computed on `predicted_growth_2025`, not on `vulnerability_score` (mathematically equivalent but cleaner to document).
+`src/model/predict.py`, `artifacts/predictions.parquet` and
+`artifacts/ranking.parquet` no longer exist. The numbers the model scored are
+preserved in §3.4 and in `tests/fixtures/audit_baseline_2026-09-04.json`, which
+`tests/test_copy_matches_artifacts.py` still checks the dashboard's account
+against.
 
 ### 3.4 The standard was right. The model failed it, and here is the replacement.
 
@@ -720,7 +719,7 @@ Results from both sources are concatenated to form the complete series. Constant
 
 **Impact:** Open unemployment for 2010–2021 (3 480 kommun-year observations) cannot be fetched from SCB by any route. Searched and ruled out: `AA0003B` (labour market, `Tid` = 2022–2024 only), `AA0003E` (demography), `AA0003H` (education), `AM0207` RAMS (municipal series end 2018/2021), and `AM0210D` BAS (kommun-level but 2020–2024 only, and a different unemployment definition).
 
-**Fix applied:** Option A of REMEDIATION_PLAN.md T0.2a. `fetch_unemployment` now reads 2010–2021 from the committed snapshot `data/lookup/unemployment_2010_2021.csv` and 2022 onwards from the live `AA0003B/IntGr1KomUtbBAS`. The dead `_PRIMARY_TABLE_URL` constant was removed so no code path can request the withdrawn archive. See 8.1 for the reproducibility consequence and DEVIATIONS.md 6.1 for the decision record.
+**Fix applied:** Option A of REMEDIATION_PLAN.md T0.2a. `fetch_unemployment` now reads 2010–2021 from the committed snapshot `data/lookup/unemployment_2010_2021.csv` and 2022 onwards from the live `AA0003B/IntGr1KomUtbBAS`. The dead `_PRIMARY_TABLE_URL` constant was removed so no code path can request the withdrawn archive. See 8.1 for the reproducibility consequence and 13.1 for the decision record.
 
 **Considered and rejected (unemployment):** re-sourcing the full history from Kolada or Arbetsförmedlingen. Both are live and carry a 2010-onwards municipal series, and both rank kommuner almost identically to the SCB series (Spearman +0.926 and +0.952 against our 2024 values), but neither matches its *level*: Kolada `N03937` runs 3.65x below our series, `N01720` 0.72x above. The gap is definitional, not an error in either series — ours is a **flow** measure (registered as openly unemployed at any point during the year, over population 20-64; see KRI §3), while `N03937` is a stock-like annual average over population 18-65, itself carrying an 18-64 → 18-65 age-band change at 2023. Splicing either onto 2010–2021 would put a step change at the 2021/2022 seam, inside the within-kommun time variation the FE model reads as signal — a series break disguised as continuity, which is worse than a documented snapshot. High rank agreement means these remain viable *fallbacks* if SCB withdraws more; it does not make them drop-in replacements.
 
@@ -781,6 +780,131 @@ For 2024 and earlier this cannot happen: a live re-fetch of `BefolkningNy` confi
 Measured on the rebuilt panel: the national 2025 population is now **10 605 520**, matching SCB exactly; Överkalix reads 3 183 and −0.5623 %. The published-total check reports 0.0000 % for every year 2009–2024 and 0.0015 % nationally with a 0.4662 % worst kommun for 2025. 290 rows changed, all in 2025; every other panel value is unchanged and all eight artifacts are byte-identical.
 
 **One hazard the fix introduced, and guarded.** Changing the age codes changes what a cached raw response contains while leaving it *fresh* by age. `_cache_matches_query` now compares a cache's age codes against the codes the current query would request and refetches on a mismatch — the same guard `_cache_shortfall` provides for skattekraft.
+
+---
+
+## 13. Decision Record
+
+Departures from the original specification that a reader needs in order to
+trust the numbers. This section absorbed `DEVIATIONS.md` when that file was
+removed on 2026-09-09; the API changes it also logged are in 12, and the model
+results that surprised us are in 7.
+
+### 13.1 Unemployment 2010-2021 is served from a committed snapshot
+
+**Specified:** every variable fetched from SCB on each run, so the panel is
+reproducible from source by anyone who clones the repository.
+
+**What happened:** SCB withdrew the whole `AA0003X` archive group (12.6). Open
+unemployment for 2010-2021, 3 480 kommun-year observations, is not obtainable
+from SCB by any route. `AA0003E`, `AA0003H`, `AM0207` (RAMS) and `AM0210D`
+(BAS) were each checked and ruled out.
+
+| | Option | Consequence |
+|---|---|---|
+| **A** *(chosen)* | Snapshot 2010-2021 from the committed panel, fetch 2022+ live | Panel intact; reproducibility becomes "from repo" for one variable |
+| B | Truncate the panel to 2022+ | Tested: 80 % of observations lost, 3 years remain, no 5-year drift windows at all |
+| C/E | Re-source from Arbetsförmedlingen or Kolada | Tested: ranks agree (Spearman +0.93 / +0.95) but levels differ by 3.65x and 0.72x, putting a step change at the 2021/2022 seam |
+| D | Drop unemployment entirely | Loses the second-strongest variable |
+
+Option A also preserves the audit baseline: C or E would have changed every
+historical unemployment value at the same moment the specification changed,
+making the before/after comparison uninterpretable. See 8.1 for the
+reproducibility consequence.
+
+### 13.2 The panel is ragged, not balanced
+
+**Specified:** a balanced 290 x 15 = 4 350 panel, every variable populated in
+every cell.
+
+**What happened:** the four sources stopped sharing an end year. Skattekraft
+reaches 2026, population and education 2025, unemployment 2024. Holding the
+panel balanced would mean truncating everything to 2024 and discarding the
+newest skattekraft.
+
+**Resolution:** anchored on skattekraft and left ragged, 290 x 17 = 4 930 rows,
+with shorter sources null where they do not reach. All 290 kommuner appear in
+every year; the raggedness is across variables only. The estimation sample is
+unchanged, because `PanelOLS` drops incomplete cases and still fits on
+2010-2024. See 2.3.1 and `src/provenance.py`.
+
+### 13.3 Population is read from SCB's published total
+
+Summing single-year age cells disagreed with SCB's own published total. The
+pipeline now reads the published total directly; the national 2025 figure
+matches SCB exactly at 10 605 520. See 12.7.
+
+### 13.4 The locked empirical model was deliberately unlocked
+
+**Specified:** PRD 5 declared the model locked — a two-way FE panel regression
+producing a vulnerability score, a quintile risk class and a one-year growth
+forecast, not to be renegotiated during implementation.
+
+**What forced the change:** an audit on 2026-09-04 scored the shipped forecast
+against outcomes SCB had by then published.
+
+| Metric | Result |
+|---|---|
+| Pearson r, predicted vs realised 2025 growth | **+0.016** |
+| RMSE | 1.512 pp against 0.974 pp for guessing the national mean |
+| Predicted dispersion | 0.33 pp against a realised 0.98 pp |
+| Realised growth by risk class | låg 4.74 %, medel 4.52 %, hög 4.68 % — unseparated and non-monotone |
+
+The forecast lost to the naive benchmark by 55 %, and the risk classes did not
+order kommuner by what happened. Reproduced three times through independent
+code paths agreeing to four decimal places, so this was a property of the
+model, not of the measurement.
+
+**The diagnosis was an estimand mismatch, not a bug.** The model was correctly
+estimated; it answered a different question from the one the dashboard asked.
+**98.2 % of the variation in relative position is between kommuner**, and
+entity fixed effects absorb exactly that variation, so a two-way FE
+specification was structurally incapable of ranking kommuner however well it
+was fitted. Year-demeaned persistence of the growth rate is about -0.05, so the
+one-year target was not recoverable either.
+
+**Resolution, four changes each with its own evidence:**
+
+1. **A descriptive spine that needs no model.** Relative position and drift
+   over 1, 3, 5 and 10 years from skattekraft alone. Rank stability 0.99 at one
+   year and 0.93 at ten — the most reliable thing the project can say, and it
+   was absent from the dashboard entirely.
+2. **A cross-sectional estimator for the ranking.** Same four variables, no
+   entity effects, R2 = 0.690-0.723 across 2021-2024. Two of the four are not
+   separately identified between kommuner and are reported as controls rather
+   than drawn as bars; the judgement is a boolean in the artifact, not a rule
+   someone has to remember.
+3. **The FE model kept, demoted and relabelled.** It answers "within a kommun
+   over time", under its own heading, with an explicit statement that it cannot
+   rank kommuner. Its lagged specification is now primary.
+4. **The forecast rebuilt on terms that make the failure hard to repeat.**
+   Five-year drift rather than one-year growth; a rolling-origin backtest
+   written *before* the forecaster; two mandatory benchmarks; intervals from the
+   backtest's own errors; and a gate in code that writes nothing when
+   out-of-sample Spearman falls below 0.25. Measured **+0.329**, beating both
+   benchmarks, intervals calibrated at 81 % against a nominal 80 %.
+
+**Two thresholds in the remediation plan itself proved arithmetically
+impossible** and were corrected in place rather than quietly met: T2.2's "mean
+|residual| < 40 % of the gap", unreachable given the R2 it was derived from,
+and T3.2's "predicted dispersion within 30 % of realised", which requires
+r >= 0.70 while the same definition of done asks only for rho > 0.25. Both were
+replaced with criteria testing the same intent: residual *variance* share, and
+interval *coverage*.
+
+### 13.5 What was removed, and when
+
+The retired model was deleted from the repository on 2026-09-09 once nothing
+read it: `src/model/predict.py`, `src/model/decompose.py`, the artifacts
+`predictions.parquet`, `ranking.parquet` and `decomposition.parquet`, their
+tests, and `scripts/freeze_audit_baseline.py`. `docs/TASKS.md` and
+`docs/REVIEW_2026-04-24.md` went with them: both described a codebase that no
+longer exists in any part.
+
+`tests/fixtures/audit_baseline_2026-09-04.json` is deliberately **kept**.
+`tests/test_copy_matches_artifacts.py` checks the dashboard's account of what
+the retired forecast scored against those frozen numbers, so the claim the app
+makes about its own history cannot drift from the record.
 
 ---
 

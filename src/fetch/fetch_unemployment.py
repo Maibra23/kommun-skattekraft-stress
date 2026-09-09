@@ -9,7 +9,7 @@ Returns "Andel öppet arbetslösa" (share of open unemployment, percent) for
 The split is not a performance choice.  SCB withdrew the AA0003X archive that
 served 1997–2021 — the whole group returns HTTP 400, not just one table — so
 those years are no longer obtainable from SCB at any URL.  The snapshot is
-their only remaining source; see METHODOLOGY §8.1 and §12.6, DEVIATIONS §6.1,
+their only remaining source; see METHODOLOGY §8.1, §12.6 and §13.1,
 and REMEDIATION_PLAN.md T0.2a.
 
 The live query uses SCB's total-aggregate codes (BakgrVar='TOT', Kön='1+2',

@@ -1,595 +1,256 @@
 # PRD.md - Product Requirements Document
 
-**Project:** Skattekraftspanelen (specified as "Kommunal Skattekraft Stress Monitor")
-**Repository name:** `skattekraftspanelen` (specified as `kommun-skattekraft-stress`)
+**Project:** Skattekraftspanelen
+**Status:** Current. Describes the product as built.
+**Last rewritten:** 2026-09-09
 
-> **Renamed 2026-09-09.** The original name promised a distress ranking. That ranking
-> was retired after its forecast scored r = +0.016 against realised growth, so the name
-> was retired with it. This document keeps its original wording as the historical
-> specification; the brand strings it names in §10 no longer match the code.
-**Status:** Locked specification, ready for implementation
-**Owner:** [your name]
-**Target completion:** 5 working days
-**Deployment target:** Streamlit Community Cloud (public)
+> **This document was rewritten, not amended.** The original PRD specified a
+> *Kommunal Skattekraft Stress Monitor*: a dashboard ranking kommuner by a
+> predicted 2025 growth figure, expressed as a vulnerability score and quintile
+> risk classes. That forecast was scored against the realised outcome and
+> failed — Pearson r = +0.016, losing to a constant-mean benchmark by 55 % —
+> and the model layer was rebuilt over 2026-09. Keeping the old spec on file
+> would have meant keeping a specification for a product that was deliberately
+> abandoned, which is a trap for the next reader rather than a record. The
+> evidence, the diagnosis and the four replacements are in METHODOLOGY 13.4.
 
 ---
 
 ## Purpose of This Document
 
-This is the master reference file for every implementation task. Every prompt in `TASKS.md` references sections of this document. If a design decision is not in this PRD, it is not part of the project.
+The master reference for what the product *is*. If a design decision is not
+here, in METHODOLOGY, or in the code, it is not part of the project.
 
-**Two layer language rule (enforced everywhere):**
+Two things this document deliberately does **not** contain:
 
-* **Code layer (developer reads):** All English. Variable names, function names, file names, comments, docstrings, log messages, exception messages, all four documentation files. Example: `tax_base_growth_pct`, `fetch_skattekraft()`, `data_fetcher.py`.
-* **User layer (dashboard user sees):** All Swedish. Page titles, chart axes, tooltips, table headers, sidebar labels, buttons, error messages shown in the UI. Example: "Skattekraft per invånare (kr)", "Riskklass", "Inga data tillgängliga för den valda perioden". Enforced through the `SWEDISH_LABELS` dictionary in section 9.
+* **The Swedish label dictionary.** It lives in `src/ui/labels.py`, which is
+  the single source of truth. The original PRD duplicated all of it here, and
+  the copy drifted.
+* **The econometric method.** That is METHODOLOGY's job. This document says
+  what the product shows; METHODOLOGY says why the numbers are what they are.
 
 ---
 
 ## 1. Project Identity
 
-**One-line description (English, for README/repo):**
-A two-way fixed-effects panel model of Swedish municipal tax base growth, with predictive vulnerability ranking and structural decomposition, delivered as a Streamlit dashboard.
+| | |
+|---|---|
+| **Name** | Skattekraftspanelen |
+| **Brand mark** | SKP |
+| **Subtitle** | Läge och förflyttning |
+| **Repository** | `skattekraftspanelen` |
+| **Language** | All user-facing text in Swedish. Code, comments and docs in English. |
 
-**One-line description (Swedish, for landing page hero):**
-"En modell över skattekraftens utveckling i Sveriges 290 kommuner, med prognoser och strukturell dekomponering."
+**What it does.** Shows where each of Sweden's 290 kommuner stands in
+skattekraft against the national average, which way it has moved over 5 and 10
+years, and what structural factors explain the difference.
 
-**Research question:** Which Swedish kommuner have the weakest predicted tax base growth in the next year, and which structural factors drive both kommun and aggregate variation?
-
-**Target audience:** Bank credit analysts, kommun controllers, SKR analysts, regional policy makers, hiring managers reviewing portfolio.
-
-**Target hiring roles:** ekonom, statistiker, controller, bankrådgivare, dataanalys (Sweden).
+**What it is not.** It is not a risk ranking, a distress monitor, or a
+one-year forecast. It is descriptive first: the model explains differences
+between kommuner, it does not predict them. The one forward-looking number it
+carries — a five-year drift forecast — is published only alongside its own
+backtest score, and the pipeline writes nothing if that score falls below its
+gate.
 
 ---
 
 ## 2. Tech Stack
 
-| Layer | Technology | Version constraint | Reason |
-|---|---|---|---|
-| Language | Python | 3.11 (>=3.11,<3.12) | Streamlit Cloud compatibility, modern typing |
-| Data fetching | `requests` | latest | direct pxweb control |
-| Data manipulation | `pandas`, `pyarrow` | pandas >=2.0 | parquet I/O, modern API |
-| Panel regression | `linearmodels` | >=6.0 | standard for two-way FE in Python |
-| Dashboard | `streamlit` | >=1.30 | as specified |
-| Plotting | `plotly` | >=5.0 | interactive, integrates with Streamlit |
-| Map (choropleth) | `folium`, `branca`, `streamlit-folium` | latest | matches design reference, polygon-based |
-| Testing | `pytest` | latest | unit tests on data harmonization |
+Python 3.11. Pinned in `requirements.txt` for Streamlit Community Cloud, kept
+in sync with `pyproject.toml`.
 
-**Excluded by design:** statsmodels (worse FE handling than linearmodels), seaborn (not needed in Streamlit context), heavy ML libraries (out of scope), live model estimation in Streamlit (precomputed artifacts pattern).
+| Layer | Library |
+|---|---|
+| Data | `requests`, `pandas`, `pyarrow` |
+| Econometrics | `linearmodels` (PanelOLS), `statsmodels` (OLS, HC3) |
+| Dashboard | `streamlit==1.55.0` |
+| Charts | `plotly` |
+| Map | `folium`, `branca`, `streamlit-folium` |
+| Tests | `pytest` |
+
+Theme is set in `.streamlit/config.toml`; `showSidebarNavigation = false`
+because the sidebar is custom.
 
 ---
 
-## 3. Folder Structure (Authoritative)
+## 3. Folder Structure
+
+Authoritative listing is in README.md, which is regenerated from disk. In
+outline:
 
 ```
-kommun-skattekraft-stress/
-├── README.md                          # Swedish, with English abstract
-├── pyproject.toml                     # dependencies, build config
-├── requirements.txt                   # pinned for Streamlit Cloud
-├── .gitignore
-├── .streamlit/
-│   └── config.toml                    # theme, server settings
-├── data/
-│   ├── raw/                           # cached pxweb pulls (JSON), gitignored except .gitkeep
-│   ├── processed/
-│   │   └── panel.parquet              # cleaned 290 x 15 panel
-│   ├── geo/
-│   │   └── kommuner.geojson           # boundary file from okfse/sweden-geojson
-│   └── lookup/
-│       └── kommunkod_harmonization.csv  # static lookup of merged/renamed kommuner
-├── artifacts/                         # PRECOMPUTED outputs loaded by Streamlit
-│   ├── model_results.pkl              # fitted PanelOLS object
-│   ├── coefficients.parquet           # for methodology display
-│   ├── predictions.parquet            # 290 kommuner x predicted 2025 growth
-│   ├── decomposition.parquet          # 290 x 5 contribution columns
-│   └── ranking.parquet                # vulnerability rank, sorted
-├── src/
-│   ├── __init__.py
-│   ├── fetch/
-│   │   ├── __init__.py
-│   │   ├── pxweb_client.py            # generic pxweb POST + chunking
-│   │   ├── fetch_skattekraft.py
-│   │   ├── fetch_population.py
-│   │   ├── fetch_unemployment.py
-│   │   └── fetch_education.py
-│   ├── clean/
-│   │   ├── __init__.py
-│   │   ├── harmonize_kommunkod.py
-│   │   ├── compute_derived.py         # dependency_ratio, growth rates
-│   │   └── build_panel.py
-│   ├── model/
-│   │   ├── __init__.py
-│   │   ├── estimate.py                # PanelOLS fit
-│   │   ├── predict.py                 # next-period predictions
-│   │   └── decompose.py               # contribution accounting
-│   └── ui/
-│       ├── __init__.py
-│       ├── css.py                     # COLORS dict, GLOBAL_CSS, inject_css()
-│       ├── components.py              # page_title, kpi_card, card_header, etc.
-│       ├── sidebar.py                 # render_sidebar(page_key)
-│       ├── chart_theme.py             # get_chart_layout(), CHART_PALETTE
-│       ├── choropleth.py              # render_choropleth()
-│       └── labels.py                  # SWEDISH_LABELS dict
-├── pipeline.py                        # orchestrates fetch -> clean -> model -> predict -> decompose
-├── app.py                             # landing page (entry point for Streamlit)
-├── pages/
-│   ├── 01_Riksoversikt.py             # national overview + choropleth
-│   └── 02_Kommunjamforelse.py         # kommun detail + decomposition
-├── tests/
-│   ├── __init__.py
-│   ├── test_harmonize.py
-│   └── test_decompose.py
-├── docs/
-│   ├── PRD.md                         # this file
-│   ├── TASKS.md
-│   ├── METHODOLOGY.md
-│   └── KRI_Dataset_Identification.md
-└── notebooks/
-    └── 01_exploratory.ipynb           # Day 2 EDA, kept for reference
+app.py              Startsida
+pages/              Riksöversikt, Kommunjämförelse
+pipeline.py         fetch → clean → estimate → decompose → forecast
+src/provenance.py   which year has which variables; never hardcode a year
+src/fetch/          SCB PxWeb clients, one per source
+src/clean/          harmonisation, derived variables, panel build
+src/model/          position, estimate, estimate_cross, decompose_cross,
+                    diagnostics, forecast, backtest
+src/ui/             css, components, sidebar, filters, chart_theme,
+                    choropleth, labels
+artifacts/          precomputed parquet the dashboard reads directly
+data/               raw cache, processed panel, geojson, lookups
+docs/               METHODOLOGY, KRI_Dataset_Identification, REMEDIATION_PLAN,
+                    this file
+tests/              pytest
 ```
-
-**Why this structure:** Clean separation between pipeline (run once locally, writes artifacts) and serving (Streamlit Cloud loads artifacts). Mirrors standard ML deployment pattern. Mirrors the SHAI reference structure where applicable.
 
 ---
 
 ## 4. Core Data Variables
 
-### Dependent variable
+Outcome and four structural variables, all per kommun-year.
 
-| Code name | Swedish display | Definition | Source | pxweb table |
-|---|---|---|---|---|
-| `tax_base_per_capita` | "Skattekraft per invånare" | Beskattningsbar förvärvsinkomst per invånare, kr | SCB | OE0101 SkatteKraft |
-| `tax_base_growth_pct` | "Skattekraftstillväxt (%)" | Year-over-year percent change, computed | derived | - |
-
-### Independent variables
-
-| Code name | Swedish display | Definition | Source | pxweb table |
-|---|---|---|---|---|
-| `unemployment_rate` | "Öppen arbetslöshet (%)" | Andel öppet arbetslösa, share of pop 20-64 registered with Arbetsförmedlingen | SCB STATIV | AA0003 |
-| `dependency_ratio` | "Försörjningskvot" | (Pop 0-19 + Pop 65+) / Pop 20-64, computed | SCB BE0101 | BE0101 |
-| `population_growth_pct` | "Befolkningstillväxt (%)" | Year-over-year percent change in folkmängd, computed | SCB BE0101 | BE0101 |
-| `edu_share` | "Andel eftergymnasialt utbildade (%)" | Share of pop 25-64 with eftergymnasial utbildning 3+ years | SCB UF0506 | UF0506 |
-
-### Identifiers and metadata
-
-| Code name | Swedish display | Definition |
+| Variable | Meaning | Source |
 |---|---|---|
-| `kommun_kod` | "Kommunkod" | 4-digit SCB kommun code, zero-padded, harmonized to 2024 boundaries |
-| `kommun_name` | "Kommun" | Kommun name in Swedish, 2024 spelling |
-| `lan_kod` | "Länskod" | 2-digit län code |
-| `lan_name` | "Län" | Län name |
-| `year` | "År" | Reference year, integer |
+| `tax_base_per_capita` | Skattekraft, SEK per inhabitant | SCB OE0101 |
+| `tax_base_index_riket` | SCB's own published index, riket = 100, population-weighted | SCB OE0101 |
+| `relative_position` | Our index: kommun ÷ unweighted mean of the 290 × 100 | derived |
+| `unemployment_rate` | Öppen arbetslöshet, % | SCB AA0003 |
+| `dependency_ratio` | (under 20 + over 64) ÷ 20-64 | derived from SCB BE0101 |
+| `population_growth_pct` | % change in population on the year before | derived from SCB BE0101 |
+| `edu_share` | Share aged 25-64 with 3+ years post-secondary, % | SCB UF0506 |
 
-### Derived outputs (artifacts)
+**The two index measures must never be mixed.** They differ in denominator,
+not in quality: ours weights every kommun equally, SCB's weights every
+inhabitant equally, so ours reads ~8 index points higher for all 290. Rank
+correlation between them is 0.999. See METHODOLOGY 7.13.
 
-| Code name | Swedish display | Definition |
-|---|---|---|
-| `predicted_growth_2025` | "Prognos 2025 (%)" | Out-of-sample prediction for 2025 |
-| `vulnerability_score` | "Sårbarhetsindex" | Standardized predicted growth (z-score, sign-flipped so high = vulnerable) |
-| `vulnerability_rank` | "Rang" | Rank 1 to 290, 1 = most vulnerable |
-| `risk_class` | "Riskklass" | Categorical: "lag", "medel", "hog" - bottom quintile = "hog" |
-| `decomp_unemployment` | "Bidrag: arbetslöshet" | Contribution of unemployment differential to gap vs national mean |
-| `decomp_dependency` | "Bidrag: försörjningskvot" | Contribution of dependency ratio differential |
-| `decomp_population` | "Bidrag: befolkning" | Contribution of population growth differential |
-| `decomp_education` | "Bidrag: utbildning" | Contribution of education share differential |
-| `decomp_residual` | "Bidrag: residual" | Kommun fixed effect plus error |
+**The panel is ragged.** Sources end in different years — skattekraft 2026,
+population and education 2025, unemployment 2024. Anything needing all four
+must read `artifacts/data_provenance.json` through `src/provenance.py`, never
+`max(panel.year)`. See METHODOLOGY 13.2.
 
 ---
 
-## 5. Empirical Model (Locked)
+## 5. Empirical Model
 
-```
-DeltaTax_base_it = alpha_i + gamma_t + beta_1,Unemployment_it + beta_2,DependencyRatio_it + beta_3,PopGrowth_it + beta_4,EduShare_it + epsilon_it
-```
+Two models answering two different questions, plus one forecast. Full
+specification in METHODOLOGY 2 and 3; this is the product-level summary.
 
-Where i indexes kommun (290), t indexes year (2010 to 2024). Two-way fixed effects (kommun and year). Standard errors clustered at kommun level. Estimated with `linearmodels.PanelOLS(entity_effects=True, time_effects=True)`. Robustness: lagged independents, drop COVID years, larger-kommuner subsample.
+**Cross-section — the headline.** Why does a kommun sit where it sits? OLS of
+relative position on the four structural variables for the latest complete-case
+year, no entity effects. R² ≈ 0.69. Of the four variables, only `edu_share` and
+`unemployment_rate` are separately identified; the other two are reported as
+controls and **never drawn as bars**, because their confidence intervals span
+zero. The identification judgement is a boolean column in the artifact, not a
+rule anyone has to remember.
 
-**Vulnerability score for prediction (2025):**
-* Use estimated betas
-* Use most recent observed (2024) values of independents
-* Use kommun's own fixed effect estimate
-* Year fixed effect = mean of last 3 years (proxy)
-* Compute predicted growth, standardize across kommuner, sign-flip so high score = high vulnerability
-* Bottom quintile (58 kommuner) = "hog" risk class
-* Quintiles 2-4 = "medel"
-* Top quintile = "lag"
+**Panel, two-way fixed effects — demoted.** What moves growth within a kommun
+over time? Presented under its own heading with an explicit statement that it
+**cannot rank kommuner**: 98 % of the variation in relative position is between
+kommuner, which is exactly what entity effects remove.
 
-**Decomposition (gap vs national mean):**
-For each kommun and each independent variable, compute (kommun value - national mean) x beta. Plus residual = alpha_i + ε_i.
-
-Full methodology in `METHODOLOGY.md`.
-
----
-
-## 6. Design System (Adapted from SHAI Reference)
-
-### 6.1 Color tokens (locked)
-
-Defined in `src/ui/css.py` as `COLORS` dict:
-
-```python
-COLORS = {
-    "primary":        "#0B1F3F",   # Navy - sidebar, KPI bars, hero
-    "primary_light":  "#1B2A4A",   # Lighter navy - hero gradient mid
-    "secondary":      "#4A6FA5",   # Blue - chart series 1
-    "accent":         "#C4A35A",   # Gold - eyebrows, brand bar, active
-    "low_risk":       "#2E7D5B",   # Green - låg risk
-    "medium_risk":    "#D4A03C",   # Amber - medel risk
-    "high_risk":      "#B94A48",   # Red - hög risk
-    "bg":             "#F7F8FA",
-    "card_bg":        "#FFFFFF",
-    "text_primary":   "#1A1A2E",
-    "text_secondary": "#6B7280",
-    "text_tertiary":  "#9CA3AF",
-    "border":         "#EEF0F3",
-    "grid":           "#E5E7EB",
-    "hover":          "#F9FAFB",
-}
-
-DIVERGING_SCALE = [
-    "#2E7D5B", "#5B9E78", "#A8C4A4",
-    "#E5E7EB",
-    "#E8BE7C", "#D4A03C", "#B94A48",
-]
-
-CHART_PALETTE = [
-    "#4A6FA5", "#2E7D5B", "#C4A35A", "#B94A48",
-    "#7B68A8", "#D4785A", "#3D8B6E", "#5A7FBD",
-]
-```
-
-### 6.2 Typography
-
-Loaded via Google Fonts `@import` in `GLOBAL_CSS`:
-```
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@300;400;600;700&display=swap');
-```
-
-| Use | Family | Weight | Size |
-|---|---|---|---|
-| Page title | Source Sans 3 | 700 | 28px |
-| Hero headline | Source Sans 3 | 700 | clamp(24px, 3vw, 36px) |
-| Card title | Source Sans 3 | 700 | 15px |
-| Eyebrow | Source Sans 3 | 600 | 11px uppercase, 1.5px tracking |
-| Body | Source Sans 3 | 400 | 14-15px |
-| KPI value | Source Sans 3 | 700 | 32px tabular-nums |
-| Numeric data | IBM Plex Mono | 400-500 | 11-12px |
-| Table headers | Source Sans 3 | 600 | 10.5px uppercase |
-
-### 6.3 Layout
-
-Same as SHAI reference: page padding 32px 40px, max-width 1480px, section gap 24px, card padding 22px 24px, card radius 4px, card border 1px solid #EEF0F3.
-
-### 6.4 Streamlit setup (every page)
-
-```python
-st.set_page_config(
-    page_title="KSS , <Page Name>",
-    page_icon=None,
-    layout="wide",
-    menu_items={"Get Help": None, "Report a bug": None},
-)
-from src.ui.css import inject_css
-inject_css()
-```
-
-**Brand mark:** "KSS" (Kommunal Skattekraft Stress) replaces SHAI in the brand block. All other CSS classes keep the `shai-` prefix for visual fidelity to the reference, but document this choice in code comments. (Renaming all CSS classes is wasted scope.)
-
-### 6.5 Sidebar
-
-`render_sidebar(page_key)` in `src/ui/sidebar.py`. Dimensions: 260px wide, navy background.
-
-* Brand block: gold accent bar + "KSS" mark + title "Skattekraft Stress" + sub "Kommunal panelmodell"
-* Navigation links to: Översikt (landing), Riksöversikt, Kommunjämförelse
-* Year selector: `st.pills()`, single, default 2024
-* Risk filter: `st.pills()`, multi, options "Hög" / "Medel" / "Låg"
-* Risk legend with colored dots
-* Footer: data source, last-updated date, version
-
-### 6.6 Components
-
-All in `src/ui/components.py`:
-* `page_title(eyebrow, title, subtitle, year)` - page header
-* `kpi_card(label, value, unit, delta, delta_direction, variant, tooltip)` - KPI tile
-* `render_kpi_row(cards)` - equal-width column layout for KPIs
-* `card_header(title, subtitle, tag)` - card top
-* `card(title, subtitle, tag, content)` - full card
-* `risk_pill(level)` - Låg/Medel/Hög pill
-* `footer_note(source, version)` - page bottom
-
-Delta direction semantics for skattekraft growth:
-* `up` = growth, GREEN (good for kommun)
-* `down` = decline, RED (bad)
-* `flat` = stable, GRAY
-
-This is **inverted from SHAI** (where rising prices = bad). Document in code.
-
-### 6.7 Choropleth map
-
-`src/ui/choropleth.py`. Folium polygon-based. Diverging green to neutral to red scale on `vulnerability_score`. Height 480px. Uses `data/geo/kommuner.geojson` from okfse/sweden-geojson (see KRI_Dataset_Identification.md 5).
-
-Legend caption (Swedish): "Sårbarhetsindex , Lägre = bättre, Högre = sämre"
-
-### 6.8 Chart theme
-
-`get_chart_layout(title, height, xaxis_title, yaxis_title, showlegend)` in `src/ui/chart_theme.py`. Same properties as SHAI reference: Source Sans 3 12px base, white plot bg, navy hover bg, gridlines #E5E7EB.
+**Forecast.** Five-year drift in relative position, never one-year growth.
+Gated in code by a rolling-origin backtest written before the forecaster;
+intervals come from the backtest's own errors, not from nominal standard
+errors. Published together with its Spearman, its RMSE and two benchmarks.
 
 ---
 
-## 7. Page Structure (3 Pages)
+## 6. Design System
 
-### Page 1: `app.py` - Landing (Översikt)
+Navy and gold over an off-white ground; Source Sans 3 for text, IBM Plex Mono
+for figures. Palette and CSS live in `src/ui/css.py`; the Plotly theme in
+`src/ui/chart_theme.py`.
 
-**Route:** `/`
-**Page title:** "KSS , Översikt"
-**Eyebrow:** "KOMMUNAL SKATTEKRAFT STRESS MONITOR"
-**Headline:** "Skattekraftens utveckling i Sveriges 290 kommuner"
-**Lead:** "En panelmodell som identifierar kommuner med svag prognosticerad skattekraftstillväxt och dekomponerar drivkrafterna bakom skillnaderna mellan kommuner."
+CSS class names keep the `shai-` prefix from the visual reference the design
+was adapted from. Renaming them is deliberate wasted scope — they are internal
+identifiers, invisible to users. The same reasoning keeps `kss-` on the map
+legend classes and the `kss_choropleth` widget key after the project rename.
 
-**Sections:**
-1. Hero block (navy gradient, gold border)
-2. Stat strip (4 cells): "290 KOMMUNER", "15 ÅR PANEL", "4 STRUKTURVARIABLER", "FIXED EFFECTS"
-3. Modellöversikt (3 input boxes to Regressionsmodell box to 3 output boxes; SVG flow)
-4. Variabler & vikter (regression coefficients displayed as bars, NOT arbitrary index weights - this is the key adaptation from SHAI)
-5. Pipeline steps (4 steps with arrow connectors): Datainsamling to Rensning to Estimering to Prognos
-6. Navigation cards (2 cards): Riksöversikt, Kommunjämförelse
-7. Källor & metod block (credibility): SCB OE0101, SCB BE0101, SCB AA0003, SCB UF0506
+**Number formatting is a single policy**, implemented in `src/ui/labels.py`:
+decimal comma throughout, one decimal for movements and effects, whole numbers
+for index values, explicit sign where direction is the point, and no sign at
+all on a value that rounds to zero. Charts and the tables beside them must
+agree to the last digit.
 
-### Page 2: `pages/01_Riksoversikt.py` - National Overview
+---
 
-**Page title:** "KSS , Riksöversikt"
-**Eyebrow:** "NATIONELL VY"
-**Title:** "Riksöversikt"
-**Subtitle:** "Skattekraftens prognosticerade utveckling 2025, alla 290 kommuner"
+## 7. Page Structure
 
-**Sections:**
-1. KPI row (4 cards):
-   * "Median prognos 2025" - predicted growth, national median
-   * "Kommuner i hög risk" - count of bottom quintile
-   * "Största nedgång (prognos)" - most negative predicted growth, with kommun name
-   * "Modellens R2" - within R2 from regression
-2. Geografisk fördelning (choropleth map, Folium, full-width or 3:2 split with histogram)
-3. Histogram of predicted growth across kommuner (right side of choropleth in 3:2 layout)
-4. Rangordning (sortable table, all 290 kommuner): Rang, Kommun, Län, Prognos 2025 (%), Riskklass. CSV download.
+**Startsida (`app.py`)** — what the measure is, what the model can and cannot
+separate. Hero; concept expander; stat strip with the counts read from the
+artifacts; model diagram; the coefficient chart as dot-and-whisker with a
+reading guide; the within-kommun panel under its own heading; pipeline steps;
+navigation; sources.
 
-### Page 3: `pages/02_Kommunjamforelse.py` - Kommun Detail
+**Riksöversikt (`pages/01_Riksoversikt.py`)** — all 290 at once. KPI row
+(index spread, largest 10-year fall and rise, cross-sectional R²); choropleth
+with a position/drift layer toggle beside a histogram of the same quantity;
+the two index measures plotted against each other; the forecast with its
+backtest panel; the full sortable table with CSV download.
 
-**Page title:** "KSS , Kommunjämförelse"
-**Eyebrow:** "KOMMUNDETALJ"
-**Title:** "Kommunjämförelse"
-**Subtitle:** "Strukturell dekomponering för vald kommun"
+**Kommunjämförelse (`pages/02_Kommunjamforelse.py`)** — one kommun in depth.
+Selector ordered by position; lead sentence; KPI row; position over time
+against 100; skattekraft in kronor with optional comparison kommuner; the
+decomposition of the position gap with controls shown as numbers rather than
+bars; nearest peers by position.
 
-**Selector:** `st.selectbox` for kommun, default to top of vulnerability rank.
-
-**Sections:**
-1. KPI row (4 cards for selected kommun):
-   * "Skattekraft 2024" (kr per invånare)
-   * "Tillväxt 2024 (%)"
-   * "Prognos 2025 (%)"
-   * "Sårbarhetsrang" (X / 290)
-2. Historisk trend (line chart): kommun vs riksgenomsnitt, 2010-2024
-3. Dekomponering (horizontal bar chart): contribution of each variable to gap vs national mean, 2024. Color-coded: positive = green, negative = red.
-4. Peer comparison table: 5 most similar kommuner by vulnerability score, with their values for each input variable
-5. Metod-länk: link to METHODOLOGY.md on GitHub
+Every chart carries a reading guide with a worked example, and every term the
+dashboard uses is defined in the glossary.
 
 ---
 
 ## 8. Acceptance Criteria
 
-A page is "done" when ALL of these pass:
-
-**Functional:**
-* Loads in under 5 seconds from cold start
-* No Python errors in console
-* All charts render
-* All tables sortable and downloadable where specified
-* Choropleth tooltip shows kommun name + key metrics
-
-**Visual:**
-* Matches design system (colors, fonts, spacing, card style)
-* Sidebar visible and styled per spec
-* All chrome (Streamlit menu, footer, default header) hidden
-* Responsive: usable on screens 1280px wide (no need for mobile)
-
-**Language:**
-* ZERO English text visible to user (check every label, tooltip, error)
-* All numeric formatting uses Swedish conventions: comma as decimal separator, narrow no-break space (`\u202f`) as thousands separator
-* Currency: "kr" suffix, never "SEK" in user-facing text
-* Percentages: comma decimal, "%" suffix
-
-**Code quality:**
-* All public functions have English docstrings
-* `pytest` passes
-* No hardcoded paths (use `pathlib.Path` relative to project root)
-* No print statements (use `logging`)
-
-**Data integrity (sanity checks, see METHODOLOGY 6):**
-* Danderyd has highest skattekraft level in 2024 data
-* Dorotea or similar small Norrland kommun has lowest skattekraft level
-* Predictions sum/average is in plausible range (3-5% growth typical)
-* No kommun has missing values across all years
+1. All three pages render against the committed artifacts with no exception
+   and no unresolved `{placeholder}` — enforced by `tests/test_pages_render.py`.
+2. Every `SWEDISH_LABELS` key a page references exists — enforced by
+   `tests/test_labels.py`, matching both quote styles.
+3. Every number quoted in the UI copy matches the artifacts — enforced by
+   `tests/test_copy_matches_artifacts.py`. A pipeline rerun that changes a
+   result fails the suite until the copy is updated.
+4. No rendered string describes the retired model, and no rendered string uses
+   the "tappa mark" idiom — both enforced in `tests/test_labels.py`.
+5. No typographic dashes in user-facing Swedish text.
+6. The forecast artifact is absent rather than wrong when the backtest gate
+   fails, and the dashboard renders correctly without it.
+7. No year is hardcoded where `src/provenance.py` can supply it.
 
 ---
 
-## 9. SWEDISH_LABELS Dictionary (Authoritative)
+## 9. Two Layer Language Rule
 
-Defined in `src/ui/labels.py`. Every user-facing string MUST come from here. Code that hardcodes Swedish text in component logic is rejected in code review.
+**Every user-facing string is Swedish and comes from `SWEDISH_LABELS` in
+`src/ui/labels.py`.** Swedish text hardcoded in component logic is rejected in
+review. Code, comments, docstrings, commit messages and documentation are
+English.
 
-```python
-SWEDISH_LABELS = {
-    # Brand and navigation
-    "brand_mark": "KSS",
-    "brand_title": "Skattekraft Stress",
-    "brand_sub": "Kommunal panelmodell",
-    "nav_landing": "Översikt",
-    "nav_national": "Riksöversikt",
-    "nav_kommun": "Kommunjämförelse",
-
-    # Page eyebrows and titles
-    "eyebrow_landing": "KOMMUNAL SKATTEKRAFT STRESS MONITOR",
-    "eyebrow_national": "NATIONELL VY",
-    "eyebrow_kommun": "KOMMUNDETALJ",
-    "title_landing": "Skattekraftens utveckling i Sveriges 290 kommuner",
-    "title_national": "Riksöversikt",
-    "title_kommun": "Kommunjämförelse",
-
-    # Sidebar controls
-    "label_year": "ÅR",
-    "label_risk_filter": "RISKKLASS",
-    "label_kommun_select": "VÄLJ KOMMUN",
-
-    # Risk classes
-    "risk_low": "Låg",
-    "risk_medium": "Medel",
-    "risk_high": "Hög",
-
-    # KPI labels (national)
-    "kpi_median_prognosis": "Median prognos 2025",
-    "kpi_high_risk_count": "Kommuner i hög risk",
-    "kpi_largest_decline": "Största nedgång (prognos)",
-    "kpi_model_r2": "Modellens R2",
-
-    # KPI labels (kommun)
-    "kpi_skattekraft_2024": "Skattekraft 2024",
-    "kpi_growth_2024": "Tillväxt 2024",
-    "kpi_prognosis_2025": "Prognos 2025",
-    "kpi_vulnerability_rank": "Sårbarhetsrang",
-
-    # Chart axes and titles
-    "axis_year": "År",
-    "axis_skattekraft": "Skattekraft per invånare (kr)",
-    "axis_growth_pct": "Tillväxt (%)",
-    "axis_kommuner_count": "Antal kommuner",
-    "chart_historical": "Historisk skattekraft",
-    "chart_decomposition": "Strukturell dekomponering",
-    "chart_distribution": "Fördelning av prognosticerad tillväxt",
-
-    # Table headers
-    "th_rank": "Rang",
-    "th_kommun": "Kommun",
-    "th_lan": "Län",
-    "th_prognosis": "Prognos 2025 (%)",
-    "th_risk_class": "Riskklass",
-    "th_skattekraft": "Skattekraft (kr)",
-    "th_unemployment": "Arbetslöshet (%)",
-    "th_dependency": "Försörjningskvot",
-    "th_pop_growth": "Befolkning (%)",
-    "th_education": "Utbildning (%)",
-
-    # Variable display names
-    "var_unemployment": "Öppen arbetslöshet",
-    "var_dependency": "Försörjningskvot",
-    "var_population": "Befolkningstillväxt",
-    "var_education": "Andel eftergymnasialt utbildade",
-    "var_residual": "Residual (kommunspecifika faktorer)",
-
-    # Decomposition contributions
-    "contrib_unemployment": "Bidrag: arbetslöshet",
-    "contrib_dependency": "Bidrag: försörjningskvot",
-    "contrib_population": "Bidrag: befolkning",
-    "contrib_education": "Bidrag: utbildning",
-    "contrib_residual": "Bidrag: residual",
-
-    # Map
-    "map_title": "Geografisk fördelning",
-    "map_subtitle": "Sårbarhetsindex per kommun",
-    "map_legend_caption": "Sårbarhetsindex , Lägre = bättre, Högre = sämre",
-    "map_color_scale_note": "Färgskala: Grön = låg sårbarhet , Gul = medel , Röd = hög sårbarhet",
-
-    # Buttons and actions
-    "btn_download_csv": "Ladda ned som CSV",
-    "btn_show_method": "Visa metod",
-
-    # States
-    "state_loading": "Laddar data...",
-    "state_no_data": "Inga data tillgängliga för den valda perioden",
-    "state_error_io": "Kunde inte hämta data. Försök igen senare.",
-    "state_error_compute": "Beräkningsfel. Se metodologisidan för detaljer.",
-
-    # Footer
-    "footer_source_label": "KÄLLA",
-    "footer_source": "SCB , OE0101, BE0101, AA0003, UF0506",
-    "footer_method_link": "Metodologi",
-
-    # Methodology callouts
-    "method_model_name": "Tvåvägs fixed effects panelmodell",
-    "method_period": "Period: 2010-2024",
-    "method_units": "290 kommuner x 15 år = 4 350 observationer",
-
-    # Units (use these everywhere)
-    "unit_sek": "kr",
-    "unit_pct": "%",
-    "unit_per_capita": "per invånare",
-}
-```
-
-**Number formatting helpers** (in `src/ui/labels.py`):
-
-```python
-def format_sek(value: float) -> str:
-    """Format integer SEK with narrow no-break space thousands separator."""
-    return f"{int(round(value)):,}".replace(",", "\u202f") + " kr"
-
-def format_pct(value: float, decimals: int = 1) -> str:
-    """Format percentage with comma decimal, % suffix."""
-    return f"{value:.{decimals}f}".replace(".", ",") + " %"
-
-def format_signed_pct(value: float, decimals: int = 1) -> str:
-    """Format signed percentage with sign always shown."""
-    return f"{value:+.{decimals}f}".replace(".", ",") + " %"
-```
+This is the most violated rule in projects of this kind. The check is
+mechanical: if a Swedish word appears inside a `.py` file outside
+`labels.py`, it is a bug.
 
 ---
 
-## 10. Two Layer Language Rule (Restated for Emphasis)
+## 10. Deployment
 
-This is the most violated rule in projects of this kind. Every prompt in `TASKS.md` includes a reminder. Code review checklist:
+Streamlit Community Cloud, serving the branch directly with no build step.
 
-* Variable names: English. `tax_base_growth_pct`, never `skattekraftstillvaxt_pct`.
-* Function names: English. `compute_dependency_ratio()`, never `berakna_forsorjningskvot()`.
-* File names: English. `fetch_skattekraft.py` is borderline (acceptable since it names a Swedish concept), but `data_fetcher.py` is preferred where natural.
-* Comments and docstrings: English.
-* Log messages: English. `logger.info("Fetched 4350 rows from OE0101")`.
-* Internal exception messages: English. `raise ValueError("kommun_kod must be 4-digit string")`.
-* User-facing strings: Swedish, from `SWEDISH_LABELS`.
-* Chart axis labels passed to Plotly: Swedish, from `SWEDISH_LABELS`.
-* Streamlit error messages shown to user (`st.error`, `st.warning`): Swedish.
-* Print statements / `st.write` debug output during development: English, but must be removed before deployment.
+**This is why `artifacts/` is committed and is a published contract**
+(METHODOLOGY 11.7). `pipeline.py` runs locally only; the deployed app reads
+the parquet files straight from git. An artifact whose schema changes in the
+same commit as the page that reads it is fine; changing one without the other
+breaks the live site.
 
 ---
 
-## 11. Deployment
+## 11. Out of Scope
 
-* GitHub repo public, name: `kommun-skattekraft-stress`
-* Streamlit Community Cloud connected to repo
-* App entry point: `app.py`
-* Requirements pinned in `requirements.txt`
-* Artifacts committed to repo (small files, well under 1 GB limit)
-* Pipeline NOT run on Streamlit Cloud. User runs `python pipeline.py` locally, commits artifacts, pushes.
-* Cold start expected: under 5 seconds
-* Caching: `@st.cache_data` on artifact loaders only. No `@st.cache_resource` needed.
+* Real (inflation-adjusted) skattekraft
+* Causal identification of any kind — the decomposition is descriptive
+* One-year growth forecasting; the data does not support it
+* Kommun-level policy recommendations
+* Any ranking by predicted distress
 
 ---
 
-## 12. Out of Scope (Explicit Non-Goals)
+## 12. Document Cross-References
 
-* Live model re-estimation in app
-* Län-level rollups
-* Mobile-optimized layout (desktop-first only)
-* Authentication / user accounts
-* Database backend (parquet only)
-* Real-time data refresh (annual SCB publication is the cadence)
-* Causal identification claims
-* Forecasts beyond t+1
-* Comparison with other Nordic countries
-
----
-
-## 13. Document Cross-References
-
-* Tasks: `docs/TASKS.md` - every task references PRD sections
-* Methodology details: `docs/METHODOLOGY.md` - theoretical foundation, formulas, sanity checks
-* Data audit: `docs/KRI_Dataset_Identification.md` - every variable's source URL, query, schema
-
----
-
-**End of PRD.md**
+| Document | Contents |
+|---|---|
+| `METHODOLOGY.md` | Model specification, formulas, limitations, decision record |
+| `KRI_Dataset_Identification.md` | SCB tables, API queries, data audit |
+| `REMEDIATION_PLAN.md` | The 2026-09 model-layer rebuild, complete |
+| `README.md` | Orientation, install, file tree |

@@ -9,7 +9,7 @@
 # Frozen:    2026-09-07 by scripts/freeze_unemployment_snapshot.py
 # Validated: overlap years 2022-2024 re-fetched live from
 #            AA0003B/IntGr1KomUtbBAS, max abs diff 0.000000 pp.
-# Rationale: docs/REMEDIATION_PLAN.md T0.2a (option A), docs/DEVIATIONS.md.
+# Rationale: docs/REMEDIATION_PLAN.md T0.2a (option A), METHODOLOGY 13.1.
 kommun_kod,year,unemployment_rate
 0114,2010,12.0
 0114,2011,11.4
