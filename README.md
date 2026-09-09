@@ -13,7 +13,7 @@ Det här projektet mäter var Sveriges 290 kommuner står i skattekraft mot riks
 - **Femårsprognos** för förflyttning, testad mot utfall innan den publiceras (Spearman +0,33), med intervall som kommer från prognosens egna träffar
 - Interaktivt Streamlit-dashboard med tre vyer, en ordlista och en läsanvisning till varje diagram
 
-**Varför?** Skattekraften varierar enormt: ~481 000 kr per invånare i Danderyd mot under 180 000 kr i delar av Norrland. Frågan projektet svarar på är *vad som förklarar den skillnaden* — och, i andra hand, hur mycket av den som går att förutsäga. Svaret på det andra är: mindre än man skulle vilja, och projektet redovisar det öppet.
+**Varför?** Skattekraften varierar enormt: 2026 hade Danderyd 517 000 kr per invånare medan Högsby, den lägsta kommunen, hade 198 000 kr, alltså index 208 respektive 80. Frågan projektet svarar på är *vad som förklarar den skillnaden* — och, i andra hand, hur mycket av den som går att förutsäga. Svaret på det andra är: mindre än man skulle vilja, och projektet redovisar det öppet.
 
 > **Om projektets historia och namnet.** En tidigare version hette *Kommunal Skattekraft Stress Monitor* och rangordnade kommuner efter en prognosticerad tillväxt för 2025 som aldrig hade testats mot utfall. När horisonten stängde och den testades blev korrelationen med faktisk tillväxt **+0,02**, och den förlorade mot att gissa riksgenomsnittet. Hela modellagret gjordes om under 2026-09, och namnet byttes när det som gjorde det till en "stress monitor" var borttaget. Se `docs/REMEDIATION_PLAN.md` och `docs/DEVIATIONS.md` §6.4.
 
