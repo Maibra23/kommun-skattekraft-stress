@@ -125,7 +125,7 @@ def _run_step(step_num: int, description: str, func, *args, **kwargs):
 def main() -> None:
     """Run the full pipeline: fetch → clean → estimate → predict → decompose."""
     parser = argparse.ArgumentParser(
-        description="Kommunal Skattekraft Stress Monitor — data pipeline"
+        description="Skattekraftspanelen data pipeline"
     )
     parser.add_argument(
         "--force-refresh",

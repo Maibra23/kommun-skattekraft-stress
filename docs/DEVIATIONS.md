@@ -1,6 +1,6 @@
 # DEVIATIONS.md
 
-**Project:** Kommunal Skattekraft Stress Monitor
+**Project:** Skattekraftspanelen
 **Purpose:** Documents how the implementation has deviated from the original PRD and TASKS specifications, why, and how each deviation was resolved.
 
 ## 1. SCB API Structural Changes

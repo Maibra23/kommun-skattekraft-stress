@@ -1,7 +1,12 @@
 # PRD.md - Product Requirements Document
 
-**Project:** Kommunal Skattekraft Stress Monitor
-**Repository name:** `kommun-skattekraft-stress`
+**Project:** Skattekraftspanelen (specified as "Kommunal Skattekraft Stress Monitor")
+**Repository name:** `skattekraftspanelen` (specified as `kommun-skattekraft-stress`)
+
+> **Renamed 2026-09-09.** The original name promised a distress ranking. That ranking
+> was retired after its forecast scored r = +0.016 against realised growth, so the name
+> was retired with it. This document keeps its original wording as the historical
+> specification; the brand strings it names in §10 no longer match the code.
 **Status:** Locked specification, ready for implementation
 **Owner:** [your name]
 **Target completion:** 5 working days

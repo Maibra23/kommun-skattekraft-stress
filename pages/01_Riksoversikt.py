@@ -29,7 +29,7 @@ import streamlit as st
 # ---------------------------------------------------------------------------
 
 st.set_page_config(
-    page_title="KSS Riksöversikt",
+    page_title="Skattekraftspanelen Riksöversikt",
     page_icon=None,
     layout="wide",
     menu_items={"Get Help": None, "Report a bug": None},

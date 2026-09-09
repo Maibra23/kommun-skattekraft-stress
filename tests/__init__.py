@@ -1,1 +1,1 @@
-"""Test suite for the Kommunal Skattekraft Stress Monitor."""
+"""Test suite for Skattekraftspanelen."""

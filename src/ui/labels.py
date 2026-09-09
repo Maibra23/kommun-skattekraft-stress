@@ -22,8 +22,8 @@ from typing import NamedTuple
 
 SWEDISH_LABELS = {
     # Brand and navigation
-    "brand_mark": "KSS",
-    "brand_title": "Skattekraft Stress",
+    "brand_mark": "SKP",
+    "brand_title": "Skattekraftspanelen",
     "brand_sub": "Läge och förflyttning",
     "nav_landing": "Startsida",
     "nav_national": "Riksöversikt",

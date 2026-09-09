@@ -1,6 +1,6 @@
 # METHODOLOGY.md - Methodology Bible
 
-**Project:** Kommunal Skattekraft Stress Monitor
+**Project:** Skattekraftspanelen
 
 This document is both a development reference and the basis for the methodology section displayed in the dashboard. It documents the theoretical foundation, the exact regression specification, every formula, the evaluation criteria, and all known limitations.
 

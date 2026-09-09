@@ -1,6 +1,6 @@
 # REMEDIATION_PLAN.md — Model Layer Remediation (14 tasks, 4 phases)
 
-**Project:** Kommunal Skattekraft Stress Monitor
+**Project:** Skattekraftspanelen
 **Created:** 2026-09-05
 **Last updated:** 2026-09-07
 **Status:** In progress — **Phase 0 complete**; T1.1 and T2.1 done, both Phase-2 gates passed. Next: step 6 (T2.2 + T2.3, decomposition and diagnostics).

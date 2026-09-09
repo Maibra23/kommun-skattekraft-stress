@@ -1,15 +1,18 @@
 """Streamlit entry point, Landing page (Startsida).
 
-Configures the page with st.set_page_config (title 'KSS Startsida',
-layout='wide'), injects the global CSS, and renders the sidebar.  Page
-sections (in order):
+Configures the page with st.set_page_config (title 'Skattekraftspanelen
+Startsida', layout='wide'), injects the global CSS, and renders the sidebar.
+Page sections (in order):
   1. Hero block with navy gradient and gold accent border
-  2. Stat strip: 290 KOMMUNER, 15 AR PANEL, 4 STRUKTURVARIABLER, FIXED EFFECTS
-  3. Modelloversikt: SVG flow diagram with explanation and collapsible example
-  4. Variabler och vikter: regression coefficients bar chart with collapsible guide
-  5. Pipeline steps: Datainsamling, Rensning, Estimering, Prognos
-  6. Navigation cards linking to Riksoversikt and Kommunjaemfoerelse
-  7. Kaellor och metod credibility block
+  2. Concept expander; the glossary now travels to the cards that use its
+     terms, behind the '?' in each card heading
+  3. Stat strip, counts read from the artifacts, with an explanation beneath
+  4. Modelloversikt: SVG flow diagram with explanation
+  5. Variabler och koefficienter: dot-and-whisker chart, table, reading guide
+  6. Samband inom kommuner over tid: the FE panel, which cannot rank kommuner
+  7. Pipeline steps: Datainsamling, Rensning, Estimering, Foerklaring
+  8. Navigation cards linking to Riksoversikt and Kommunjaemfoerelse
+  9. Kaellor och metod credibility block
 
 All Swedish strings come from SWEDISH_LABELS in src/ui/labels.py.
 """
@@ -26,7 +29,7 @@ import streamlit as st
 # ---------------------------------------------------------------------------
 
 st.set_page_config(
-    page_title="KSS Startsida",
+    page_title="Skattekraftspanelen Startsida",
     page_icon=None,
     layout="wide",
     menu_items={"Get Help": None, "Report a bug": None},

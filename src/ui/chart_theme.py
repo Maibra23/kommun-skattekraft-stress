@@ -22,7 +22,7 @@ def get_chart_layout(
     yaxis_title: str = "",
     showlegend: bool = True,
 ) -> dict:
-    """Return a Plotly layout dict conforming to the KSS design system.
+    """Return a Plotly layout dict conforming to the Skattekraftspanelen design system.
 
     Uses Source Sans 3 as the base font, white plot background, navy hover
     background, dotted Y gridlines, and no Plotly branding (logo, mode bar).

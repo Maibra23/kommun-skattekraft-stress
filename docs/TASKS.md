@@ -1,6 +1,9 @@
 # TASKS.md — Implementation Tasks (16 tasks, 5 days)
 
-**Project:** Kommunal Skattekraft Stress Monitor
+**Project:** Skattekraftspanelen (specified as "Kommunal Skattekraft Stress Monitor")
+
+> **Renamed 2026-09-09.** Task text below is kept verbatim as the historical record and
+> still refers to the old name and the retired vulnerability ranking.
 **References:** `PRD.md` (master spec), `METHODOLOGY.md` (model and formulas), `KRI_Dataset_Identification.md` (data sources and pxweb queries)
 
 ---

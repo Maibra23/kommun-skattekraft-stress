@@ -1,6 +1,6 @@
 # KRI_Dataset_Identification.md - Dataset Identification & Audit
 
-**Project:** Kommunal Skattekraft Stress Monitor
+**Project:** Skattekraftspanelen
 **Purpose:** Implementation-ready audit of every data source. For each variable: source authority, full URL, pxweb table ID, query parameters, response schema, expected row count, known data quality issues, refresh cadence, and join keys.
 
 This document is the contract between the data sources and the pipeline. If a fetcher behaves differently from what is documented here, the documentation is updated, not the assumption.

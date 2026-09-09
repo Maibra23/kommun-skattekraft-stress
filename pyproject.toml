@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "kommun-skattekraft-stress"
+name = "skattekraftspanelen"
 version = "0.1.0"
-description = "Two-way fixed-effects panel model of Swedish municipal tax base growth with Streamlit dashboard."
+description = "Where Sweden's 290 kommuner stand in tax base against the national average, which way they are moving, and what explains the difference. Streamlit dashboard over SCB data."
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "requests",
